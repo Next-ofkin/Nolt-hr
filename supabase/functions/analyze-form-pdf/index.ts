@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       .eq('id', importJobId)
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
-    const model = Deno.env.get('FORM_IMPORT_MODEL') || 'gpt-4o-mini'
+    const model = Deno.env.get('FORM_IMPORT_MODEL') || 'gpt-5.6-terra'
 
     if (!openAiApiKey) {
       // AI provider not configured
@@ -128,15 +128,23 @@ Deno.serve(async (req) => {
     const arrayBuffer = await fileData.arrayBuffer()
     const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
 
-    // Call OpenAI Server-Side
-    const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its structured template schema.
+    // Call OpenAI Server-Side with strict extraction guidelines & store: false
+    const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its structured digital template schema.
+CRITICAL INSTRUCTIONS:
+1. EXTRACT and STRUCTURE the document accurately.
+2. DO NOT rewrite legal wording, summarize contractual clauses, or alter agreement text. Preserve legal content verbatim as PARAGRAPH or HEADING fields.
+3. DO NOT invent employee questions or declarations not present in the source document.
+4. Identify document title, category, section headings, short text fields, long text areas, dates, email, phone, numbers, yes/no, dropdown/radio/checkbox options, file upload requests, signature areas, repeating groups (e.g. beneficiaries, dependants), and signer roles.
+5. Infer the appropriate presentation mode ("STANDARD", "DOCUMENT", or "AGREEMENT") and field layout spans (12 for full width, 6 for half, 4 for third).
+6. Set "needs_review": true on any field where confidence or field type interpretation is uncertain.
+
 Return ONLY a JSON object matching this strict schema:
 {
   "form": {
     "name": "Extracted Title",
     "category": "General",
-    "description": "Brief summary",
-    "instructions": "Instructions text",
+    "description": "Brief description of the form",
+    "instructions": "Instructions or guidance text",
     "presentation": { "mode": "DOCUMENT" }
   },
   "fields": [
@@ -147,7 +155,7 @@ Return ONLY a JSON object matching this strict schema:
       "required": false,
       "description": null,
       "placeholder": null,
-      "configuration": {},
+      "configuration": { "layout": { "span": 12 } },
       "position": 0,
       "needs_review": false,
       "review_note": null
@@ -167,9 +175,10 @@ Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
       },
       body: JSON.stringify({
         model: model,
+        store: false,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: 'You extract HR forms into JSON structures.' },
+          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
           {
             role: 'user',
             content: [
