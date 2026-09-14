@@ -19,12 +19,67 @@ export interface ProviderResult {
   modelName: string
 }
 
+export class ProviderAnalysisError extends Error {
+  code: string
+  userMessage: string
+  httpStatus: number
+
+  constructor(code: string, userMessage: string, httpStatus = 400) {
+    super(userMessage)
+    this.name = 'ProviderAnalysisError'
+    this.code = code
+    this.userMessage = userMessage
+    this.httpStatus = httpStatus
+  }
+}
+
 export interface FormImportAIProvider {
   name: string
   model: string
   isConfigured(): boolean
   getMissingKeyError(): string
   analyze(base64Pdf: string, promptText: string): Promise<ProviderResult>
+}
+
+export function mapHttpErrorToSafeDiagnostic(providerName: string, status: number, errText: string): ProviderAnalysisError {
+  const prov = providerName.toUpperCase()
+  console.error(`${providerName} Upstream HTTP ${status}:`, errText)
+
+  if (status === 400) {
+    return new ProviderAnalysisError(
+      `${prov}_BAD_REQUEST`,
+      `${providerName === 'gemini' ? 'Gemini' : providerName} could not process this form request.`
+    )
+  }
+  if (status === 401) {
+    return new ProviderAnalysisError(
+      `${prov}_AUTH`,
+      `${providerName === 'gemini' ? 'Gemini' : providerName} authentication failed. Please contact the system administrator.`
+    )
+  }
+  if (status === 403) {
+    return new ProviderAnalysisError(
+      `${prov}_PERMISSION`,
+      `${providerName === 'gemini' ? 'Gemini' : providerName} API access is not permitted for the configured project.`
+    )
+  }
+  if (status === 404) {
+    return new ProviderAnalysisError(
+      `${prov}_MODEL_NOT_FOUND`,
+      `The configured ${providerName === 'gemini' ? 'Gemini' : providerName} model is unavailable.`
+    )
+  }
+  if (status === 429) {
+    return new ProviderAnalysisError(
+      `${prov}_RATE_LIMIT`,
+      `${providerName === 'gemini' ? 'Gemini' : providerName}'s current usage limit has been reached. Please try again later.`
+    )
+  }
+
+  return new ProviderAnalysisError(
+    `${prov}_UPSTREAM_ERROR`,
+    `${providerName === 'gemini' ? 'Gemini' : providerName} is temporarily unavailable. Please try again.`
+  )
 }
 
 export class GeminiFormImportProvider implements FormImportAIProvider {
@@ -34,7 +89,7 @@ export class GeminiFormImportProvider implements FormImportAIProvider {
 
   constructor() {
     this.apiKey = Deno.env.get('GEMINI_API_KEY')
-    this.model = Deno.env.get('FORM_IMPORT_MODEL') || 'gemini-3.8-flash'
+    this.model = Deno.env.get('FORM_IMPORT_MODEL') || 'gemini-2.5-flash'
   }
 
   isConfigured(): boolean {
@@ -47,33 +102,38 @@ export class GeminiFormImportProvider implements FormImportAIProvider {
 
   async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: 'application/pdf',
-                  data: base64Pdf,
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'application/pdf',
+                    data: base64Pdf,
+                  },
                 },
-              },
-              { text: promptText },
-            ],
+                { text: promptText },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
           },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-      }),
-    })
+        }),
+      })
+    } catch (fetchErr) {
+      console.error('Gemini fetch failure:', fetchErr)
+      throw new ProviderAnalysisError('GEMINI_UPSTREAM_ERROR', 'Gemini network request failed. Please try again.')
+    }
 
     if (!res.ok) {
       const errText = await res.text()
-      console.error('Gemini API Error:', errText)
-      throw new Error('Gemini AI provider analysis failed.')
+      throw mapHttpErrorToSafeDiagnostic(this.name, res.status, errText)
     }
 
     const data = await res.json()
@@ -105,35 +165,40 @@ export class OpenRouterFormImportProvider implements FormImportAIProvider {
   }
 
   async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: promptText },
-              {
-                type: 'image_url',
-                image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
-              },
-            ],
-          },
-        ],
-      }),
-    })
+    let res: Response
+    try {
+      res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: promptText },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
+                },
+              ],
+            },
+          ],
+        }),
+      })
+    } catch (fetchErr) {
+      console.error('OpenRouter fetch failure:', fetchErr)
+      throw new ProviderAnalysisError('OPENROUTER_UPSTREAM_ERROR', 'OpenRouter network request failed. Please try again.')
+    }
 
     if (!res.ok) {
       const errText = await res.text()
-      console.error('OpenRouter API Error:', errText)
-      throw new Error('OpenRouter AI provider analysis failed.')
+      throw mapHttpErrorToSafeDiagnostic(this.name, res.status, errText)
     }
 
     const data = await res.json()
@@ -165,36 +230,41 @@ export class OpenAIFormImportProvider implements FormImportAIProvider {
   }
 
   async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        store: false,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: promptText },
-              {
-                type: 'image_url',
-                image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
-              },
-            ],
-          },
-        ],
-      }),
-    })
+    let res: Response
+    try {
+      res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          store: false,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: promptText },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
+                },
+              ],
+            },
+          ],
+        }),
+      })
+    } catch (fetchErr) {
+      console.error('OpenAI fetch failure:', fetchErr)
+      throw new ProviderAnalysisError('OPENAI_UPSTREAM_ERROR', 'OpenAI network request failed. Please try again.')
+    }
 
     if (!res.ok) {
       const errText = await res.text()
-      console.error('OpenAI API Error:', errText)
-      throw new Error('OpenAI AI provider analysis failed.')
+      throw mapHttpErrorToSafeDiagnostic(this.name, res.status, errText)
     }
 
     const data = await res.json()
@@ -303,11 +373,12 @@ Deno.serve(async (req: Request) => {
 
     if (!provider.isConfigured()) {
       const errorMessage = provider.getMissingKeyError()
+      const provUpper = provider.name.toUpperCase()
       await adminClient
         .from('form_import_jobs')
         .update({
           status: 'FAILED',
-          error_code: 'AI_NOT_CONFIGURED',
+          error_code: `${provUpper}_NOT_CONFIGURED`,
           error_message: errorMessage,
         })
         .eq('id', importJobId)
@@ -335,7 +406,7 @@ Deno.serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ ok: false, error: 'Failed to read source PDF file.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -385,24 +456,53 @@ Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
     let providerResult: ProviderResult
     try {
       providerResult = await provider.analyze(base64Pdf, promptText)
-    } catch (err) {
-      console.error(`${provider.name} analysis error:`, err)
+    } catch (analysisErr) {
+      const isDiagnostic = analysisErr instanceof ProviderAnalysisError
+      const errorCode = isDiagnostic ? analysisErr.code : `${provider.name.toUpperCase()}_UPSTREAM_ERROR`
+      const errorMessage = isDiagnostic ? analysisErr.userMessage : `${provider.name === 'gemini' ? 'Gemini' : provider.name} AI provider analysis failed.`
+
       await adminClient
         .from('form_import_jobs')
         .update({
           status: 'FAILED',
-          error_code: 'AI_PROVIDER_ERROR',
-          error_message: `${provider.name} AI provider analysis failed.`,
+          error_code: errorCode,
+          error_message: errorMessage,
+          provider: provider.name,
+          model: provider.model,
         })
         .eq('id', importJobId)
 
       return new Response(
-        JSON.stringify({ ok: false, error: `${provider.name} AI provider analysis failed.` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: false, error: errorMessage, error_code: errorCode }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const parsedSchema = JSON.parse(providerResult.rawContent)
+    let parsedSchema: Record<string, unknown>
+    try {
+      parsedSchema = JSON.parse(providerResult.rawContent)
+    } catch (jsonErr) {
+      console.error('JSON Parse error:', jsonErr)
+      const provUpper = provider.name.toUpperCase()
+      const errorCode = `${provUpper}_INVALID_JSON`
+      const errorMessage = `${provider.name === 'gemini' ? 'Gemini' : provider.name} returned an invalid JSON response structure.`
+
+      await adminClient
+        .from('form_import_jobs')
+        .update({
+          status: 'FAILED',
+          error_code: errorCode,
+          error_message: errorMessage,
+          provider: providerResult.providerName,
+          model: providerResult.modelName,
+        })
+        .eq('id', importJobId)
+
+      return new Response(
+        JSON.stringify({ ok: false, error: errorMessage, error_code: errorCode }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Canonical normalization across all providers
     const validFieldTypes = new Set([
@@ -411,11 +511,12 @@ Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
       'SIGNATURE', 'HEADING', 'PARAGRAPH', 'DIVIDER', 'REPEATING_GROUP',
     ])
 
-    const normalizedFields = (parsedSchema.fields || []).map((f: Record<string, unknown>, idx: number) => {
-      let type = String(f.field_type || 'SHORT_TEXT').toUpperCase()
+    const rawFields = Array.isArray(parsedSchema.fields) ? parsedSchema.fields : []
+    const normalizedFields = rawFields.map((f: Record<string, unknown>, idx: number) => {
+      let type = String(f?.field_type || 'SHORT_TEXT').toUpperCase()
       if (!validFieldTypes.has(type)) type = 'SHORT_TEXT'
 
-      let key = String(f.field_key || `field_${idx}`).toLowerCase().trim()
+      let key = String(f?.field_key || `field_${idx}`).toLowerCase().trim()
       key = key.replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
       if (!key || !/^[a-z]/.test(key)) {
         key = `field_${idx}`
@@ -423,25 +524,26 @@ Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
 
       return {
         field_type: type,
-        label: String(f.label || `Field ${idx + 1}`),
+        label: String(f?.label || `Field ${idx + 1}`),
         field_key: key,
-        required: Boolean(f.required),
-        description: f.description ? String(f.description) : null,
-        placeholder: f.placeholder ? String(f.placeholder) : null,
-        configuration: typeof f.configuration === 'object' && f.configuration ? f.configuration : {},
+        required: Boolean(f?.required),
+        description: f?.description ? String(f.description) : null,
+        placeholder: f?.placeholder ? String(f.placeholder) : null,
+        configuration: typeof f?.configuration === 'object' && f.configuration ? f.configuration : {},
         position: idx,
-        needs_review: Boolean(f.needs_review),
-        review_note: f.review_note ? String(f.review_note) : null,
+        needs_review: Boolean(f?.needs_review),
+        review_note: f?.review_note ? String(f.review_note) : null,
       }
     })
 
+    const rawForm = (typeof parsedSchema.form === 'object' && parsedSchema.form) ? parsedSchema.form as Record<string, unknown> : {}
     const proposedSchema = {
       form: {
-        name: String(parsedSchema.form?.name || job.original_filename.replace(/\.pdf$/i, '')),
-        category: String(parsedSchema.form?.category || 'General'),
-        description: parsedSchema.form?.description ? String(parsedSchema.form.description) : null,
-        instructions: parsedSchema.form?.instructions ? String(parsedSchema.form.instructions) : null,
-        presentation: parsedSchema.form?.presentation || { mode: 'DOCUMENT' },
+        name: String(rawForm.name || job.original_filename.replace(/\.pdf$/i, '')),
+        category: String(rawForm.category || 'General'),
+        description: rawForm.description ? String(rawForm.description) : null,
+        instructions: rawForm.instructions ? String(rawForm.instructions) : null,
+        presentation: rawForm.presentation || { mode: 'DOCUMENT' },
       },
       fields: normalizedFields,
       warnings: Array.isArray(parsedSchema.warnings) ? parsedSchema.warnings : [],

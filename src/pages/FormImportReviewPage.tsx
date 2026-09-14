@@ -178,14 +178,16 @@ export default function FormImportReviewPage() {
           <Button variant="ghost" onClick={handleCancel} disabled={acceptMutation.isPending}>
             Cancel Import
           </Button>
-          <Button
-            variant="primary"
-            disabled={isAnalyzing || isFailed || acceptMutation.isPending}
-            onClick={handleAcceptImport}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {acceptMutation.isPending ? 'Creating Draft…' : 'Create Draft Form'}
-          </Button>
+          {job.status === 'READY_FOR_REVIEW' && (
+            <Button
+              variant="primary"
+              disabled={acceptMutation.isPending}
+              onClick={handleAcceptImport}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {acceptMutation.isPending ? 'Creating Draft…' : 'Create Draft Form'}
+            </Button>
+          )}
         </div>
       </div>
 

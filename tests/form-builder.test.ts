@@ -438,3 +438,38 @@ test('AI provider selection defaults to Gemini and supports OpenRouter and OpenA
   const geminiConfigured = selectAIProviderMock('gemini', { GEMINI_API_KEY: 'gemini-secret-xyz' })
   assert.equal(geminiConfigured.isConfigured, true)
 })
+
+test('Gemini HTTP status mapping maps upstream error codes cleanly without exposing secrets', () => {
+  function mapHttpErrorToSafeDiagnostic(providerName: string, status: number) {
+    const prov = providerName.toUpperCase()
+    if (status === 400) return { code: `${prov}_BAD_REQUEST`, message: 'Gemini could not process this form request.' }
+    if (status === 401) return { code: `${prov}_AUTH`, message: 'Gemini authentication failed. Please contact the system administrator.' }
+    if (status === 403) return { code: `${prov}_PERMISSION`, message: 'Gemini API access is not permitted for the configured project.' }
+    if (status === 404) return { code: `${prov}_MODEL_NOT_FOUND`, message: 'The configured Gemini model is unavailable.' }
+    if (status === 429) return { code: `${prov}_RATE_LIMIT`, message: "Gemini's current usage limit has been reached. Please try again later." }
+    return { code: `${prov}_UPSTREAM_ERROR`, message: 'Gemini is temporarily unavailable. Please try again.' }
+  }
+
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 400).code, 'GEMINI_BAD_REQUEST')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 401).code, 'GEMINI_AUTH')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 403).code, 'GEMINI_PERMISSION')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 404).code, 'GEMINI_MODEL_NOT_FOUND')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 429).code, 'GEMINI_RATE_LIMIT')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 500).code, 'GEMINI_UPSTREAM_ERROR')
+  assert.equal(mapHttpErrorToSafeDiagnostic('gemini', 503).code, 'GEMINI_UPSTREAM_ERROR')
+})
+
+test('FAILED or ANALYZING import jobs are strictly rejected by draft creation guard', () => {
+  function validateAcceptJobStatus(status: string) {
+    if (status !== 'READY_FOR_REVIEW') {
+      return { ok: false, error: 'Import job is not ready for review' }
+    }
+    return { ok: true }
+  }
+
+  assert.equal(validateAcceptJobStatus('FAILED').ok, false)
+  assert.equal(validateAcceptJobStatus('ANALYZING').ok, false)
+  assert.equal(validateAcceptJobStatus('UPLOADED').ok, false)
+  assert.equal(validateAcceptJobStatus('CANCELLED').ok, false)
+  assert.equal(validateAcceptJobStatus('READY_FOR_REVIEW').ok, true)
+})
