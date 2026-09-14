@@ -9,6 +9,11 @@ import ProfilePage from './pages/ProfilePage'
 import HrPage from './pages/HrPage'
 import AdminPage from './pages/AdminPage'
 import AuthCallback from './pages/AuthCallback'
+import EmployeesPage from './pages/EmployeesPage'
+import CreateEmployeePage from './pages/CreateEmployeePage'
+import EmployeeDetailPage from './pages/EmployeeDetailPage'
+import EditEmployeePage from './pages/EditEmployeePage'
+import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
   {
@@ -31,6 +36,38 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={['admin', 'hr']}>
             <HrPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/employees',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <EmployeesPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/employees/new',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <CreateEmployeePage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/employees/:id',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <EmployeeDetailPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/employees/:id/edit',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <EditEmployeePage />
           </RequireRole>
         ),
       },

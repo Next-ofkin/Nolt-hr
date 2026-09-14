@@ -25,9 +25,14 @@ export function AppLayout() {
             Profile
           </NavLink>
           {(role === 'hr' || role === 'admin') && (
-            <NavLink to="/hr" className="nav-link">
-              HR
-            </NavLink>
+            <>
+              <NavLink to="/hr/employees" className="nav-link">
+                Employees
+              </NavLink>
+              <NavLink to="/hr" className="nav-link">
+                Invitations
+              </NavLink>
+            </>
           )}
           {role === 'admin' && (
             <NavLink to="/admin" className="nav-link">

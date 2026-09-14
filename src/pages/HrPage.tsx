@@ -13,12 +13,15 @@ export default function HrPage() {
 
   return (
     <div className="page">
-      <h1>HR — Invite & Directory</h1>
+      <h1>Invitations & Accounts</h1>
+      <p className="subtitle">
+        Invite application users and review their access roles. Employee business records are managed separately.
+      </p>
 
       <InviteUserForm roles={inviteRoles} />
 
       <div className="card">
-        <h2>Employee Directory</h2>
+        <h2>Application Accounts</h2>
         {listError && <p className="error">{listError.message}</p>}
         {isLoading && <p>Loading…</p>}
         {!isLoading && employees?.length === 0 && <p>No employees found.</p>}

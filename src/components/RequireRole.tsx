@@ -7,7 +7,7 @@ export function RequireRole({
   roles,
   children,
 }: {
-  roles: UserRole[]
+  roles: readonly UserRole[]
   children: ReactNode
 }) {
   const { session, isLoading: authLoading } = useAuth()

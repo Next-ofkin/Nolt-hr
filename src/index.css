@@ -99,7 +99,7 @@ a {
 .main {
   flex: 1;
   width: 100%;
-  max-width: 920px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem 1.25rem 3rem;
 }
@@ -180,12 +180,16 @@ select:focus {
 /* ---------- buttons ---------- */
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   font-weight: 600;
   padding: 0.55rem 1rem;
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .btn:disabled {
@@ -210,6 +214,16 @@ select:focus {
 
 .btn-ghost:hover {
   background: var(--bg);
+}
+
+.btn-danger {
+  color: #991b1b;
+  background: #fff;
+  border-color: #fecaca;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
 }
 
 /* ---------- roles ---------- */
@@ -315,4 +329,290 @@ select:focus {
   color: var(--text-muted);
   font-size: 0.875rem;
   margin: 0.25rem 0 0.5rem;
+}
+
+/* ---------- employee lifecycle ---------- */
+
+.employee-page {
+  gap: 1.25rem;
+}
+
+.narrow-page {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-heading,
+.page-actions,
+.heading-meta,
+.form-actions,
+.pagination,
+.danger-zone {
+  display: flex;
+  align-items: center;
+}
+
+.page-heading {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-heading .subtitle {
+  margin: 0;
+}
+
+.page-actions,
+.heading-meta,
+.form-actions {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 1rem;
+  width: min(220px, 100%);
+}
+
+.metric-card span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.metric-card strong {
+  color: var(--text-strong);
+  font-size: 1.6rem;
+}
+
+.directory-card {
+  padding: 1rem;
+}
+
+.directory-filters {
+  align-items: end;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(150px, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field label {
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.field .field-error {
+  margin: 0;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.employee-table {
+  min-width: 1100px;
+}
+
+.employee-table th {
+  white-space: nowrap;
+}
+
+.table-actions {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.table-actions a,
+.back-link {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+.empty-state h2,
+.empty-state p {
+  margin-bottom: 0.35rem;
+}
+
+.pagination {
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.employee-status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.employee-status-draft,
+.employee-status-archived {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.employee-status-invited,
+.employee-status-pre_onboarding,
+.employee-status-ready_to_resume {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.employee-status-hr_review {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.employee-status-post_onboarding,
+.employee-status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.employee-status-suspended {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.employee-form {
+  padding: 1.5rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-note {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.form-actions {
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+
+.employee-detail-heading {
+  align-items: flex-end;
+}
+
+.heading-meta {
+  color: var(--text-muted);
+}
+
+.detail-tabs {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+}
+
+.detail-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 0.1rem;
+  white-space: nowrap;
+}
+
+.detail-tab.active {
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.section-empty-state {
+  min-height: 220px;
+}
+
+.danger-zone {
+  border-color: #fecaca;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.danger-zone p {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .directory-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar,
+  .page-heading,
+  .employee-detail-heading,
+  .danger-zone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar-right {
+    font-size: 0.85rem;
+  }
+
+  .directory-filters,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-actions .btn {
+    width: 100%;
+  }
 }
