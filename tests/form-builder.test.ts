@@ -5,6 +5,7 @@ import {
   FIELD_TYPE_METADATA,
   generateUniqueFieldKey,
   getDefaultConfiguration,
+  getLatestPublishedVersion,
   isFormVersionEditable,
   slugifyFieldKey,
   validateFieldKey,
@@ -253,4 +254,56 @@ test('publishing a DRAFT version retains its version_number', () => {
   assert.equal(published.version_number, 1)
   assert.equal(published.status, 'PUBLISHED')
   assert.equal(published.instructions, 'Follow the steps below to complete the form.')
+})
+
+test('field key server/domain validation requires starting with a lowercase letter', () => {
+  // Accepted
+  assert.equal(validateFieldKey('first_name'), true)
+  assert.equal(validateFieldKey('employee1'), true)
+  assert.equal(validateFieldKey('date_of_birth'), true)
+
+  // Rejected
+  assert.equal(validateFieldKey('1employee'), false, 'Key starting with digit must be rejected')
+  assert.equal(validateFieldKey('_first_name'), false, 'Key starting with underscore must be rejected')
+  assert.equal(validateFieldKey('First_Name'), false, 'Uppercase key must be rejected')
+  assert.equal(validateFieldKey('first-name'), false, 'Hyphenated key must be rejected')
+})
+
+test('multiple published versions remain PUBLISHED as immutable historical snapshots', () => {
+  // 1. Initial Draft Version 1
+  const v1Draft = createMockVersion({ id: 'ver-1', version_number: 1, status: 'DRAFT' })
+  assert.equal(v1Draft.status, 'DRAFT')
+
+  // 2. Publish Version 1
+  const v1Published: FormVersion = { ...v1Draft, status: 'PUBLISHED', published_at: '2026-09-14T10:00:00Z' }
+  assert.equal(v1Published.status, 'PUBLISHED')
+  assert.equal(isFormVersionEditable(v1Published.status), false)
+
+  // 3. Create Draft Version 2 from V1
+  const v2Draft: FormVersion = {
+    ...v1Published,
+    id: 'ver-2',
+    version_number: 2,
+    status: 'DRAFT',
+    published_at: null,
+  }
+  assert.equal(v1Published.status, 'PUBLISHED', 'V1 must remain PUBLISHED when V2 draft is created')
+  assert.equal(v2Draft.status, 'DRAFT')
+
+  // 4. Publish Version 2
+  const v2Published: FormVersion = { ...v2Draft, status: 'PUBLISHED', published_at: '2026-09-14T12:00:00Z' }
+
+  // 5. Verify BOTH V1 and V2 remain PUBLISHED and immutable
+  assert.equal(v1Published.status, 'PUBLISHED', 'V1 must remain PUBLISHED after V2 is published')
+  assert.equal(v2Published.status, 'PUBLISHED', 'V2 must be PUBLISHED')
+  assert.equal(isFormVersionEditable(v1Published.status), false, 'V1 remains immutable')
+  assert.equal(isFormVersionEditable(v2Published.status), false, 'V2 remains immutable')
+
+  // 6. Verify Latest Published version selection resolves V2 without modifying V1
+  const versions = [v1Published, v2Published]
+  const latest = getLatestPublishedVersion(versions)
+  assert.notEqual(latest, null)
+  assert.equal(latest?.id, 'ver-2')
+  assert.equal(latest?.version_number, 2)
+  assert.equal(v1Published.status, 'PUBLISHED')
 })

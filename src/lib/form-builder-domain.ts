@@ -2,6 +2,7 @@ import type {
   FormField,
   FormFieldInsert,
   FormFieldType,
+  FormVersion,
   FormVersionStatus,
 } from './database.types'
 
@@ -149,7 +150,7 @@ export function slugifyFieldKey(label: string): string {
 }
 
 export function validateFieldKey(key: string): boolean {
-  return Boolean(key) && key === key.toLowerCase().trim() && /^[a-z0-9_]+$/.test(key)
+  return Boolean(key) && key === key.toLowerCase().trim() && /^[a-z][a-z0-9_]*$/.test(key)
 }
 
 export function generateUniqueFieldKey(baseLabel: string, existingFields: Array<{ field_key: string }>): string {
@@ -252,4 +253,12 @@ export function duplicateFieldPayload(
     field_key: newKey,
     configuration: sourceField.configuration,
   }
+}
+
+export function getLatestPublishedVersion(versions: FormVersion[]): FormVersion | null {
+  const published = versions.filter((v) => v.status === 'PUBLISHED')
+  if (published.length === 0) return null
+  return published.reduce((latest, current) =>
+    current.version_number > latest.version_number ? current : latest
+  )
 }
