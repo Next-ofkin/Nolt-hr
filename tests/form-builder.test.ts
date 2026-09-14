@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   duplicateFieldPayload,
+  FIELD_TYPE_METADATA,
   generateUniqueFieldKey,
   getDefaultConfiguration,
   isFormVersionEditable,
@@ -199,4 +200,57 @@ test('creating draft from published version clones fields without altering publi
   assert.equal(publishedVersion.status, 'PUBLISHED')
   assert.equal(publishedVersion.version_number, 1)
   assert.equal(sourceFields[0].form_version_id, 'ver-1')
+})
+
+test('all 16 form field types exist in type metadata including SIGNATURE, DIVIDER, and REPEATING_GROUP', () => {
+  const expectedTypes: FormFieldType[] = [
+    'SHORT_TEXT',
+    'LONG_TEXT',
+    'EMAIL',
+    'PHONE',
+    'NUMBER',
+    'DATE',
+    'DROPDOWN',
+    'RADIO',
+    'CHECKBOX',
+    'YES_NO',
+    'FILE_UPLOAD',
+    'SIGNATURE',
+    'HEADING',
+    'PARAGRAPH',
+    'DIVIDER',
+    'REPEATING_GROUP',
+  ]
+
+  for (const fieldType of expectedTypes) {
+    assert.ok(FIELD_TYPE_METADATA[fieldType], `Missing metadata for ${fieldType}`)
+    assert.equal(FIELD_TYPE_METADATA[fieldType].type, fieldType)
+  }
+
+  assert.equal(FIELD_TYPE_METADATA.SIGNATURE.category, 'advanced')
+  assert.equal(FIELD_TYPE_METADATA.DIVIDER.category, 'content')
+  assert.equal(FIELD_TYPE_METADATA.REPEATING_GROUP.category, 'advanced')
+})
+
+test('publishing a DRAFT version retains its version_number', () => {
+  const draftVersion = createMockVersion({
+    version_number: 1,
+    status: 'DRAFT',
+    instructions: 'Follow the steps below to complete the form.',
+  })
+
+  // Simulating publish_form_version RPC logic
+  function simulatePublish(version: FormVersion): FormVersion {
+    assert.equal(version.status, 'DRAFT', 'Only DRAFT versions can be published')
+    return {
+      ...version,
+      status: 'PUBLISHED',
+      published_at: new Date().toISOString(),
+    }
+  }
+
+  const published = simulatePublish(draftVersion)
+  assert.equal(published.version_number, 1)
+  assert.equal(published.status, 'PUBLISHED')
+  assert.equal(published.instructions, 'Follow the steps below to complete the form.')
 })

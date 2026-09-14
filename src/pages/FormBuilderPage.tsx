@@ -250,11 +250,16 @@ export default function FormBuilderPage() {
                         key={meta.type}
                         type="button"
                         className="palette-item"
-                        disabled={!isEditable}
-                        onClick={() => handleAddField(meta.type)}
+                        disabled={!isEditable || meta.isAdvanced}
+                        title={meta.isAdvanced ? 'Coming in a later phase' : undefined}
+                        onClick={() => !meta.isAdvanced && handleAddField(meta.type)}
                       >
                         <span className="palette-item-name">{meta.label}</span>
-                        {meta.isAdvanced && <span className="badge badge-neutral" style={{ fontSize: '0.65rem' }}>Phase 2</span>}
+                        {meta.isAdvanced && (
+                          <span className="text-muted" style={{ fontSize: '0.65rem', display: 'block' }}>
+                            Coming in a later phase
+                          </span>
+                        )}
                       </button>
                     ))}
                 </div>
@@ -278,14 +283,26 @@ export default function FormBuilderPage() {
                     className="input input-subtitle mt-2"
                     rows={2}
                     value={version.description || ''}
-                    placeholder="Form Description or Instructions for employee..."
+                    placeholder="Form Description for HR reference..."
                     onChange={(e) => updateVersionMutation.mutate({ description: e.target.value })}
+                  />
+                  <textarea
+                    className="input input-subtitle mt-2"
+                    rows={2}
+                    value={version.instructions || ''}
+                    placeholder="Instructions for employee filling this form (optional)..."
+                    onChange={(e) => updateVersionMutation.mutate({ instructions: e.target.value })}
                   />
                 </>
               ) : (
                 <>
                   <h2>{version.title}</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>{version.description}</p>
+                  {version.description && <p style={{ color: 'var(--text-muted)' }}>{version.description}</p>}
+                  {version.instructions && (
+                    <div className="alert alert-info mt-2">
+                      <strong>Instructions:</strong> {version.instructions}
+                    </div>
+                  )}
                 </>
               )}
             </div>

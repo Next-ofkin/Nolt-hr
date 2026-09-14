@@ -364,10 +364,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      activate_my_employee_account: {
-        Args: Record<string, never>
-        Returns: Json
-      }
+      activate_my_employee_account: { Args: never; Returns: Json }
       create_form_draft_from_version: {
         Args: { p_form_version_id: string }
         Returns: Json
@@ -378,9 +375,9 @@ export type Database = {
       }
       finalize_employee_invitation: {
         Args: {
+          p_auth_user_id: string
           p_employee_id: string
           p_invitation_id: string
-          p_auth_user_id: string
           p_invited_by: string
         }
         Returns: undefined
