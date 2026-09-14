@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
 import HrPage from './pages/HrPage'
 import AdminPage from './pages/AdminPage'
+import AuthCallback from './pages/AuthCallback'
 
 const router = createBrowserRouter([
   {
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: '/login', element: <Login /> },
+  { path: '/auth/callback', element: <AuthCallback /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ])
 

@@ -7,7 +7,9 @@ export interface AuthContextValue {
   session: Session | null
   user: User | null
   isLoading: boolean
-  signIn: (email: string, password: string) => Promise<Result>
+  authError: string | null
+  sendMagicLink: (email: string) => Promise<Result>
+  signInAdmin: (email: string, password: string) => Promise<Result>
   signOut: () => Promise<void>
 }
 

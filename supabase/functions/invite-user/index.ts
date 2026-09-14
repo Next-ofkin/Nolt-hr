@@ -8,6 +8,7 @@ if (!supabaseUrl || !serviceRoleKey) {
 }
 
 const siteUrl = Deno.env.get('SITE_URL') ?? supabaseUrl
+const authCallbackUrl = new URL('/auth/callback', siteUrl).href
 
 const ALLOWED_ROLES = ['admin', 'hr', 'employee'] as const
 type Role = (typeof ALLOWED_ROLES)[number]
@@ -84,13 +85,29 @@ Deno.serve(async (req) => {
   }
 
   const invite = await supabase.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName, role: requestedRole },
-    redirectTo: `${siteUrl}/login?invited=1`,
+    data: { full_name: fullName },
+    redirectTo: authCallbackUrl,
   })
 
   if (invite.error) {
     return json({ error: invite.error.message }, 400)
   }
 
-  return json({ ok: true, id: invite.data.user.id })
+  const invitedUser = invite.data.user
+  const metadata = await supabase.auth.admin.updateUserById(invitedUser.id, {
+    app_metadata: { ...invitedUser.app_metadata, role: requestedRole },
+  })
+  if (metadata.error) {
+    return json({ error: 'The invitation was sent, but its role could not be assigned' }, 500)
+  }
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ full_name: fullName, role: requestedRole })
+    .eq('id', invitedUser.id)
+  if (profileError) {
+    return json({ error: 'The invitation was sent, but its profile could not be updated' }, 500)
+  }
+
+  return json({ ok: true, id: invitedUser.id })
 })
