@@ -12,7 +12,7 @@ import {
   validateFormVersionForPublishing,
 } from '../src/lib/form-builder-domain.ts'
 import { isRouteAllowedForRole } from '../src/lib/roles.ts'
-import type { FormField, FormVersion } from '../src/lib/database.types.ts'
+import type { FormField, FormFieldType, FormVersion } from '../src/lib/database.types.ts'
 
 function createMockVersion(overrides: Partial<FormVersion> = {}): FormVersion {
   return {
