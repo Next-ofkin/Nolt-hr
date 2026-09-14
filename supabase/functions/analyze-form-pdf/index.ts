@@ -1,4 +1,12 @@
+// @ts-expect-error: Deno module URL import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined
+  }
+  serve(handler: (req: Request) => Promise<Response> | Response): void
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -212,7 +220,7 @@ export function selectAIProvider(providerName?: string): FormImportAIProvider {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
