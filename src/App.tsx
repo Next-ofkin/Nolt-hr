@@ -17,6 +17,7 @@ import FormsPage from './pages/FormsPage'
 import CreateFormPage from './pages/CreateFormPage'
 import FormDetailPage from './pages/FormDetailPage'
 import FormBuilderPage from './pages/FormBuilderPage'
+import FormImportReviewPage from './pages/FormImportReviewPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -96,6 +97,14 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <CreateFormPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/forms/import/:importJobId',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <FormImportReviewPage />
           </RequireRole>
         ),
       },

@@ -137,10 +137,17 @@ export function useCreateFormTemplate() {
   })
 }
 
+import type { Json } from './database.types'
+
 export function useUpdateFormVersion(versionId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (updates: { title?: string; description?: string; instructions?: string }) => {
+    mutationFn: async (updates: {
+      title?: string
+      description?: string
+      instructions?: string
+      presentation_config?: Json
+    }) => {
       if (!versionId) throw new Error('Form version missing')
       const { data, error } = await supabase
         .from('form_versions')

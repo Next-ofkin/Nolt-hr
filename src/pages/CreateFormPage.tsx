@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCreateFormTemplate } from '../lib/form-builder-queries'
+import { Button } from '../components/ui/button'
+import { Card, CardContent } from '../components/ui/card'
+import { Input } from '../components/ui/input'
+import { Textarea } from '../components/ui/textarea'
+import { Label } from '../components/ui/label'
 
 export default function CreateFormPage() {
   const navigate = useNavigate()
@@ -9,12 +14,13 @@ export default function CreateFormPage() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('General')
   const [description, setDescription] = useState('')
+  const [presentationMode, setPresentationMode] = useState<'STANDARD' | 'DOCUMENT' | 'AGREEMENT'>('STANDARD')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      setError('Form Name is required.')
+      setError('Form name is required.')
       return
     }
 
@@ -22,90 +28,146 @@ export default function CreateFormPage() {
     try {
       const result = await createMutation.mutateAsync({
         name: name.trim(),
-        category: category.trim(),
-        description: description.trim(),
+        category: category.trim() || 'General',
+        description: description.trim() || undefined,
       })
-      // Redirect directly to visual Form Builder for Version 1
+
       navigate(`/hr/forms/${result.templateId}/builder/${result.versionId}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to create form.'
-      setError(msg)
+      setError(err instanceof Error ? err.message : 'Failed to create form template.')
     }
   }
 
   return (
-    <div className="page create-form-page" style={{ maxWidth: '640px' }}>
-      <Link to="/hr/forms" className="back-link">← Back to Forms</Link>
+    <div className="page p-6 max-w-3xl mx-auto space-y-6">
+      <Link to="/hr/forms" className="text-sm font-medium text-gray-500 hover:text-gray-900">
+        ← Back to Forms
+      </Link>
 
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">FORM TEMPLATE</p>
-          <h1>Create New Form</h1>
-          <p className="subtitle">Set up a new reusable HR form template.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Create New HR Form</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Initialize a new versioned HR form template and launch NOLT Form Studio.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card">
-        {error && (
-          <div className="alert alert-error mb-4" role="alert">
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div className="form-group">
-          <label htmlFor="form-name">Form Name *</label>
-          <input
-            id="form-name"
-            type="text"
-            className="input"
-            placeholder="e.g. Beneficiary Nomination Form"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+      {error && (
+        <div className="alert alert-error" role="alert">
+          <p>{error}</p>
         </div>
+      )}
 
-        <div className="form-group">
-          <label htmlFor="form-category">Category</label>
-          <select
-            id="form-category"
-            className="input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="General">General</option>
-            <option value="Onboarding">Onboarding</option>
-            <option value="Declarations">Declarations</option>
-            <option value="Agreements">Agreements</option>
-            <option value="Benefits">Benefits</option>
-          </select>
-        </div>
+      <Card>
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="name">Form Name *</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="e.g. Employee Background Declaration"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
 
-        <div className="form-group">
-          <label htmlFor="form-description">Description</label>
-          <textarea
-            id="form-description"
-            className="input"
-            rows={3}
-            placeholder="Brief description of this form's purpose..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <select
+                id="category"
+                className="input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="General">General HR</option>
+                <option value="Onboarding">Onboarding</option>
+                <option value="Compliance">Compliance & Legal</option>
+                <option value="Benefits">Benefits & Claims</option>
+                <option value="Performance">Performance Review</option>
+              </select>
+            </div>
 
-        <div className="form-actions mt-4">
-          <Link to="/hr/forms" className="btn btn-ghost">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? 'Creating Form…' : 'Create & Open Builder'}
-          </button>
-        </div>
-      </form>
+            <div className="space-y-2">
+              <Label htmlFor="description">Form Description</Label>
+              <Textarea
+                id="description"
+                rows={3}
+                placeholder="Brief internal description of this form's purpose..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <Label>Default Presentation Style</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <label
+                  className={`p-3 border rounded-md cursor-pointer transition-all ${
+                    presentationMode === 'STANDARD' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
+                  }`}
+                  onClick={() => setPresentationMode('STANDARD')}
+                >
+                  <input
+                    type="radio"
+                    name="presentation"
+                    checked={presentationMode === 'STANDARD'}
+                    onChange={() => setPresentationMode('STANDARD')}
+                    className="sr-only"
+                  />
+                  <div className="font-semibold text-sm">Standard</div>
+                  <div className="text-xs text-gray-500 mt-1">Modern digital questionnaire</div>
+                </label>
+
+                <label
+                  className={`p-3 border rounded-md cursor-pointer transition-all ${
+                    presentationMode === 'DOCUMENT' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
+                  }`}
+                  onClick={() => setPresentationMode('DOCUMENT')}
+                >
+                  <input
+                    type="radio"
+                    name="presentation"
+                    checked={presentationMode === 'DOCUMENT'}
+                    onChange={() => setPresentationMode('DOCUMENT')}
+                    className="sr-only"
+                  />
+                  <div className="font-semibold text-sm">Document</div>
+                  <div className="text-xs text-gray-500 mt-1">Official HR paper layout with sections</div>
+                </label>
+
+                <label
+                  className={`p-3 border rounded-md cursor-pointer transition-all ${
+                    presentationMode === 'AGREEMENT' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
+                  }`}
+                  onClick={() => setPresentationMode('AGREEMENT')}
+                >
+                  <input
+                    type="radio"
+                    name="presentation"
+                    checked={presentationMode === 'AGREEMENT'}
+                    onChange={() => setPresentationMode('AGREEMENT')}
+                    className="sr-only"
+                  />
+                  <div className="font-semibold text-sm">Agreement</div>
+                  <div className="text-xs text-gray-500 mt-1">Legal contract with clauses & signatures</div>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Link to="/hr/forms">
+                <Button variant="ghost" type="button">
+                  Cancel
+                </Button>
+              </Link>
+              <Button variant="primary" type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Creating…' : 'Create & Open Studio'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

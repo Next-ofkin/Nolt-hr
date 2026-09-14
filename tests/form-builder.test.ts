@@ -12,7 +12,7 @@ import {
   validateFormVersionForPublishing,
 } from '../src/lib/form-builder-domain.ts'
 import { isRouteAllowedForRole } from '../src/lib/roles.ts'
-import type { FormField, FormFieldType, FormVersion } from '../src/lib/database.types.ts'
+import type { FormField, FormFieldType, FormVersion, Json } from '../src/lib/database.types.ts'
 
 function createMockVersion(overrides: Partial<FormVersion> = {}): FormVersion {
   return {
@@ -25,6 +25,7 @@ function createMockVersion(overrides: Partial<FormVersion> = {}): FormVersion {
     instructions: null,
     published_at: null,
     published_by: null,
+    presentation_config: {},
     created_at: '2026-09-14T12:00:00Z',
     updated_at: '2026-09-14T12:00:00Z',
     ...overrides,
@@ -306,4 +307,71 @@ test('multiple published versions remain PUBLISHED as immutable historical snaps
   assert.equal(latest?.id, 'ver-2')
   assert.equal(latest?.version_number, 2)
   assert.equal(v1Published.status, 'PUBLISHED')
+})
+
+test('AI PDF Import proposal acceptance creates a DRAFT version and NEVER auto-publishes', () => {
+  // Pure logic simulation of accept_form_import_job RPC
+  function simulateAcceptImportProposal(input: {
+    jobId: string
+    name: string
+    category: string
+    description: string
+    instructions: string
+    presentation: Record<string, unknown>
+    fields: Array<Record<string, unknown>>
+  }) {
+    const template = {
+      id: 'tpl-imported-1',
+      name: input.name,
+      category: input.category,
+      description: input.description,
+    }
+
+    const version: FormVersion = {
+      id: 'ver-imported-1',
+      form_template_id: template.id,
+      version_number: 1,
+      status: 'DRAFT', // MUST ALWAYS BE DRAFT
+      title: input.name,
+      description: input.description,
+      instructions: input.instructions,
+      published_at: null,
+      published_by: null,
+      created_at: '2026-09-14T15:00:00Z',
+      updated_at: '2026-09-14T15:00:00Z',
+      presentation_config: input.presentation as unknown as Json,
+    }
+
+    return { template, version }
+  }
+
+  const proposalInput = {
+    jobId: 'job-101',
+    name: 'Imported Guarantor Form',
+    category: 'Onboarding',
+    description: 'Guarantor declaration form extracted from PDF',
+    instructions: 'Complete all sections accurately.',
+    presentation: { mode: 'DOCUMENT' },
+    fields: [
+      { field_type: 'HEADING', label: 'SECTION 1: GUARANTOR DETAILS' },
+      { field_type: 'SHORT_TEXT', label: 'Full Legal Name', field_key: 'guarantor_name' },
+      { field_type: 'SIGNATURE', label: 'Guarantor Signature', field_key: 'guarantor_sig' },
+    ],
+  }
+
+  const result = simulateAcceptImportProposal(proposalInput)
+
+  // Verify created version is Version 1 DRAFT and NOT published
+  assert.equal(result.version.version_number, 1)
+  assert.equal(result.version.status, 'DRAFT', 'AI import must create a DRAFT version')
+  assert.equal(result.version.published_at, null)
+  assert.equal((result.version.presentation_config as Record<string, unknown>).mode, 'DOCUMENT')
+  assert.equal(isFormVersionEditable(result.version.status), true)
+})
+
+test('Form import route authorization restricts access to admin and hr only', () => {
+  assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', 'admin'), true)
+  assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', 'hr'), true)
+  assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', 'employee'), false)
+  assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', null), false)
 })

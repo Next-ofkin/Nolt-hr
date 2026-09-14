@@ -10,6 +10,8 @@ import {
   Plus,
   Send,
   Trash2,
+  LayoutGrid,
+  Search,
 } from 'lucide-react'
 import {
   useCreateFormDraftFromVersion,
@@ -29,19 +31,20 @@ import {
   generateUniqueFieldKey,
   getDefaultConfiguration,
   isFormVersionEditable,
-  slugifyFieldKey,
-  validateFieldKey,
   validateFormVersionForPublishing,
+  type FieldCategory,
 } from '../lib/form-builder-domain'
-import type { ChoiceOption, FieldCategory } from '../lib/form-builder-domain'
+import { FormDocumentRenderer } from '../components/FormDocumentRenderer'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 import type { FormField, FormFieldType, Json } from '../lib/database.types'
 
 const PALETTE_CATEGORIES: Array<{ key: FieldCategory; label: string }> = [
   { key: 'text', label: 'Text Input' },
   { key: 'choice', label: 'Choices' },
   { key: 'other', label: 'Date & Other' },
-  { key: 'content', label: 'Content' },
-  { key: 'advanced', label: 'Advanced (Phase 2)' },
+  { key: 'advanced', label: 'Uploads, Signatures & Data' },
+  { key: 'content', label: 'Content & Layout' },
 ]
 
 export default function FormBuilderPage() {
@@ -61,32 +64,43 @@ export default function FormBuilderPage() {
   const createDraftMutation = useCreateFormDraftFromVersion(templateId)
 
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
-  const [isPreviewMode, setIsPreviewMode] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [keyError, setKeyError] = useState<string | null>(null)
+  const [leftTab, setLeftTab] = useState<'FIELDS' | 'STRUCTURE'>('FIELDS')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const template = templateQuery.data
   const version = versionQuery.data
   const fields = fieldsQuery.data ?? []
-  const isEditable = isFormVersionEditable(version?.status)
 
-  const selectedField = fields.find((f) => f.id === selectedFieldId) ?? null
+  const isLoading = templateQuery.isLoading || versionQuery.isLoading || fieldsQuery.isLoading
 
-  if (templateQuery.isLoading || versionQuery.isLoading || fieldsQuery.isLoading) {
-    return <div className="page"><p>Loading Form Builder…</p></div>
-  }
-
-  if (!template || !version) {
+  if (isLoading) {
     return (
-      <div className="page">
-        <h1>Form or version not found</h1>
-        <Link to="/hr/forms">Back to Forms</Link>
+      <div className="page p-6 max-w-7xl mx-auto">
+        <p className="text-gray-500">Loading NOLT Form Studio…</p>
       </div>
     )
   }
 
-  // --- Field Handlers ---
+  if (templateQuery.error || versionQuery.error || !template || !version) {
+    return (
+      <div className="page p-6 max-w-7xl mx-auto space-y-3">
+        <h1 className="text-xl font-bold">Form Studio item not found</h1>
+        <Link to="/hr/forms">
+          <Button variant="outline">Back to Forms</Button>
+        </Link>
+      </div>
+    )
+  }
+
+  const isEditable = isFormVersionEditable(version.status)
+  const selectedField = fields.find((f) => f.id === selectedFieldId)
+  const presentationConfig = (version.presentation_config as Record<string, unknown>) || {}
+  const currentMode = (presentationConfig.mode as 'STANDARD' | 'DOCUMENT' | 'AGREEMENT') || 'STANDARD'
+
   const handleAddField = async (type: FormFieldType) => {
     if (!isEditable) return
     const meta = FIELD_TYPE_METADATA[type]
@@ -123,46 +137,59 @@ export default function FormBuilderPage() {
 
   const handleDeleteField = async (fieldId: string) => {
     if (!isEditable) return
-    if (!window.confirm('Delete this field from the draft form?')) return
     try {
       await deleteFieldMutation.mutateAsync(fieldId)
-      if (selectedFieldId === fieldId) setSelectedFieldId(null)
+      if (selectedFieldId === fieldId) {
+        setSelectedFieldId(null)
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete field.')
     }
   }
 
-  const handleMoveField = async (index: number, direction: 'up' | 'down') => {
+  const handleMoveField = async (currentIndex: number, direction: 'up' | 'down') => {
     if (!isEditable) return
-    const newFields = [...fields]
-    const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= newFields.length) return
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= fields.length) return
 
-    const [moved] = newFields.splice(index, 1)
-    newFields.splice(targetIndex, 0, moved)
+    const reordered = [...fields]
+    const [moved] = reordered.splice(currentIndex, 1)
+    reordered.splice(targetIndex, 0, moved)
 
-    const orderedIds = newFields.map((f) => f.id)
-    await reorderFieldsMutation.mutateAsync(orderedIds)
+    const orderedIds = reordered.map((f) => f.id)
+
+    try {
+      await reorderFieldsMutation.mutateAsync(orderedIds)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to reorder fields.')
+    }
+  }
+
+  const handleOpenPublishModal = () => {
+    setPublishError(null)
+    const err = validateFormVersionForPublishing(version.title, fields)
+    if (err) {
+      setPublishError(err)
+    }
+    setIsPublishModalOpen(true)
   }
 
   const handlePublish = async () => {
-    const validationError = validateFormVersionForPublishing(version.title, fields)
-    if (validationError) {
-      setPublishError(validationError)
+    const err = validateFormVersionForPublishing(version.title, fields)
+    if (err) {
+      setPublishError(err)
       return
     }
 
-    setPublishError(null)
     try {
       await publishMutation.mutateAsync()
       setIsPublishModalOpen(false)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to publish form.'
-      setPublishError(msg)
+      setPublishError(err instanceof Error ? err.message : 'Failed to publish form version.')
     }
   }
 
-  const handleCreateNewDraftVersion = async () => {
+  const handleCreateDraft = async () => {
     try {
       const newVersionId = await createDraftMutation.mutateAsync(version.id)
       navigate(`/hr/forms/${template.id}/builder/${newVersionId}`)
@@ -172,122 +199,197 @@ export default function FormBuilderPage() {
   }
 
   return (
-    <div className="builder-container">
-      {/* Header Bar */}
-      <header className="builder-header">
-        <div className="builder-header-left">
-          <Link to={`/hr/forms/${template.id}`} className="btn btn-ghost btn-sm">
-            <ChevronLeft size={16} aria-hidden="true" /> Exit Builder
+    <div className="builder-page flex flex-col h-screen overflow-hidden bg-gray-50">
+      {/* Studio Top Header */}
+      <header className="builder-navbar h-14 bg-white border-b px-4 flex items-center justify-between z-10 shrink-0">
+        <div className="flex items-center gap-3">
+          <Link to={`/hr/forms/${template.id}`}>
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Back
+            </Button>
           </Link>
-          <div className="builder-title-meta">
-            <h1>{version.title}</h1>
-            <span className={version.status === 'PUBLISHED' ? 'badge badge-success' : 'badge badge-warning'}>
-              v{version.version_number} {version.status}
-            </span>
-          </div>
+          <div className="h-4 w-px bg-gray-200" />
+          <h1 className="font-semibold text-base text-gray-900 truncate max-w-xs md:max-w-md">
+            {template.name}
+          </h1>
+          <Badge variant="neutral" className="text-xs">
+            v{version.version_number}
+          </Badge>
+          <Badge variant={version.status === 'PUBLISHED' ? 'success' : 'warning'} className="text-xs">
+            {version.status}
+          </Badge>
         </div>
 
-        <div className="builder-header-right">
-          <button
-            type="button"
-            className={isPreviewMode ? 'btn btn-secondary' : 'btn btn-ghost'}
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
-          >
-            <Eye size={16} aria-hidden="true" /> {isPreviewMode ? 'Edit Form' : 'Preview Form'}
-          </button>
-
-          {isEditable ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setPublishError(null)
-                setIsPublishModalOpen(true)
+        <div className="flex items-center gap-3">
+          {/* Presentation Mode Selector */}
+          <div className="hidden md:flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">Mode:</span>
+            <select
+              className="input input-sm text-xs py-1"
+              disabled={!isEditable}
+              value={currentMode}
+              onChange={(e) => {
+                const mode = e.target.value
+                updateVersionMutation.mutate({
+                  presentation_config: { ...presentationConfig, mode },
+                })
               }}
             >
-              <Send size={16} aria-hidden="true" /> Publish Form
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={createDraftMutation.isPending}
-              onClick={handleCreateNewDraftVersion}
-            >
+              <option value="STANDARD">Standard</option>
+              <option value="DOCUMENT">Document</option>
+              <option value="AGREEMENT">Agreement</option>
+            </select>
+          </div>
 
-              <Plus size={16} aria-hidden="true" /> Create New Draft Version
-            </button>
+          <Button variant="outline" size="sm" onClick={() => setIsPreviewOpen(true)}>
+            <Eye className="w-4 h-4 mr-1.5" />
+            Preview
+          </Button>
+
+          {isEditable ? (
+            <Button variant="primary" size="sm" onClick={handleOpenPublishModal}>
+              <Send className="w-4 h-4 mr-1.5" />
+              Publish Version
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" onClick={handleCreateDraft}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Create New Draft
+            </Button>
           )}
         </div>
       </header>
 
+      {/* Read-Only Notice Banner */}
       {!isEditable && (
-        <div className="alert alert-warning" style={{ borderRadius: 0, padding: '0.6rem 1.5rem', border: 'none' }}>
-          <p>
-            <strong>Read-only:</strong> Version {version.version_number} is published and immutable. Click <em>Create New Draft Version</em> to make edits.
-          </p>
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between shrink-0">
+          <span>
+            <strong>Read-Only Mode:</strong> Version {version.version_number} is PUBLISHED and immutable.
+          </span>
+          <Button variant="ghost" size="sm" className="h-6 text-xs text-amber-900" onClick={handleCreateDraft}>
+            Create New Draft
+          </Button>
         </div>
       )}
 
-      {/* Main Workspace */}
-      {isPreviewMode ? (
-        <FormPreviewOverlay version={version} fields={fields} onClose={() => setIsPreviewMode(false)} />
-      ) : (
-        <div className="builder-workspace">
-          {/* Left Panel: Field Palette */}
-          <aside className="builder-panel builder-palette">
-            <h2>Field Palette</h2>
-            <p className="panel-subtitle">Click to add fields to the canvas.</p>
+      {/* Main Studio 3-Panel Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Palette & Structure */}
+        <aside className="w-72 bg-white border-r flex flex-col shrink-0">
+          <div className="p-3 border-b flex items-center gap-2 bg-gray-50">
+            <Button
+              variant={leftTab === 'FIELDS' ? 'primary' : 'ghost'}
+              size="sm"
+              className="flex-1 text-xs"
+              onClick={() => setLeftTab('FIELDS')}
+            >
+              Fields Palette
+            </Button>
+            <Button
+              variant={leftTab === 'STRUCTURE' ? 'primary' : 'ghost'}
+              size="sm"
+              className="flex-1 text-xs"
+              onClick={() => setLeftTab('STRUCTURE')}
+            >
+              Structure
+            </Button>
+          </div>
 
-            {PALETTE_CATEGORIES.map((cat) => (
-              <div key={cat.key} className="palette-section">
-                <h3>{cat.label}</h3>
-                <div className="palette-grid">
-                  {Object.values(FIELD_TYPE_METADATA)
-                    .filter((m) => m.category === cat.key)
-                    .map((meta) => (
-                      <button
-                        key={meta.type}
-                        type="button"
-                        className="palette-item"
-                        disabled={!isEditable || meta.isAdvanced}
-                        title={meta.isAdvanced ? 'Coming in a later phase' : undefined}
-                        onClick={() => !meta.isAdvanced && handleAddField(meta.type)}
-                      >
-                        <span className="palette-item-name">{meta.label}</span>
-                        {meta.isAdvanced && (
-                          <span className="text-muted" style={{ fontSize: '0.65rem', display: 'block' }}>
-                            Coming in a later phase
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                </div>
+          {leftTab === 'FIELDS' ? (
+            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search fields..."
+                  className="input input-sm pl-8 text-xs w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-            ))}
-          </aside>
 
-          {/* Center Panel: Form Canvas */}
-          <main className="builder-canvas">
-            <div className="canvas-header-card card">
+              {PALETTE_CATEGORIES.map((cat) => {
+                const categoryMetas = Object.values(FIELD_TYPE_METADATA)
+                  .filter((m) => m.category === cat.key)
+                  .filter((m) => !searchQuery || m.label.toLowerCase().includes(searchQuery.toLowerCase()))
+
+                if (categoryMetas.length === 0) return null
+
+                return (
+                  <div key={cat.key} className="space-y-2">
+                    <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider">
+                      {cat.label}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {categoryMetas.map((meta) => (
+                        <button
+                          key={meta.type}
+                          type="button"
+                          disabled={!isEditable}
+                          className="w-full text-left p-2 border rounded-md hover:border-blue-500 hover:bg-blue-50/50 transition-all text-xs flex items-center justify-between group disabled:opacity-50 disabled:pointer-events-none"
+                          onClick={() => handleAddField(meta.type)}
+                        >
+                          <span className="font-medium text-gray-800 group-hover:text-blue-900">
+                            {meta.label}
+                          </span>
+                          <Plus className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <h3 className="text-xs font-bold uppercase text-gray-400 tracking-wider mb-2">
+                Document Structure ({fields.length})
+              </h3>
+              {fields.map((f, idx) => (
+                <div
+                  key={f.id}
+                  className={`p-2 border rounded-md text-xs cursor-pointer flex items-center justify-between ${
+                    selectedFieldId === f.id ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setSelectedFieldId(f.id)}
+                >
+                  <div className="truncate pr-2">
+                    <span className="font-semibold text-gray-500 mr-1.5">#{idx + 1}</span>
+                    <span>{f.label || f.field_key}</span>
+                  </div>
+                  <Badge variant="neutral" className="text-[10px] shrink-0">
+                    {f.field_type}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+
+        {/* Center Workspace: A4 Document Canvas */}
+        <main className="flex-1 bg-gray-200 overflow-y-auto p-6 md:p-10 flex justify-center">
+          <div className="w-full max-w-4xl bg-white shadow-xl rounded-md border min-h-[900px] p-8 md:p-12 relative flex flex-col">
+            {/* Header Editable Block */}
+            <div className="mb-6 pb-4 border-b space-y-2">
               {isEditable ? (
                 <>
                   <input
                     type="text"
-                    className="input input-title"
+                    className="input text-2xl font-bold border-none px-0 focus:ring-0 w-full"
                     value={version.title}
                     placeholder="Form Title"
                     onChange={(e) => updateVersionMutation.mutate({ title: e.target.value })}
                   />
                   <textarea
-                    className="input input-subtitle mt-2"
+                    className="input text-sm text-gray-600 border-none px-0 focus:ring-0 w-full resize-none"
                     rows={2}
                     value={version.description || ''}
                     placeholder="Form Description for HR reference..."
                     onChange={(e) => updateVersionMutation.mutate({ description: e.target.value })}
                   />
                   <textarea
-                    className="input input-subtitle mt-2"
+                    className="input text-sm text-blue-900 bg-blue-50/50 p-2 rounded border-none w-full resize-none"
                     rows={2}
                     value={version.instructions || ''}
                     placeholder="Instructions for employee filling this form (optional)..."
@@ -296,120 +398,102 @@ export default function FormBuilderPage() {
                 </>
               ) : (
                 <>
-                  <h2>{version.title}</h2>
-                  {version.description && <p style={{ color: 'var(--text-muted)' }}>{version.description}</p>}
-                  {version.instructions && (
-                    <div className="alert alert-info mt-2">
-                      <strong>Instructions:</strong> {version.instructions}
-                    </div>
-                  )}
+                  <h1 className="text-2xl font-bold text-gray-900">{version.title}</h1>
+                  {version.description && <p className="text-sm text-gray-600">{version.description}</p>}
                 </>
               )}
             </div>
 
-            <div className="canvas-fields-list">
+            {/* Document Canvas Fields */}
+            <div className="flex-1">
               {fields.length === 0 ? (
-                <div className="card empty-state my-4">
-                  <FileText size={32} aria-hidden="true" />
-                  <h2>Form canvas is empty</h2>
-                  <p>Click any field type from the Left Palette to add your first field.</p>
+                <div className="py-20 text-center text-gray-400 border-2 border-dashed rounded-lg">
+                  <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="font-semibold text-sm">Form Document Canvas is Empty</p>
+                  <p className="text-xs mt-1">Click any field type from the Left Palette to build your form.</p>
                 </div>
               ) : (
-                fields.map((field, idx) => (
-                  <div
-                    key={field.id}
-                    className={`canvas-field-card card ${selectedFieldId === field.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedFieldId(field.id)}
-                  >
-                    <div className="field-card-header">
-                      <div className="field-card-info">
-                        <span className="badge badge-neutral">{FIELD_TYPE_METADATA[field.field_type]?.label}</span>
-                        <code className="field-key-badge">{field.field_key}</code>
-                        {field.required && <span className="badge badge-danger">Required</span>}
-                      </div>
-
+                <div className="space-y-4">
+                  {fields.map((field, idx) => (
+                    <div
+                      key={field.id}
+                      className={`relative p-3 border rounded-md transition-all cursor-pointer ${
+                        selectedFieldId === field.id ? 'border-blue-600 ring-2 ring-blue-100 bg-blue-50/20' : 'hover:border-gray-300'
+                      }`}
+                      onClick={() => setSelectedFieldId(field.id)}
+                    >
+                      {/* Floating Control Toolbar */}
                       {isEditable && (
-                        <div className="field-card-actions" onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 shadow-sm border rounded p-0.5 z-10" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            className="btn-icon"
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30"
                             disabled={idx === 0}
                             title="Move Up"
                             onClick={() => handleMoveField(idx, 'up')}
                           >
-                            <ArrowUp size={14} />
+                            <ArrowUp className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="btn-icon"
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30"
                             disabled={idx === fields.length - 1}
                             title="Move Down"
                             onClick={() => handleMoveField(idx, 'down')}
                           >
-                            <ArrowDown size={14} />
+                            <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="btn-icon"
-                            title="Duplicate Field"
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600"
+                            title="Duplicate"
                             onClick={() => handleDuplicateField(field)}
                           >
-                            <Copy size={14} />
+                            <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="btn-icon danger"
-                            title="Delete Field"
+                            className="p-1 hover:bg-red-50 text-red-600 rounded"
+                            title="Delete"
                             onClick={() => handleDeleteField(field.id)}
                           >
-                            <Trash2 size={14} />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}
-                    </div>
 
-                    <div className="field-card-body mt-2">
-                      <strong className="field-card-label">
-                        {field.label || <em>Unlabeled Field</em>}
-                      </strong>
-                      {field.description && <p className="field-card-desc">{field.description}</p>}
-
-                      {/* Mock Mini Visual Element */}
-                      <div className="field-card-mock-input mt-2">
-                        {field.field_type === 'SHORT_TEXT' && <input type="text" disabled placeholder={field.placeholder || 'Short text answer'} className="input input-sm" />}
-                        {field.field_type === 'LONG_TEXT' && <textarea disabled placeholder={field.placeholder || 'Long text answer'} rows={2} className="input input-sm" />}
-                        {field.field_type === 'EMAIL' && <input type="email" disabled placeholder="name@example.com" className="input input-sm" />}
-                        {field.field_type === 'PHONE' && <input type="text" disabled placeholder="+234 800 000 0000" className="input input-sm" />}
-                        {field.field_type === 'NUMBER' && <input type="number" disabled placeholder="0" className="input input-sm" />}
-                        {field.field_type === 'DATE' && <input type="date" disabled className="input input-sm" />}
-                        {field.field_type === 'HEADING' && <h3>{field.label}</h3>}
-                        {field.field_type === 'PARAGRAPH' && <p>{String((field.configuration as Record<string, unknown>)?.content || 'Paragraph text content')}</p>}
-                        {field.field_type === 'DIVIDER' && <hr />}
-                        {['DROPDOWN', 'RADIO', 'CHECKBOX', 'YES_NO'].includes(field.field_type) && (
-                          <div className="mock-choices">
-                            {(((field.configuration as Record<string, unknown>)?.options as ChoiceOption[]) || []).map((opt, oIdx) => (
-                              <span key={oIdx} className="choice-chip">
-                                {opt.label}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {['FILE_UPLOAD', 'SIGNATURE', 'REPEATING_GROUP'].includes(field.field_type) && (
-                          <span className="text-muted" style={{ fontSize: '0.8rem' }}>[Phase 2 Feature]</span>
-                        )}
-                      </div>
+                      <FormDocumentRenderer
+                        version={version}
+                        fields={[field]}
+                        presentation={{ mode: currentMode, showHeader: false, showFooter: false }}
+                        selectedFieldId={selectedFieldId}
+                        onSelectField={setSelectedFieldId}
+                      />
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
-          </main>
+          </div>
+        </main>
 
-          {/* Right Panel: Field Settings Inspector */}
-          <aside className="builder-panel builder-inspector">
-            <h2>Field Settings</h2>
+        {/* Right Panel: Property Inspector */}
+        <aside className="w-80 bg-white border-l flex flex-col shrink-0">
+          <div className="p-3 border-b bg-gray-50 flex items-center justify-between">
+            <h2 className="font-semibold text-sm text-gray-800">Field Settings Inspector</h2>
+            {selectedField && (
+              <Badge variant="neutral" className="text-[10px]">
+                {selectedField.field_type}
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
             {!selectedField ? (
-              <p className="panel-subtitle">Click any field in the canvas to edit its properties.</p>
+              <div className="py-12 text-center text-xs text-gray-400 space-y-2">
+                <LayoutGrid className="w-8 h-8 mx-auto opacity-40" />
+                <p>Click any field in the document canvas to inspect and edit properties.</p>
+              </div>
             ) : (
               <FieldInspector
                 field={selectedField}
@@ -422,17 +506,43 @@ export default function FormBuilderPage() {
                 onKeyErrorChange={setKeyError}
               />
             )}
-          </aside>
+          </div>
+        </aside>
+      </div>
+
+      {/* Live Preview Modal */}
+      {isPreviewOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="success">LIVE PREVIEW</Badge>
+                <h2 className="text-lg font-bold">{version.title}</h2>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setIsPreviewOpen(false)}>
+                ✕ Close
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-6">
+              <FormDocumentRenderer
+                version={version}
+                fields={fields}
+                presentation={{ mode: currentMode }}
+                readOnly
+              />
+            </div>
+          </div>
         </div>
       )}
 
       {/* Publish Confirmation Modal */}
       {isPublishModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal-card">
-            <h2>Publish Form Version {version.version_number}?</h2>
-            <p className="modal-description mt-2">
-              Publishing will make Version {version.version_number} immutable. Future modifications will require creating a new draft version.
+          <div className="modal-card max-w-md">
+            <h2 className="text-lg font-bold">Publish Form Version {version.version_number}?</h2>
+            <p className="text-sm text-gray-600 mt-2">
+              Publishing makes Version {version.version_number} immutable. Future edits will require creating a new draft version.
             </p>
 
             {publishError && (
@@ -441,23 +551,13 @@ export default function FormBuilderPage() {
               </div>
             )}
 
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={publishMutation.isPending}
-                onClick={() => setIsPublishModalOpen(false)}
-              >
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="ghost" disabled={publishMutation.isPending} onClick={() => setIsPublishModalOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={publishMutation.isPending}
-                onClick={handlePublish}
-              >
+              </Button>
+              <Button variant="primary" disabled={publishMutation.isPending} onClick={handlePublish}>
                 {publishMutation.isPending ? 'Publishing…' : 'Publish Version'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -466,9 +566,6 @@ export default function FormBuilderPage() {
   )
 }
 
-// -------------------------------------------------------------
-// Field Settings Inspector Component
-// -------------------------------------------------------------
 function FieldInspector({
   field,
   fields,
@@ -484,34 +581,14 @@ function FieldInspector({
   onUpdate: (updates: Partial<FormField>) => void
   onKeyErrorChange: (err: string | null) => void
 }) {
-  const [label, setLabel] = useState(field.label || '')
-  const [fieldKey, setFieldKey] = useState(field.field_key)
-  const [description, setDescription] = useState(field.description || '')
-  const [placeholder, setPlaceholder] = useState(field.placeholder || '')
-  const [required, setRequired] = useState(field.required)
-  const [config, setConfig] = useState<Record<string, unknown>>((field.configuration as Record<string, unknown>) || {})
+  const config = (field.configuration as Record<string, unknown>) || {}
+  const layout = (config.layout as Record<string, unknown>) || {}
+  const span = (layout.span as number) || 12
 
-  const handleLabelChange = (newLabel: string) => {
-    setLabel(newLabel)
-    if (!isEditable) return
-
-    // Auto-update key if key matches current auto-slug of old label
-    const autoOldKey = slugifyFieldKey(field.label || '')
-    if (fieldKey === autoOldKey) {
-      const autoNewKey = generateUniqueFieldKey(newLabel, fields.filter((f) => f.id !== field.id))
-      setFieldKey(autoNewKey)
-      onKeyErrorChange(null)
-      onUpdate({ label: newLabel, field_key: autoNewKey })
-      return
-    }
-    onUpdate({ label: newLabel })
-  }
-
-  const handleKeyChange = (newKey: string) => {
-    const trimmed = newKey.trim().toLowerCase()
-    setFieldKey(trimmed)
-    if (!validateFieldKey(trimmed)) {
-      onKeyErrorChange('Field key must contain only lowercase letters, numbers, and underscores.')
+  const handleKeyChange = (val: string) => {
+    const trimmed = val.toLowerCase().trim()
+    if (!trimmed || !/^[a-z][a-z0-9_]*$/.test(trimmed)) {
+      onKeyErrorChange('Field key must start with a lowercase letter and contain only a-z, 0-9, and _.')
       return
     }
     const isDuplicate = fields.some((f) => f.id !== field.id && f.field_key === trimmed)
@@ -523,286 +600,119 @@ function FieldInspector({
     onUpdate({ field_key: trimmed })
   }
 
-  const handleOptionsChange = (options: ChoiceOption[]) => {
-    const newConfig = { ...config, options }
-    setConfig(newConfig)
-    onUpdate({ configuration: newConfig as unknown as Json })
-  }
-
-  const handleAddOption = () => {
-    const currentOptions = (config.options as ChoiceOption[]) || []
-    const idx = currentOptions.length + 1
-    const newOptions = [...currentOptions, { label: `Option ${idx}`, value: `option_${idx}` }]
-    handleOptionsChange(newOptions)
-  }
-
-  const handleRemoveOption = (index: number) => {
-    const currentOptions = (config.options as ChoiceOption[]) || []
-    const newOptions = currentOptions.filter((_, i) => i !== index)
-    handleOptionsChange(newOptions)
-  }
-
-  const handleEditOption = (index: number, key: 'label' | 'value', val: string) => {
-    const currentOptions = [...(((config.options as ChoiceOption[]) || []))]
-    if (!currentOptions[index]) return
-    currentOptions[index] = { ...currentOptions[index], [key]: val }
-    if (key === 'label' && !currentOptions[index].value) {
-      currentOptions[index].value = slugifyFieldKey(val)
-    }
-    handleOptionsChange(currentOptions)
+  const handleSpanChange = (newSpan: number) => {
+    const newConfig = { ...config, layout: { ...layout, span: newSpan } }
+    onUpdate({ configuration: newConfig as Json })
   }
 
   return (
-    <div className="inspector-content">
-      <div className="inspector-header mb-3">
-        <span className="badge badge-neutral">{FIELD_TYPE_METADATA[field.field_type]?.label}</span>
-        <code className="field-key-badge">{field.field_key}</code>
-      </div>
-
-      <div className="form-group">
-        <label>Field Label</label>
+    <div className="space-y-4 text-xs">
+      <div>
+        <label className="font-semibold block mb-1">Field Label / Title</label>
         <input
           type="text"
-          className="input"
+          className="input input-sm w-full"
           disabled={!isEditable}
-          value={label}
-          onChange={(e) => handleLabelChange(e.target.value)}
+          value={field.label || ''}
+          onChange={(e) => onUpdate({ label: e.target.value })}
         />
       </div>
 
-      <div className="form-group">
-        <label>Field Machine Key *</label>
+      <div>
+        <label className="font-semibold block mb-1">Machine Key *</label>
         <input
           type="text"
-          className="input"
+          className="input input-sm w-full font-mono"
           disabled={!isEditable}
-          value={fieldKey}
+          value={field.field_key}
           onChange={(e) => handleKeyChange(e.target.value)}
         />
-        {keyError && <p className="error" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>{keyError}</p>}
+        {keyError && <p className="text-red-600 mt-1">{keyError}</p>}
       </div>
 
-      <div className="form-group">
-        <label>Help Description</label>
+      <div>
+        <label className="font-semibold block mb-1">Layout Column Width</label>
+        <select
+          className="input input-sm w-full"
+          disabled={!isEditable}
+          value={span}
+          onChange={(e) => handleSpanChange(Number(e.target.value))}
+        >
+          <option value={12}>Full Width (12/12)</option>
+          <option value={6}>Half Width (6/12)</option>
+          <option value={4}>Third Width (4/12)</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="font-semibold block mb-1">Help Description</label>
         <input
           type="text"
-          className="input"
+          className="input input-sm w-full"
           disabled={!isEditable}
-          value={description}
-          placeholder="Instructions shown below input"
-          onChange={(e) => {
-            setDescription(e.target.value)
-            onUpdate({ description: e.target.value })
-          }}
+          value={field.description || ''}
+          placeholder="Instructions below input"
+          onChange={(e) => onUpdate({ description: e.target.value })}
         />
       </div>
 
-      <div className="form-group checkbox-group mt-2">
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+      <div className="pt-2">
+        <label className="flex items-center gap-2 cursor-pointer font-medium">
           <input
             type="checkbox"
             disabled={!isEditable}
-            checked={required}
-            onChange={(e) => {
-              setRequired(e.target.checked)
-              onUpdate({ required: e.target.checked })
-            }}
+            checked={field.required}
+            onChange={(e) => onUpdate({ required: e.target.checked })}
           />
           Required field
         </label>
       </div>
 
-      {['SHORT_TEXT', 'LONG_TEXT', 'EMAIL', 'PHONE', 'NUMBER'].includes(field.field_type) && (
-        <div className="form-group mt-3">
-          <label>Placeholder Text</label>
-          <input
-            type="text"
-            className="input"
-            disabled={!isEditable}
-            value={placeholder}
-            placeholder="e.g. Enter answer here"
-            onChange={(e) => {
-              setPlaceholder(e.target.value)
-              onUpdate({ placeholder: e.target.value })
-            }}
-          />
-        </div>
-      )}
-
-      {/* Choice Fields Options Editor */}
-      {['DROPDOWN', 'RADIO', 'CHECKBOX', 'YES_NO'].includes(field.field_type) && (
-        <div className="inspector-options-editor mt-4">
-          <h3>Choice Options</h3>
-          <div className="options-list mt-2">
-            {(((config.options as ChoiceOption[]) || [])).map((opt, i) => (
-              <div key={i} className="option-row mb-2">
-                <input
-                  type="text"
-                  className="input input-sm"
-                  disabled={!isEditable}
-                  placeholder="Label"
-                  value={opt.label}
-                  onChange={(e) => handleEditOption(i, 'label', e.target.value)}
-                />
-                <input
-                  type="text"
-                  className="input input-sm"
-                  disabled={!isEditable}
-                  placeholder="Value"
-                  value={opt.value}
-                  onChange={(e) => handleEditOption(i, 'value', e.target.value)}
-                />
-                {isEditable && (
-                  <button
-                    type="button"
-                    className="btn-icon danger"
-                    title="Remove Option"
-                    onClick={() => handleRemoveOption(i)}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+      {/* Advanced Field Options */}
+      {field.field_type === 'FILE_UPLOAD' && (
+        <div className="pt-3 border-t space-y-2">
+          <h4 className="font-bold uppercase text-gray-400">File Upload Rules</h4>
+          <div>
+            <label className="block mb-1">Allowed File Types</label>
+            <input
+              type="text"
+              className="input input-sm w-full"
+              disabled={!isEditable}
+              value={String(config.allowedTypes || 'PDF, DOCX, PNG')}
+              onChange={(e) => {
+                const newCfg = { ...config, allowedTypes: e.target.value }
+                onUpdate({ configuration: newCfg as Json })
+              }}
+            />
           </div>
-
-          {isEditable && field.field_type !== 'YES_NO' && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm mt-2"
-              onClick={handleAddOption}
-            >
-              + Add Option
-            </button>
-          )}
         </div>
       )}
 
-      {/* Content Field Editor */}
-      {['HEADING', 'PARAGRAPH'].includes(field.field_type) && (
-        <div className="form-group mt-3">
-          <label>Content Text</label>
-          <textarea
-            className="input"
-            rows={3}
-            disabled={!isEditable}
-            value={String(config.content || '')}
-            onChange={(e) => {
-              const newCfg = { ...config, content: e.target.value }
-              setConfig(newCfg)
-              onUpdate({ configuration: newCfg as Json })
-            }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// -------------------------------------------------------------
-// Live Preview Overlay Component
-// -------------------------------------------------------------
-function FormPreviewOverlay({
-  version,
-  fields,
-  onClose,
-}: {
-  version: { title: string; description?: string | null }
-  fields: FormField[]
-  onClose: () => void
-}) {
-  return (
-    <div className="preview-container">
-      <div className="preview-card card">
-        <div className="preview-header mb-4">
-          <span className="badge badge-success mb-2">LIVE PREVIEW</span>
-          <h1>{version.title}</h1>
-          {version.description && <p className="subtitle">{version.description}</p>}
-        </div>
-
-        <form onSubmit={(e) => e.preventDefault()} className="preview-form">
-          {fields.map((field) => (
-            <div key={field.id} className="preview-field-group mb-4">
-              {field.field_type !== 'HEADING' && field.field_type !== 'PARAGRAPH' && field.field_type !== 'DIVIDER' && (
-                <label className="preview-label">
-                  {field.label || 'Unlabeled'}
-                  {field.required && <span style={{ color: 'var(--danger)', marginLeft: '0.25rem' }}>*</span>}
-                </label>
-              )}
-
-              {field.description && <p className="preview-desc">{field.description}</p>}
-
-              {field.field_type === 'SHORT_TEXT' && <input type="text" className="input" placeholder={field.placeholder || ''} />}
-              {field.field_type === 'LONG_TEXT' && <textarea className="input" rows={4} placeholder={field.placeholder || ''} />}
-              {field.field_type === 'EMAIL' && <input type="email" className="input" placeholder={field.placeholder || 'user@example.com'} />}
-              {field.field_type === 'PHONE' && <input type="tel" className="input" placeholder={field.placeholder || '+234 800 000 0000'} />}
-              {field.field_type === 'NUMBER' && <input type="number" className="input" placeholder={field.placeholder || '0'} />}
-              {field.field_type === 'DATE' && <input type="date" className="input" />}
-
-              {field.field_type === 'DROPDOWN' && (
-                <select className="input">
-                  <option value="">-- Select option --</option>
-                  {(((field.configuration as Record<string, unknown>)?.options as ChoiceOption[]) || []).map((opt, i) => (
-                    <option key={i} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              )}
-
-              {field.field_type === 'RADIO' && (
-                <div className="preview-choices-list">
-                  {(((field.configuration as Record<string, unknown>)?.options as ChoiceOption[]) || []).map((opt, i) => (
-                    <label key={i} className="choice-option-row">
-                      <input type="radio" name={field.field_key} value={opt.value} />
-                      <span>{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {field.field_type === 'CHECKBOX' && (
-                <div className="preview-choices-list">
-                  {(((field.configuration as Record<string, unknown>)?.options as ChoiceOption[]) || []).map((opt, i) => (
-                    <label key={i} className="choice-option-row">
-                      <input type="checkbox" value={opt.value} />
-                      <span>{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {field.field_type === 'YES_NO' && (
-                <div className="preview-choices-list flex-row">
-                  <label className="choice-option-row">
-                    <input type="radio" name={field.field_key} value="yes" />
-                    <span>Yes</span>
-                  </label>
-                  <label className="choice-option-row">
-                    <input type="radio" name={field.field_key} value="no" />
-                    <span>No</span>
-                  </label>
-                </div>
-              )}
-
-              {field.field_type === 'HEADING' && <h2>{field.label || String((field.configuration as Record<string, unknown>)?.content || '')}</h2>}
-              {field.field_type === 'PARAGRAPH' && <p>{String((field.configuration as Record<string, unknown>)?.content || field.label || '')}</p>}
-              {field.field_type === 'DIVIDER' && <hr />}
-
-              {['FILE_UPLOAD', 'SIGNATURE', 'REPEATING_GROUP'].includes(field.field_type) && (
-                <div className="card text-center py-3" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>
-                  <em>{FIELD_TYPE_METADATA[field.field_type]?.label} — Supported in a later phase</em>
-                </div>
-              )}
-            </div>
-          ))}
-
-          <div className="preview-actions mt-4 pt-3" style={{ borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-            <span className="text-muted" style={{ fontSize: '0.85rem' }}>Visual Preview Mode — Form submissions are disabled</span>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Close Preview
-            </button>
+      {field.field_type === 'SIGNATURE' && (
+        <div className="pt-3 border-t space-y-2">
+          <h4 className="font-bold uppercase text-gray-400">Signature Rules</h4>
+          <div>
+            <label className="block mb-1">Signer Role</label>
+            <input
+              type="text"
+              className="input input-sm w-full"
+              disabled={!isEditable}
+              value={String(config.signerRole || 'Employee')}
+              onChange={(e) => {
+                const newCfg = { ...config, signerRole: e.target.value }
+                onUpdate({ configuration: newCfg as Json })
+              }}
+            />
           </div>
-        </form>
-      </div>
+        </div>
+      )}
+
+      {field.field_type === 'REPEATING_GROUP' && (
+        <div className="pt-3 border-t space-y-2">
+          <h4 className="font-bold uppercase text-gray-400">Repeating Group Columns</h4>
+          <p className="text-gray-500">Configured as repeatable table rows in Form Studio.</p>
+        </div>
+      )}
     </div>
   )
 }

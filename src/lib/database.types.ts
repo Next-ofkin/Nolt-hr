@@ -249,6 +249,60 @@ export type Database = {
           },
         ]
       }
+      form_import_jobs: {
+        Row: {
+          accepted_at: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          model: string | null
+          original_filename: string
+          proposed_schema: Json | null
+          provider: string | null
+          source_object_path: string
+          status: Database["public"]["Enums"]["form_import_status"]
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          original_filename: string
+          proposed_schema?: Json | null
+          provider?: string | null
+          source_object_path: string
+          status?: Database["public"]["Enums"]["form_import_status"]
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          original_filename?: string
+          proposed_schema?: Json | null
+          provider?: string | null
+          source_object_path?: string
+          status?: Database["public"]["Enums"]["form_import_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       form_templates: {
         Row: {
           category: string | null
@@ -289,6 +343,7 @@ export type Database = {
           form_template_id: string
           id: string
           instructions: string | null
+          presentation_config: Json
           published_at: string | null
           published_by: string | null
           status: Database["public"]["Enums"]["form_version_status"]
@@ -302,6 +357,7 @@ export type Database = {
           form_template_id: string
           id?: string
           instructions?: string | null
+          presentation_config?: Json
           published_at?: string | null
           published_by?: string | null
           status?: Database["public"]["Enums"]["form_version_status"]
@@ -315,6 +371,7 @@ export type Database = {
           form_template_id?: string
           id?: string
           instructions?: string | null
+          presentation_config?: Json
           published_at?: string | null
           published_by?: string | null
           status?: Database["public"]["Enums"]["form_version_status"]
@@ -364,6 +421,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_form_import_job: {
+        Args: {
+          p_category: string
+          p_description: string
+          p_fields: Json
+          p_instructions: string
+          p_job_id: string
+          p_name: string
+          p_presentation: Json
+        }
+        Returns: Json
+      }
       activate_my_employee_account: { Args: never; Returns: Json }
       create_form_draft_from_version: {
         Args: { p_form_version_id: string }
@@ -425,6 +494,13 @@ export type Database = {
         | "PARAGRAPH"
         | "DIVIDER"
         | "REPEATING_GROUP"
+      form_import_status:
+        | "UPLOADED"
+        | "ANALYZING"
+        | "READY_FOR_REVIEW"
+        | "ACCEPTED"
+        | "FAILED"
+        | "CANCELLED"
       form_version_status: "DRAFT" | "PUBLISHED" | "ARCHIVED"
       user_role: "admin" | "hr" | "employee"
     }
@@ -590,6 +666,14 @@ export const Constants = {
         "DIVIDER",
         "REPEATING_GROUP",
       ],
+      form_import_status: [
+        "UPLOADED",
+        "ANALYZING",
+        "READY_FOR_REVIEW",
+        "ACCEPTED",
+        "FAILED",
+        "CANCELLED",
+      ],
       form_version_status: ["DRAFT", "PUBLISHED", "ARCHIVED"],
       user_role: ["admin", "hr", "employee"],
     },
@@ -602,6 +686,7 @@ export type EmployeeStatus = Database["public"]["Enums"]["employee_status"]
 export type EmployeeInvitationStatus = Database["public"]["Enums"]["employee_invitation_status"]
 export type FormFieldType = Database["public"]["Enums"]["form_field_type"]
 export type FormVersionStatus = Database["public"]["Enums"]["form_version_status"]
+export type FormImportStatus = Database["public"]["Enums"]["form_import_status"]
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 export type Department = Database["public"]["Tables"]["departments"]["Row"]
@@ -624,3 +709,7 @@ export type FormVersionUpdate = Database["public"]["Tables"]["form_versions"]["U
 export type FormField = Database["public"]["Tables"]["form_fields"]["Row"]
 export type FormFieldInsert = Database["public"]["Tables"]["form_fields"]["Insert"]
 export type FormFieldUpdate = Database["public"]["Tables"]["form_fields"]["Update"]
+
+export type FormImportJob = Database["public"]["Tables"]["form_import_jobs"]["Row"]
+export type FormImportJobInsert = Database["public"]["Tables"]["form_import_jobs"]["Insert"]
+export type FormImportJobUpdate = Database["public"]["Tables"]["form_import_jobs"]["Update"]
