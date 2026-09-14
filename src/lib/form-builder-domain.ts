@@ -135,18 +135,47 @@ export const FIELD_TYPE_METADATA: Record<FormFieldType, FieldTypeMeta> = {
   },
 }
 
+export type DataClassification = 'GENERAL' | 'SENSITIVE_HEALTH' | 'SENSITIVE_FINANCIAL'
+
+export interface FieldLayoutConfig {
+  span?: 12 | 6 | 4
+  newRow?: boolean
+  placement?: 'flow' | 'header_aside'
+}
+
+export interface VisibilityRule {
+  fieldKey: string
+  operator: 'equals'
+  value: unknown
+}
+
+export interface RepeatingGroupColumn {
+  name: string
+  type: FormFieldType
+}
+
+export interface RepeatingGroupConfig {
+  minRows?: number
+  maxRows?: number
+  columns?: RepeatingGroupColumn[]
+}
+
 export interface ChoiceOption {
   label: string
   value: string
 }
 
 export function slugifyFieldKey(label: string): string {
-  const normalized = label
-    .toLowerCase()
+  const withSpaces = label
     .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+  const normalized = withSpaces
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
-  return normalized || 'field_key'
+  if (!normalized) return 'field_key'
+  if (!/^[a-z]/.test(normalized)) return `field_${normalized}`
+  return normalized
 }
 
 export function validateFieldKey(key: string): boolean {

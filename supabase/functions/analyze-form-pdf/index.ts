@@ -417,12 +417,16 @@ Deno.serve(async (req: Request) => {
     // Canonical prompt text
     const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its structured digital template schema.
 CRITICAL INSTRUCTIONS:
-1. EXTRACT and STRUCTURE the document accurately.
+1. EXTRACT and STRUCTURE the document accurately, respecting visual layout and visual row groupings.
 2. DO NOT rewrite legal wording, summarize contractual clauses, or alter agreement text. Preserve legal content verbatim as PARAGRAPH or HEADING fields.
 3. DO NOT invent employee questions or declarations not present in the source document.
-4. Identify document title, category, section headings, short text fields, long text areas, dates, email, phone, numbers, yes/no, dropdown/radio/checkbox options, file upload requests, signature areas, repeating groups (e.g. beneficiaries, dependants), and signer roles.
-5. Infer the appropriate presentation mode ("STANDARD", "DOCUMENT", or "AGREEMENT") and field layout spans (12 for full width, 6 for half, 4 for third).
-6. Set "needs_review": true on any field where confidence or field type interpretation is uncertain.
+4. Field keys MUST be snake_case with clear word boundaries (e.g. "place_of_birth" NOT "placeofbirth", "date_employed" NOT "dateemployed").
+5. Layout Spans: Assign "configuration.layout.span" = 12 for full-width fields, 6 for two-column side-by-side rows, 4 for three-column rows. Set "configuration.layout.newRow" = true when a field starts a new visual line.
+6. Photo Boxes: Labelled or unlabelled passport/photograph boxes near page headers MUST be extracted as FILE_UPLOAD with "configuration.displayVariant": "photo", "configuration.layout.placement": "header_aside", "configuration.layout.span": 4.
+7. Repeating Tables/Data: Numbered lists or tables (e.g., Schools Attended, Beneficiary rows) MUST be extracted as REPEATING_GROUP with "configuration.repeatingGroup": { "columns": [{ "name": "School", "type": "SHORT_TEXT" }, ...] }.
+8. Conditional Fields: Fields that appear conditionally (e.g. "If YES, explain below") MUST include "configuration.visibilityRule": { "fieldKey": "parent_field_key", "operator": "equals", "value": true }.
+9. Data Classification: Assign "configuration.dataClassification" = "SENSITIVE_HEALTH" for health questions/medical data, "SENSITIVE_FINANCIAL" for bank/tax/pension fields, or "GENERAL" for standard biodata.
+10. Set "needs_review": true on any field where type interpretation or visual layout is uncertain.
 
 Return ONLY a JSON object matching this strict schema:
 {
@@ -441,7 +445,10 @@ Return ONLY a JSON object matching this strict schema:
       "required": false,
       "description": null,
       "placeholder": null,
-      "configuration": { "layout": { "span": 12 } },
+      "configuration": {
+        "layout": { "span": 12, "newRow": true, "placement": "flow" },
+        "dataClassification": "GENERAL"
+      },
       "position": 0,
       "needs_review": false,
       "review_note": null

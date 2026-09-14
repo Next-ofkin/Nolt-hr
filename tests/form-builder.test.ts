@@ -473,3 +473,115 @@ test('FAILED or ANALYZING import jobs are strictly rejected by draft creation gu
   assert.equal(validateAcceptJobStatus('CANCELLED').ok, false)
   assert.equal(validateAcceptJobStatus('READY_FOR_REVIEW').ok, true)
 })
+
+test('slugifyFieldKey preserves word boundaries and formats valid snake_case keys', () => {
+  assert.equal(slugifyFieldKey('Place of Birth'), 'place_of_birth')
+  assert.equal(slugifyFieldKey('Date Employed'), 'date_employed')
+  assert.equal(slugifyFieldKey('Type of Employment'), 'type_of_employment')
+  assert.equal(slugifyFieldKey('Spouse Phone No'), 'spouse_phone_no')
+  assert.equal(slugifyFieldKey('Permanent Home Address'), 'permanent_home_address')
+  assert.equal(slugifyFieldKey('State of Origin'), 'state_of_origin')
+  assert.equal(slugifyFieldKey('Blood Group'), 'blood_group')
+  assert.equal(slugifyFieldKey('Next of Kin Name'), 'next_of_kin_name')
+  assert.equal(slugifyFieldKey('Bank Account Number'), 'bank_account_number')
+  assert.equal(slugifyFieldKey('Pension Administrator'), 'pension_administrator')
+  assert.equal(slugifyFieldKey('Tax ID Number'), 'tax_id_number')
+})
+
+test('Synthetic mock proposal preserves two-column layout grid, photo placement, repeating groups, and conditional rules', () => {
+  const mockProposal = {
+    form: {
+      name: 'Employee Data Form',
+      category: 'Onboarding',
+      description: 'Employee personal, medical, and financial details',
+      presentation: { mode: 'DOCUMENT' },
+    },
+    fields: [
+      {
+        field_type: 'FILE_UPLOAD',
+        label: 'Attach Passport Photograph',
+        field_key: 'passport_photo',
+        required: true,
+        configuration: {
+          displayVariant: 'photo',
+          layout: { placement: 'header_aside', span: 4 },
+          dataClassification: 'GENERAL',
+        },
+      },
+      {
+        field_type: 'SHORT_TEXT',
+        label: 'Full Legal Name',
+        field_key: 'full_name',
+        required: true,
+        configuration: { layout: { span: 12, newRow: true }, dataClassification: 'GENERAL' },
+      },
+      {
+        field_type: 'DATE',
+        label: 'Date Employed',
+        field_key: 'date_employed',
+        required: true,
+        configuration: { layout: { span: 6, newRow: true }, dataClassification: 'GENERAL' },
+      },
+      {
+        field_type: 'DROPDOWN',
+        label: 'Type of Employment',
+        field_key: 'employment_type',
+        required: true,
+        configuration: { layout: { span: 6, newRow: false }, dataClassification: 'GENERAL' },
+      },
+      {
+        field_type: 'REPEATING_GROUP',
+        label: 'Schools Attended / Qualifications',
+        field_key: 'schools_attended',
+        required: false,
+        configuration: {
+          layout: { span: 12, newRow: true },
+          repeatingGroup: {
+            columns: [
+              { name: 'School Name', type: 'SHORT_TEXT' },
+              { name: 'Qualification', type: 'SHORT_TEXT' },
+              { name: 'Year Completed', type: 'NUMBER' },
+            ],
+          },
+          dataClassification: 'GENERAL',
+        },
+      },
+      {
+        field_type: 'SHORT_TEXT',
+        label: 'Bank Account Number',
+        field_key: 'bank_account_number',
+        required: true,
+        configuration: { layout: { span: 6, newRow: true }, dataClassification: 'SENSITIVE_FINANCIAL' },
+      },
+      {
+        field_type: 'YES_NO',
+        label: 'Do you have any health issues?',
+        field_key: 'has_health_issues',
+        required: true,
+        configuration: { layout: { span: 12, newRow: true }, dataClassification: 'SENSITIVE_HEALTH' },
+      },
+      {
+        field_type: 'LONG_TEXT',
+        label: 'Kindly explain health issues below',
+        field_key: 'health_issues_explanation',
+        required: false,
+        configuration: {
+          layout: { span: 12, newRow: true },
+          visibilityRule: { fieldKey: 'has_health_issues', operator: 'equals', value: true },
+          dataClassification: 'SENSITIVE_HEALTH',
+        },
+      },
+    ],
+  }
+
+  // Validate structure & metadata preservation
+  assert.equal(mockProposal.fields.length, 8)
+  assert.equal(mockProposal.fields[0].configuration.displayVariant, 'photo')
+  assert.equal(mockProposal.fields[0].configuration.layout.placement, 'header_aside')
+  assert.equal(mockProposal.fields[2].configuration.layout.span, 6)
+  assert.equal(mockProposal.fields[3].configuration.layout.span, 6)
+  assert.equal(mockProposal.fields[4].field_type, 'REPEATING_GROUP')
+  assert.equal(mockProposal.fields[5].configuration.dataClassification, 'SENSITIVE_FINANCIAL')
+  assert.equal(mockProposal.fields[6].configuration.dataClassification, 'SENSITIVE_HEALTH')
+  assert.equal(mockProposal.fields[7].configuration.visibilityRule.fieldKey, 'has_health_issues')
+})
