@@ -1,12 +1,24 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildAuthCallbackUrl,
   cleanAuthRedirectUrl,
   isPasswordAdmin,
   requestMagicLink,
   restoreAuthSession,
   signInPasswordAdmin,
 } from '../src/lib/auth-flows.ts'
+
+test('buildAuthCallbackUrl constructs canonical callback URL with target continuation path', () => {
+  const defaultUrl = buildAuthCallbackUrl()
+  assert.equal(defaultUrl, 'http://localhost:5173/auth/callback?next=/employee')
+
+  const customUrl = buildAuthCallbackUrl('http://localhost:5173', '/employee')
+  assert.equal(customUrl, 'http://localhost:5173/auth/callback?next=/employee')
+
+  const prodUrl = buildAuthCallbackUrl('https://nolt-hr.noltfinance.com', '/employee')
+  assert.equal(prodUrl, 'https://nolt-hr.noltfinance.com/auth/callback?next=/employee')
+})
 
 test('admin email comparison is normalized', () => {
   assert.equal(isPasswordAdmin(' Admin@Example.com ', 'admin@example.com'), true)
@@ -37,7 +49,7 @@ test('magic-link login never creates a new user and returns to the callback', as
     email: 'person@example.com',
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: 'https://hr.example.com/auth/callback',
+      emailRedirectTo: 'https://hr.example.com/auth/callback?next=/employee',
     },
   })
 })

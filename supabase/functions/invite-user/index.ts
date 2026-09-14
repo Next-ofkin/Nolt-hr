@@ -7,7 +7,7 @@ if (!supabaseUrl || !serviceRoleKey) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secret')
 }
 
-const siteUrl = Deno.env.get('SITE_URL') ?? supabaseUrl
+const siteUrl = Deno.env.get('SITE_URL') ?? 'http://localhost:5173'
 const authCallbackUrl = new URL('/auth/callback?next=/employee', siteUrl).href
 
 const ALLOWED_ROLES = ['admin', 'hr', 'employee'] as const

@@ -6,6 +6,12 @@ type Result = { error: string | null }
 export type SessionResult = Result & { session: Session | null }
 
 export const AUTH_CALLBACK_PATH = '/auth/callback'
+export const DEFAULT_SITE_URL = 'http://localhost:5173'
+
+export function buildAuthCallbackUrl(siteUrl?: string | null, next = '/employee'): string {
+  const base = siteUrl?.trim() || DEFAULT_SITE_URL
+  return new URL(`${AUTH_CALLBACK_PATH}?next=${next}`, base).href
+}
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -75,7 +81,7 @@ export async function requestMagicLink(
       email: normalizeEmail(email),
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: new URL(AUTH_CALLBACK_PATH, origin).href,
+        emailRedirectTo: buildAuthCallbackUrl(origin, '/employee'),
       },
     })
     return { error: error?.message ?? null }
