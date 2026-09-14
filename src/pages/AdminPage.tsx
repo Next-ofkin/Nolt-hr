@@ -1,5 +1,5 @@
 import { useProfiles, useUpdateUserRole } from '../lib/queries'
-import { InviteUserForm } from '../components/InviteUserForm'
+import { RoleBadge } from '../components/RoleBadge'
 import type { UserRole } from '../lib/database.types'
 
 export default function AdminPage() {
@@ -8,12 +8,14 @@ export default function AdminPage() {
 
   return (
     <div className="page">
-      <h1>Admin — User management</h1>
-
-      <InviteUserForm roles={['employee', 'hr', 'admin']} />
+      <div className="page-heading">
+        <div>
+          <h1>User Access &amp; Roles</h1>
+          <p className="subtitle">Manage application access and role assignments.</p>
+        </div>
+      </div>
 
       <div className="card">
-        <h2>Users</h2>
         {listError && <p className="error">{listError.message}</p>}
         {isLoading && <p>Loading…</p>}
         {!isLoading && users?.length === 0 && <p>No users found.</p>}
@@ -21,9 +23,10 @@ export default function AdminPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>User</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Joined</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -32,11 +35,15 @@ export default function AdminPage() {
                 <tr key={u.id}>
                   <td>{u.full_name}</td>
                   <td>{u.email}</td>
-                  <td>{u.role}</td>
+                  <td>
+                    <RoleBadge role={u.role} />
+                  </td>
+                  <td>{new Date(u.created_at).toLocaleDateString()}</td>
                   <td>
                     <select
                       value={u.role}
                       disabled={updateUserRole.isPending}
+                      aria-label={`Change role for ${u.full_name}`}
                       onChange={(event) => {
                         void updateUserRole.mutateAsync({
                           userId: u.id,

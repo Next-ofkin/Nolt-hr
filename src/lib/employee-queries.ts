@@ -6,7 +6,7 @@ import {
   type EmployeeFilters,
   type EmployeeWithRelations,
 } from './employee-domain'
-import type { EmployeeInsert, EmployeeUpdate } from './database.types'
+import type { EmployeeInsert, EmployeeStatus, EmployeeUpdate } from './database.types'
 
 export const EMPLOYEE_PAGE_SIZE = 20
 
@@ -76,6 +76,39 @@ export function useEmployeeDirectory(filters: EmployeeFilters) {
       if (error) throw error
       return { employees: (data ?? []) as EmployeeWithRelations[], count: count ?? 0 }
     },
+  })
+}
+
+export function useEmployeeStatusCounts(enabled: boolean) {
+  return useQuery({
+    queryKey: ['employees', 'status-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('employees').select('status')
+      if (error) throw error
+      const counts = {} as Record<EmployeeStatus, number>
+      for (const row of data ?? []) {
+        counts[row.status] = (counts[row.status] ?? 0) + 1
+      }
+      const total = data?.length ?? 0
+      return { counts, total }
+    },
+    enabled,
+  })
+}
+
+export function useRecentEmployees(limit: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['employees', 'recent', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select(employeeSelection)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return (data ?? []) as EmployeeWithRelations[]
+    },
+    enabled,
   })
 }
 

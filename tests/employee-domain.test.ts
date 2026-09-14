@@ -7,9 +7,11 @@ import {
   createEmployeePayload,
   employeeDirectoryRow,
   employeeMutationError,
+  hasActiveEmployeeFilters,
   isEmployeeStatus,
   updateEmployeePayload,
   validateEmployee,
+  type EmployeeFilters,
   type EmployeeFormValues,
   type EmployeeWithRelations,
 } from '../src/lib/employee-domain.ts'
@@ -119,6 +121,22 @@ test('edit employee payload includes a valid lifecycle status but never auth_use
 
 test('archive behavior retains the record and changes only its status', () => {
   assert.deepEqual(archiveEmployeePayload(), { status: 'ARCHIVED' })
+})
+
+test('hasActiveEmployeeFilters distinguishes an empty directory from a filtered one', () => {
+  const noFilters: EmployeeFilters = {
+    search: '',
+    departmentId: '',
+    employmentTypeId: '',
+    status: '',
+    page: 1,
+  }
+  assert.equal(hasActiveEmployeeFilters(noFilters), false)
+  assert.equal(hasActiveEmployeeFilters({ ...noFilters, search: '  ' }), false)
+  assert.equal(hasActiveEmployeeFilters({ ...noFilters, search: 'ada' }), true)
+  assert.equal(hasActiveEmployeeFilters({ ...noFilters, departmentId: 'dept-1' }), true)
+  assert.equal(hasActiveEmployeeFilters({ ...noFilters, employmentTypeId: 'type-1' }), true)
+  assert.equal(hasActiveEmployeeFilters({ ...noFilters, status: 'DRAFT' }), true)
 })
 
 test('duplicate work email and staff ID errors are friendly', () => {

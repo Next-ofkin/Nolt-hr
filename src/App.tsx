@@ -6,7 +6,6 @@ import { RequireRole } from './components/RequireRole'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
-import HrPage from './pages/HrPage'
 import AdminPage from './pages/AdminPage'
 import AuthCallback from './pages/AuthCallback'
 import EmployeesPage from './pages/EmployeesPage'
@@ -35,7 +34,7 @@ const router = createBrowserRouter([
         path: '/hr',
         element: (
           <RequireRole roles={['admin', 'hr']}>
-            <HrPage />
+            <Navigate to="/hr/employees" replace />
           </RequireRole>
         ),
       },

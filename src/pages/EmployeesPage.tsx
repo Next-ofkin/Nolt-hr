@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Users } from 'lucide-react'
 import { EmployeeStatusBadge } from '../components/EmployeeStatusBadge'
 import {
   EMPLOYEE_PAGE_SIZE,
@@ -11,6 +12,7 @@ import {
   EMPLOYEE_STATUSES,
   EMPLOYEE_STATUS_LABELS,
   employeeDirectoryRow,
+  hasActiveEmployeeFilters,
   type EmployeeFilters,
 } from '../lib/employee-domain'
 import type { EmployeeStatus } from '../lib/database.types'
@@ -31,10 +33,13 @@ export default function EmployeesPage() {
   const employees = directory.data?.employees ?? []
   const total = directory.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / EMPLOYEE_PAGE_SIZE))
+  const filtersActive = hasActiveEmployeeFilters(filters)
 
   const updateFilter = <K extends keyof EmployeeFilters>(key: K, value: EmployeeFilters[K]) => {
     setFilters((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 1 }))
   }
+
+  const clearFilters = () => setFilters(initialFilters)
 
   return (
     <div className="page employee-page">
@@ -109,8 +114,26 @@ export default function EmployeesPage() {
         {directory.isLoading && <p className="empty-state">Loading employees…</p>}
         {!directory.isLoading && !directory.error && employees.length === 0 && (
           <div className="empty-state">
-            <h2>No employees found</h2>
-            <p>Adjust the search or filters, or add the first employee record.</p>
+            <div className="empty-state-icon">
+              <Users size={22} aria-hidden="true" />
+            </div>
+            {filtersActive ? (
+              <>
+                <h2>No employees match your filters.</h2>
+                <p>Try adjusting or clearing your search and filters.</p>
+                <button type="button" className="btn btn-ghost" onClick={clearFilters}>
+                  Clear Filters
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>No employees yet</h2>
+                <p>Create your first employee record to start managing their lifecycle.</p>
+                <Link className="btn btn-primary" to="/hr/employees/new">
+                  Add Employee
+                </Link>
+              </>
+            )}
           </div>
         )}
         {!directory.isLoading && employees.length > 0 && (

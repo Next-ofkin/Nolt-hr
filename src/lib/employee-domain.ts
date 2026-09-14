@@ -153,6 +153,12 @@ export function employeeDirectoryRow(employee: EmployeeWithRelations) {
   }
 }
 
+export function hasActiveEmployeeFilters(filters: EmployeeFilters) {
+  return Boolean(
+    filters.search.trim() || filters.departmentId || filters.employmentTypeId || filters.status,
+  )
+}
+
 export function sanitizeEmployeeSearch(value: string) {
   return value.trim().replace(/[,()%_*]/g, ' ').replace(/\s+/g, ' ')
 }

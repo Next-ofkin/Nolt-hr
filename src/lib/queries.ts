@@ -42,7 +42,7 @@ export function useProfiles() {
 export function useUpdateProfile(userId: string | null | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (updates: Partial<Pick<Profile, 'full_name' | 'email'>>) => {
+    mutationFn: async (updates: Pick<Profile, 'full_name'>) => {
       if (!userId) throw new Error('Not signed in')
       const { error } = await supabase
         .from('profiles')
