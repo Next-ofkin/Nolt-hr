@@ -30,7 +30,7 @@ const router = createBrowserRouter([
       {
         path: '/employee',
         element: (
-          <RequireRole roles={['employee', 'admin', 'hr']}>
+          <RequireRole roles={['employee']}>
             <EmployeePortalPage />
           </RequireRole>
         ),
