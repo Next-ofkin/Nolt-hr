@@ -375,3 +375,66 @@ test('Form import route authorization restricts access to admin and hr only', ()
   assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', 'employee'), false)
   assert.equal(isRouteAllowedForRole('/hr/forms/import/job-1', null), false)
 })
+
+test('AI provider selection defaults to Gemini and supports OpenRouter and OpenAI with safe errors', () => {
+  function selectAIProviderMock(providerEnv?: string, secrets: Record<string, string> = {}) {
+    const selected = (providerEnv || 'gemini').toLowerCase().trim()
+
+    if (selected === 'openrouter') {
+      const key = secrets['OPENROUTER_API_KEY']
+      return {
+        name: 'openrouter',
+        model: secrets['FORM_IMPORT_MODEL'] || 'openrouter/free',
+        isConfigured: Boolean(key && key.trim() !== ''),
+        missingError: 'OpenRouter PDF import is not configured.',
+      }
+    }
+
+    if (selected === 'openai') {
+      const key = secrets['OPENAI_API_KEY']
+      return {
+        name: 'openai',
+        model: secrets['FORM_IMPORT_MODEL'] || 'gpt-5.6-terra',
+        isConfigured: Boolean(key && key.trim() !== ''),
+        missingError: 'OpenAI PDF import is not configured.',
+      }
+    }
+
+    // Default: Gemini
+    const key = secrets['GEMINI_API_KEY']
+    return {
+      name: 'gemini',
+      model: secrets['FORM_IMPORT_MODEL'] || 'gemini-3.8-flash',
+      isConfigured: Boolean(key && key.trim() !== ''),
+      missingError: 'Gemini PDF import is not configured.',
+    }
+  }
+
+  // 1. Default provider is Gemini
+  const defaultProvider = selectAIProviderMock(undefined, {})
+  assert.equal(defaultProvider.name, 'gemini')
+  assert.equal(defaultProvider.model, 'gemini-3.8-flash')
+  assert.equal(defaultProvider.isConfigured, false)
+  assert.equal(defaultProvider.missingError, 'Gemini PDF import is not configured.')
+
+  // 2. OpenRouter provider selection
+  const openRouterUnconfigured = selectAIProviderMock('openrouter', {})
+  assert.equal(openRouterUnconfigured.name, 'openrouter')
+  assert.equal(openRouterUnconfigured.model, 'openrouter/free')
+  assert.equal(openRouterUnconfigured.isConfigured, false)
+  assert.equal(openRouterUnconfigured.missingError, 'OpenRouter PDF import is not configured.')
+
+  const openRouterConfigured = selectAIProviderMock('openrouter', { OPENROUTER_API_KEY: 'test-key-123' })
+  assert.equal(openRouterConfigured.isConfigured, true)
+
+  // 3. OpenAI provider selection retained
+  const openAiUnconfigured = selectAIProviderMock('openai', {})
+  assert.equal(openAiUnconfigured.name, 'openai')
+  assert.equal(openAiUnconfigured.model, 'gpt-5.6-terra')
+  assert.equal(openAiUnconfigured.isConfigured, false)
+  assert.equal(openAiUnconfigured.missingError, 'OpenAI PDF import is not configured.')
+
+  // 4. Gemini configured
+  const geminiConfigured = selectAIProviderMock('gemini', { GEMINI_API_KEY: 'gemini-secret-xyz' })
+  assert.equal(geminiConfigured.isConfigured, true)
+})

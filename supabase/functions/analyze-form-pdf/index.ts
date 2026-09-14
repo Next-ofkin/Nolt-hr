@@ -5,6 +5,213 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+export interface ProviderResult {
+  rawContent: string
+  providerName: string
+  modelName: string
+}
+
+export interface FormImportAIProvider {
+  name: string
+  model: string
+  isConfigured(): boolean
+  getMissingKeyError(): string
+  analyze(base64Pdf: string, promptText: string): Promise<ProviderResult>
+}
+
+export class GeminiFormImportProvider implements FormImportAIProvider {
+  name = 'gemini'
+  model: string
+  private apiKey: string | undefined
+
+  constructor() {
+    this.apiKey = Deno.env.get('GEMINI_API_KEY')
+    this.model = Deno.env.get('FORM_IMPORT_MODEL') || 'gemini-3.8-flash'
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.apiKey && this.apiKey.trim() !== '')
+  }
+
+  getMissingKeyError(): string {
+    return 'Gemini PDF import is not configured.'
+  }
+
+  async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'application/pdf',
+                  data: base64Pdf,
+                },
+              },
+              { text: promptText },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      }),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('Gemini API Error:', errText)
+      throw new Error('Gemini AI provider analysis failed.')
+    }
+
+    const data = await res.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    return {
+      rawContent: text,
+      providerName: this.name,
+      modelName: this.model,
+    }
+  }
+}
+
+export class OpenRouterFormImportProvider implements FormImportAIProvider {
+  name = 'openrouter'
+  model: string
+  private apiKey: string | undefined
+
+  constructor() {
+    this.apiKey = Deno.env.get('OPENROUTER_API_KEY')
+    this.model = Deno.env.get('FORM_IMPORT_MODEL') || 'openrouter/free'
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.apiKey && this.apiKey.trim() !== '')
+  }
+
+  getMissingKeyError(): string {
+    return 'OpenRouter PDF import is not configured.'
+  }
+
+  async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: promptText },
+              {
+                type: 'image_url',
+                image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
+              },
+            ],
+          },
+        ],
+      }),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('OpenRouter API Error:', errText)
+      throw new Error('OpenRouter AI provider analysis failed.')
+    }
+
+    const data = await res.json()
+    const text = data.choices?.[0]?.message?.content || '{}'
+    return {
+      rawContent: text,
+      providerName: this.name,
+      modelName: this.model,
+    }
+  }
+}
+
+export class OpenAIFormImportProvider implements FormImportAIProvider {
+  name = 'openai'
+  model: string
+  private apiKey: string | undefined
+
+  constructor() {
+    this.apiKey = Deno.env.get('OPENAI_API_KEY')
+    this.model = Deno.env.get('FORM_IMPORT_MODEL') || 'gpt-5.6-terra'
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.apiKey && this.apiKey.trim() !== '')
+  }
+
+  getMissingKeyError(): string {
+    return 'OpenAI PDF import is not configured.'
+  }
+
+  async analyze(base64Pdf: string, promptText: string): Promise<ProviderResult> {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        store: false,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: promptText },
+              {
+                type: 'image_url',
+                image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
+              },
+            ],
+          },
+        ],
+      }),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('OpenAI API Error:', errText)
+      throw new Error('OpenAI AI provider analysis failed.')
+    }
+
+    const data = await res.json()
+    const text = data.choices?.[0]?.message?.content || '{}'
+    return {
+      rawContent: text,
+      providerName: this.name,
+      modelName: this.model,
+    }
+  }
+}
+
+export function selectAIProvider(providerName?: string): FormImportAIProvider {
+  const selected = (providerName || Deno.env.get('FORM_IMPORT_PROVIDER') || 'gemini').toLowerCase().trim()
+  switch (selected) {
+    case 'openrouter':
+      return new OpenRouterFormImportProvider()
+    case 'openai':
+      return new OpenAIFormImportProvider()
+    case 'gemini':
+    default:
+      return new GeminiFormImportProvider()
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -23,7 +230,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
 
-    // Client for auth check
+    // User client for auth verification
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     })
@@ -36,10 +243,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Service client for DB & Storage ops
+    // Admin client for DB & Storage ops
     const adminClient = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Check user role
+    // Check caller role
     const { data: profile } = await adminClient
       .from('profiles')
       .select('role')
@@ -63,7 +270,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Load import job
+    // Load import job record
     const { data: job, error: jobErr } = await adminClient
       .from('form_import_jobs')
       .select('*')
@@ -77,28 +284,28 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update status to ANALYZING
+    // Mark job as ANALYZING
     await adminClient
       .from('form_import_jobs')
       .update({ status: 'ANALYZING' })
       .eq('id', importJobId)
 
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
-    const model = Deno.env.get('FORM_IMPORT_MODEL') || 'gpt-5.6-terra'
+    // Provider selection
+    const provider = selectAIProvider()
 
-    if (!openAiApiKey) {
-      // AI provider not configured
+    if (!provider.isConfigured()) {
+      const errorMessage = provider.getMissingKeyError()
       await adminClient
         .from('form_import_jobs')
         .update({
           status: 'FAILED',
           error_code: 'AI_NOT_CONFIGURED',
-          error_message: 'AI PDF import is not configured.',
+          error_message: errorMessage,
         })
         .eq('id', importJobId)
 
       return new Response(
-        JSON.stringify({ ok: false, error: 'AI PDF import is not configured.' }),
+        JSON.stringify({ ok: false, error: errorMessage }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -128,7 +335,7 @@ Deno.serve(async (req) => {
     const arrayBuffer = await fileData.arrayBuffer()
     const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
 
-    // Call OpenAI Server-Side with strict extraction guidelines & store: false
+    // Canonical prompt text
     const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its structured digital template schema.
 CRITICAL INSTRUCTIONS:
 1. EXTRACT and STRUCTURE the document accurately.
@@ -167,55 +374,29 @@ Return ONLY a JSON object matching this strict schema:
 Allowed field_type values: SHORT_TEXT, LONG_TEXT, EMAIL, PHONE, NUMBER, DATE, DROPDOWN, RADIO, CHECKBOX, YES_NO, FILE_UPLOAD, SIGNATURE, HEADING, PARAGRAPH, DIVIDER, REPEATING_GROUP.
 Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
 
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model,
-        store: false,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You extract HR forms into JSON structures without altering legal wording.' },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: promptText },
-              {
-                type: 'image_url',
-                image_url: { url: `data:application/pdf;base64,${base64Pdf}` },
-              },
-            ],
-          },
-        ],
-      }),
-    })
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text()
-      console.error('OpenAI Error:', errText)
+    let providerResult: ProviderResult
+    try {
+      providerResult = await provider.analyze(base64Pdf, promptText)
+    } catch (err) {
+      console.error(`${provider.name} analysis error:`, err)
       await adminClient
         .from('form_import_jobs')
         .update({
           status: 'FAILED',
           error_code: 'AI_PROVIDER_ERROR',
-          error_message: 'AI provider analysis failed.',
+          error_message: `${provider.name} AI provider analysis failed.`,
         })
         .eq('id', importJobId)
 
       return new Response(
-        JSON.stringify({ ok: false, error: 'AI provider analysis failed.' }),
+        JSON.stringify({ ok: false, error: `${provider.name} AI provider analysis failed.` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const aiData = await aiRes.json()
-    const content = aiData.choices?.[0]?.message?.content || '{}'
-    const parsedSchema = JSON.parse(content)
+    const parsedSchema = JSON.parse(providerResult.rawContent)
 
-    // Normalize field keys and positions
+    // Canonical normalization across all providers
     const validFieldTypes = new Set([
       'SHORT_TEXT', 'LONG_TEXT', 'EMAIL', 'PHONE', 'NUMBER', 'DATE',
       'DROPDOWN', 'RADIO', 'CHECKBOX', 'YES_NO', 'FILE_UPLOAD',
@@ -264,8 +445,8 @@ Ensure field_key starts with a lowercase letter (^[a-z][a-z0-9_]*$).`
       .update({
         status: 'READY_FOR_REVIEW',
         proposed_schema: proposedSchema,
-        provider: 'OpenAI',
-        model: model,
+        provider: providerResult.providerName,
+        model: providerResult.modelName,
         completed_at: new Date().toISOString(),
       })
       .eq('id', importJobId)
