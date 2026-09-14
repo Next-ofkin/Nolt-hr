@@ -1,6 +1,7 @@
 import type {
   Employee,
   EmployeeInsert,
+  EmployeeInvitation,
   EmployeeStatus,
   EmployeeUpdate,
   UserRole,
@@ -150,4 +151,19 @@ export function employeeMutationError(error: unknown, fallback: string) {
   }
   if (databaseError.code === '23503') return 'One of the linked records for this employee is no longer valid.'
   return fallback
+}
+
+export type EmployeeAccountState = 'NOT_INVITED' | 'PENDING' | 'ACTIVE' | 'FAILED'
+
+export function getEmployeeAccountState(
+  employee?: Employee | null,
+  latestInvitation?: EmployeeInvitation | null,
+): EmployeeAccountState {
+  if (!employee) return 'NOT_INVITED'
+  if (employee.account_activated_at) return 'ACTIVE'
+  if (latestInvitation?.status === 'ACCEPTED') return 'ACTIVE'
+  if (employee.status === 'INVITED' || latestInvitation?.status === 'PENDING') return 'PENDING'
+  if (employee.auth_user_id && employee.status !== 'DRAFT') return 'PENDING'
+  if (latestInvitation?.status === 'FAILED') return 'FAILED'
+  return 'NOT_INVITED'
 }

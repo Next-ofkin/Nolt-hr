@@ -12,6 +12,7 @@ import EmployeesPage from './pages/EmployeesPage'
 import CreateEmployeePage from './pages/CreateEmployeePage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import EditEmployeePage from './pages/EditEmployeePage'
+import EmployeePortalPage from './pages/EmployeePortalPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -25,6 +26,14 @@ const router = createBrowserRouter([
       {
         path: '/',
         element: <Dashboard />,
+      },
+      {
+        path: '/employee',
+        element: (
+          <RequireRole roles={['employee', 'admin', 'hr']}>
+            <EmployeePortalPage />
+          </RequireRole>
+        ),
       },
       {
         path: '/profile',

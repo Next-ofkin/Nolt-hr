@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, PlusCircle, ShieldCheck, Users } from 'lucide-react'
 import { useCurrentProfile } from '../lib/queries'
 import { useAuth } from '../lib/useAuth'
@@ -27,6 +27,10 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { data: profile } = useCurrentProfile()
   const role = profile?.role ?? null
+
+  if (role === 'employee') {
+    return <Navigate to="/employee" replace />
+  }
 
   if (role === 'admin' || role === 'hr') {
     return <HrDashboard role={role} firstName={firstNameOf(profile?.full_name)} />

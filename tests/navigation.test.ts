@@ -30,9 +30,14 @@ test('HR navigation includes Dashboard and Employees but not User Access', () =>
   assert.equal(labels.includes('User Access'), false)
 })
 
-test('employee and signed-out navigation is limited to Dashboard', () => {
-  assert.deepEqual(flatten('employee').map((item) => item.label), ['Dashboard'])
-  assert.deepEqual(flatten(null).map((item) => item.label), ['Dashboard'])
+test('employee navigation is dedicated Home, signed-out is Dashboard', () => {
+  const empItems = flatten('employee')
+  assert.deepEqual(empItems.map((item) => item.label), ['Home'])
+  assert.deepEqual(empItems.map((item) => item.to), ['/employee'])
+
+  const signedOutItems = flatten(null)
+  assert.deepEqual(signedOutItems.map((item) => item.label), ['Dashboard'])
+  assert.deepEqual(signedOutItems.map((item) => item.to), ['/'])
 })
 
 test('no role ever surfaces Profile or the legacy Invitations page in primary navigation', () => {

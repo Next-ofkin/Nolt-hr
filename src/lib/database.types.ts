@@ -41,14 +41,70 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_invitations: {
+        Row: {
+          accepted_at: string | null
+          auth_user_id: string | null
+          created_at: string
+          email: string
+          employee_id: string
+          failed_at: string | null
+          failure_code: string | null
+          id: string
+          invited_by: string | null
+          revoked_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["employee_invitation_status"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          email: string
+          employee_id: string
+          failed_at?: string | null
+          failure_code?: string | null
+          id?: string
+          invited_by?: string | null
+          revoked_at?: string | null
+          sent_at?: string | null
+          status: Database["public"]["Enums"]["employee_invitation_status"]
+        }
+        Update: {
+          accepted_at?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string
+          employee_id?: string
+          failed_at?: string | null
+          failure_code?: string | null
+          id?: string
+          invited_by?: string | null
+          revoked_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["employee_invitation_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_invitations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
+          account_activated_at: string | null
           auth_user_id: string | null
           created_at: string
           department_id: string | null
           employment_type_id: string | null
           first_name: string
           id: string
+          invited_at: string | null
+          invited_by: string | null
           job_title: string | null
           last_name: string
           middle_name: string | null
@@ -60,12 +116,15 @@ export type Database = {
           work_email: string
         }
         Insert: {
+          account_activated_at?: string | null
           auth_user_id?: string | null
           created_at?: string
           department_id?: string | null
           employment_type_id?: string | null
           first_name: string
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
           job_title?: string | null
           last_name: string
           middle_name?: string | null
@@ -77,12 +136,15 @@ export type Database = {
           work_email: string
         }
         Update: {
+          account_activated_at?: string | null
           auth_user_id?: string | null
           created_at?: string
           department_id?: string | null
           employment_type_id?: string | null
           first_name?: string
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
           job_title?: string | null
           last_name?: string
           middle_name?: string | null
@@ -166,9 +228,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_my_employee_account: {
+        Args: Record<string, never>
+        Returns: Json
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      finalize_employee_invitation: {
+        Args: {
+          p_employee_id: string
+          p_invitation_id: string
+          p_auth_user_id: string
+          p_invited_by: string
+        }
+        Returns: undefined
       }
       update_user_role: {
         Args: { p_role: string; p_user_id: string }
@@ -176,6 +251,12 @@ export type Database = {
       }
     }
     Enums: {
+      employee_invitation_status:
+        | "CREATING"
+        | "PENDING"
+        | "ACCEPTED"
+        | "FAILED"
+        | "REVOKED"
       employee_status:
         | "DRAFT"
         | "INVITED"
@@ -314,6 +395,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      employee_invitation_status: [
+        "CREATING",
+        "PENDING",
+        "ACCEPTED",
+        "FAILED",
+        "REVOKED",
+      ],
       employee_status: [
         "DRAFT",
         "INVITED",
@@ -334,6 +422,7 @@ export const Constants = {
 // regenerations so consuming modules never need to change their imports.
 export type UserRole = Database["public"]["Enums"]["user_role"]
 export type EmployeeStatus = Database["public"]["Enums"]["employee_status"]
+export type EmployeeInvitationStatus = Database["public"]["Enums"]["employee_invitation_status"]
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 export type Department = Database["public"]["Tables"]["departments"]["Row"]
@@ -341,3 +430,6 @@ export type EmploymentType = Database["public"]["Tables"]["employment_types"]["R
 export type Employee = Database["public"]["Tables"]["employees"]["Row"]
 export type EmployeeInsert = Database["public"]["Tables"]["employees"]["Insert"]
 export type EmployeeUpdate = Database["public"]["Tables"]["employees"]["Update"]
+export type EmployeeInvitation = Database["public"]["Tables"]["employee_invitations"]["Row"]
+export type EmployeeInvitationInsert = Database["public"]["Tables"]["employee_invitations"]["Insert"]
+export type EmployeeInvitationUpdate = Database["public"]["Tables"]["employee_invitations"]["Update"]

@@ -8,7 +8,7 @@ if (!supabaseUrl || !serviceRoleKey) {
 }
 
 const siteUrl = Deno.env.get('SITE_URL') ?? supabaseUrl
-const authCallbackUrl = new URL('/auth/callback', siteUrl).href
+const authCallbackUrl = new URL('/auth/callback?next=/employee', siteUrl).href
 
 const ALLOWED_ROLES = ['admin', 'hr', 'employee'] as const
 type Role = (typeof ALLOWED_ROLES)[number]
@@ -46,18 +46,19 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Validate the caller's JWT (the platform also verifies it, but
-  // we re-check so the role decision below is trustworthy).
+  // Validate the caller's JWT
   const { data: tokenData, error: tokenError } = await supabase.auth.getUser(token)
   if (tokenError || !tokenData.user) {
     return json({ error: 'Unauthorized' }, 401)
   }
 
-  // Fetch the caller's role from profiles (service role bypasses RLS).
+  const callerId = tokenData.user.id
+
+  // Fetch the caller's role from profiles
   const { data: caller } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', tokenData.user.id)
+    .eq('id', callerId)
     .single()
   const callerRole = caller?.role ?? null
 
@@ -66,6 +67,145 @@ Deno.serve(async (req) => {
   }
 
   const body = await req.json().catch(() => ({}))
+
+  // -------------------------------------------------------------
+  // MODE A: Employee Record Authoritative Invitation ({ employee_id })
+  // -------------------------------------------------------------
+  if (body.employee_id && typeof body.employee_id === 'string') {
+    const employeeId = body.employee_id.trim()
+
+    // 1. Load employee from database
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('id, first_name, middle_name, last_name, work_email, status, auth_user_id')
+      .eq('id', employeeId)
+      .single()
+
+    if (empError || !employee) {
+      return json({ error: 'Employee record not found' }, 440)
+    }
+
+    if (employee.status === 'ARCHIVED') {
+      return json({ error: 'Archived employees cannot be invited' }, 400)
+    }
+
+    if (employee.auth_user_id) {
+      return json({ error: 'This employee is already linked to a user account' }, 400)
+    }
+
+    if (employee.status !== 'DRAFT') {
+      return json({ error: `Cannot invite employee with lifecycle status ${employee.status}` }, 400)
+    }
+
+    const workEmail = String(employee.work_email ?? '').trim().toLowerCase()
+    if (!workEmail) {
+      return json({ error: 'Employee work email is required' }, 400)
+    }
+
+    const fullName = [employee.first_name, employee.middle_name, employee.last_name]
+      .filter(Boolean)
+      .join(' ')
+
+    // 2. Create local invitation record in CREATING state
+    const { data: invitation, error: invInsertError } = await supabase
+      .from('employee_invitations')
+      .insert({
+        employee_id: employee.id,
+        email: workEmail,
+        status: 'CREATING',
+        invited_by: callerId,
+      })
+      .select('id')
+      .single()
+
+    if (invInsertError || !invitation) {
+      if (invInsertError?.code === '23505') {
+        return json({ error: 'An active invitation already exists for this employee.' }, 409)
+      }
+      return json({ error: 'Failed to create invitation record' }, 500)
+    }
+
+    const invitationId = invitation.id
+
+    // 3. Invite via Supabase Auth Admin API
+    const inviteRes = await supabase.auth.admin.inviteUserByEmail(workEmail, {
+      data: { full_name: fullName, employee_id: employee.id },
+      redirectTo: authCallbackUrl,
+    })
+
+    if (inviteRes.error) {
+      const isExistingUser = inviteRes.error.message.toLowerCase().includes('already') ||
+        inviteRes.error.message.toLowerCase().includes('registered') ||
+        inviteRes.error.status === 422
+
+      await supabase
+        .from('employee_invitations')
+        .update({
+          status: 'FAILED',
+          failed_at: new Date().toISOString(),
+          failure_code: isExistingUser ? 'EMAIL_EXISTS' : 'AUTH_INVITE_FAILED',
+        })
+        .eq('id', invitationId)
+
+      if (isExistingUser) {
+        return json({
+          error: 'An application account already exists for this email. The account was not linked automatically. Please contact an administrator.',
+        }, 400)
+      }
+
+      return json({ error: 'Failed to send invitation email. Please try again.' }, 400)
+    }
+
+    const invitedUser = inviteRes.data.user
+
+    // 4. Update app_metadata safely with role "employee" and employee_id
+    const updatedMetadata = { ...invitedUser.app_metadata, role: 'employee', employee_id: employee.id }
+    const metadataRes = await supabase.auth.admin.updateUserById(invitedUser.id, {
+      app_metadata: updatedMetadata,
+    })
+
+    if (metadataRes.error) {
+      // Compensation: revoke created user and mark invitation failed
+      await supabase.auth.admin.deleteUser(invitedUser.id).catch(() => {})
+      await supabase
+        .from('employee_invitations')
+        .update({
+          status: 'FAILED',
+          failed_at: new Date().toISOString(),
+          failure_code: 'METADATA_FAILED',
+        })
+        .eq('id', invitationId)
+      return json({ error: 'Failed to assign application metadata to invited user' }, 500)
+    }
+
+    // 5. Finalize local employee record and invitation tracking row atomically via RPC
+    const { error: rpcError } = await supabase.rpc('finalize_employee_invitation', {
+      p_employee_id: employee.id,
+      p_invitation_id: invitationId,
+      p_auth_user_id: invitedUser.id,
+      p_invited_by: callerId,
+    })
+
+    if (rpcError) {
+      // Compensation: revoke created user and mark invitation failed
+      await supabase.auth.admin.deleteUser(invitedUser.id).catch(() => {})
+      await supabase
+        .from('employee_invitations')
+        .update({
+          status: 'FAILED',
+          failed_at: new Date().toISOString(),
+          failure_code: 'FINALIZATION_FAILED',
+        })
+        .eq('id', invitationId)
+      return json({ error: 'Failed to complete employee account linking' }, 500)
+    }
+
+    return json({ ok: true, id: invitedUser.id, invitation_id: invitationId })
+  }
+
+  // -------------------------------------------------------------
+  // MODE B: Legacy Generic User Invitation
+  // -------------------------------------------------------------
   const email = String(body.email ?? '').trim().toLowerCase()
   const fullName = String(body.full_name ?? '').trim()
   const requestedRole = String(body.role ?? 'employee') as Role
@@ -79,7 +219,6 @@ Deno.serve(async (req) => {
   if (!ALLOWED_ROLES.includes(requestedRole)) {
     return json({ error: 'Invalid role' }, 400)
   }
-  // HR may only invite employees; only admins may grant hr/admin.
   if (callerRole === 'hr' && requestedRole !== 'employee') {
     return json({ error: 'HR can only invite users with the employee role' }, 403)
   }
