@@ -635,6 +635,10 @@ select:focus {
   grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(150px, 1fr));
 }
 
+.directory-filters-compact {
+  grid-template-columns: minmax(240px, 2fr) minmax(180px, 1fr);
+}
+
 .field {
   display: flex;
   flex-direction: column;

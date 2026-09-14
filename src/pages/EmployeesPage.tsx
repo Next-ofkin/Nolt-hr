@@ -2,12 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Users } from 'lucide-react'
 import { EmployeeStatusBadge } from '../components/EmployeeStatusBadge'
-import {
-  EMPLOYEE_PAGE_SIZE,
-  useDepartments,
-  useEmployeeDirectory,
-  useEmploymentTypes,
-} from '../lib/employee-queries'
+import { EMPLOYEE_PAGE_SIZE, useEmployeeDirectory } from '../lib/employee-queries'
 import {
   EMPLOYEE_STATUSES,
   EMPLOYEE_STATUS_LABELS,
@@ -19,8 +14,6 @@ import type { EmployeeStatus } from '../lib/database.types'
 
 const initialFilters: EmployeeFilters = {
   search: '',
-  departmentId: '',
-  employmentTypeId: '',
   status: '',
   page: 1,
 }
@@ -28,8 +21,6 @@ const initialFilters: EmployeeFilters = {
 export default function EmployeesPage() {
   const [filters, setFilters] = useState(initialFilters)
   const directory = useEmployeeDirectory(filters)
-  const departments = useDepartments()
-  const employmentTypes = useEmploymentTypes()
   const employees = directory.data?.employees ?? []
   const total = directory.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / EMPLOYEE_PAGE_SIZE))
@@ -58,7 +49,7 @@ export default function EmployeesPage() {
       </div>
 
       <section className="card directory-card" aria-label="Employee directory">
-        <div className="directory-filters">
+        <div className="directory-filters directory-filters-compact">
           <div className="field search-field">
             <label htmlFor="employee-search">Search employees</label>
             <input
@@ -68,32 +59,6 @@ export default function EmployeesPage() {
               value={filters.search}
               onChange={(event) => updateFilter('search', event.target.value)}
             />
-          </div>
-          <div className="field">
-            <label htmlFor="department-filter">Department</label>
-            <select
-              id="department-filter"
-              value={filters.departmentId}
-              onChange={(event) => updateFilter('departmentId', event.target.value)}
-            >
-              <option value="">All departments</option>
-              {departments.data?.map((department) => (
-                <option key={department.id} value={department.id}>{department.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="type-filter">Employment Type</label>
-            <select
-              id="type-filter"
-              value={filters.employmentTypeId}
-              onChange={(event) => updateFilter('employmentTypeId', event.target.value)}
-            >
-              <option value="">All types</option>
-              {employmentTypes.data?.map((employmentType) => (
-                <option key={employmentType.id} value={employmentType.id}>{employmentType.name}</option>
-              ))}
-            </select>
           </div>
           <div className="field">
             <label htmlFor="status-filter">Status</label>
@@ -144,8 +109,6 @@ export default function EmployeesPage() {
                   <th>Employee</th>
                   <th>Staff ID</th>
                   <th>Work Email</th>
-                  <th>Department</th>
-                  <th>Employment Type</th>
                   <th>Job Title</th>
                   <th>Start Date</th>
                   <th>Status</th>
@@ -160,8 +123,6 @@ export default function EmployeesPage() {
                       <td><strong>{row.name}</strong></td>
                       <td>{row.staffId}</td>
                       <td>{row.workEmail}</td>
-                      <td>{row.department}</td>
-                      <td>{row.employmentType}</td>
                       <td>{row.jobTitle}</td>
                       <td>{row.startDate ? new Date(`${row.startDate}T00:00:00`).toLocaleDateString() : '—'}</td>
                       <td><EmployeeStatusBadge status={row.status} /></td>

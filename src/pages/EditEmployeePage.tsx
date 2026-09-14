@@ -1,11 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EmployeeForm } from '../components/EmployeeForm'
-import {
-  useDepartments,
-  useEmployee,
-  useEmploymentTypes,
-  useUpdateEmployee,
-} from '../lib/employee-queries'
+import { useEmployee, useUpdateEmployee } from '../lib/employee-queries'
 import {
   archiveEmployeePayload,
   formatEmployeeName,
@@ -17,8 +12,6 @@ export default function EditEmployeePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const employeeQuery = useEmployee(id)
-  const departments = useDepartments()
-  const employmentTypes = useEmploymentTypes()
   const updateEmployee = useUpdateEmployee(id)
   const employee = employeeQuery.data
 
@@ -35,11 +28,11 @@ export default function EditEmployeePage() {
     navigate(`/hr/employees/${id}`)
   }
 
-  if (employeeQuery.isLoading || departments.isLoading || employmentTypes.isLoading) {
+  if (employeeQuery.isLoading) {
     return <div className="page"><p>Loading employee form…</p></div>
   }
 
-  if (employeeQuery.error || departments.error || employmentTypes.error) {
+  if (employeeQuery.error) {
     return <div className="page"><p className="error">Unable to load this employee.</p></div>
   }
 
@@ -59,8 +52,6 @@ export default function EditEmployeePage() {
       </div>
       <EmployeeForm
         employee={employee}
-        departments={departments.data ?? []}
-        employmentTypes={employmentTypes.data ?? []}
         includeStatus
         submitLabel="Save Changes"
         isSubmitting={updateEmployee.isPending}

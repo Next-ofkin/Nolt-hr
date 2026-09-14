@@ -73,8 +73,6 @@ export default function EmployeeDetailPage() {
               <dt>Work Email</dt><dd>{employee.work_email}</dd>
               <dt>Phone</dt><dd>{employee.phone ?? '—'}</dd>
               <dt>Job Title</dt><dd>{employee.job_title ?? '—'}</dd>
-              <dt>Department</dt><dd>{employee.department?.name ?? '—'}</dd>
-              <dt>Employment Type</dt><dd>{employee.employment_type?.name ?? '—'}</dd>
               <dt>Start Date</dt><dd>{displayDate(employee.start_date)}</dd>
               <dt>Lifecycle Status</dt><dd><EmployeeStatusBadge status={employee.status} /></dd>
             </dl>

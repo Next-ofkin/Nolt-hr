@@ -5,12 +5,10 @@ import {
   employeeFormValues,
   type EmployeeFormValues,
 } from '../lib/employee-domain'
-import type { Department, Employee, EmploymentType } from '../lib/database.types'
+import type { Employee } from '../lib/database.types'
 
 interface EmployeeFormProps {
   employee?: Employee | null
-  departments: Department[]
-  employmentTypes: EmploymentType[]
   includeStatus?: boolean
   submitLabel: string
   isSubmitting: boolean
@@ -20,8 +18,6 @@ interface EmployeeFormProps {
 
 export function EmployeeForm({
   employee,
-  departments,
-  employmentTypes,
   includeStatus = false,
   submitLabel,
   isSubmitting,
@@ -77,31 +73,6 @@ export function EmployeeForm({
         <div className="field">
           <label htmlFor="job_title">Job Title</label>
           <input id="job_title" {...register('job_title')} />
-        </div>
-        <div className="field">
-          <label htmlFor="department_id">Department *</label>
-          <select id="department_id" {...register('department_id', { required: 'Department is required' })}>
-            <option value="">Select department</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>{department.name}</option>
-            ))}
-          </select>
-          {errors.department_id && <p className="field-error">{errors.department_id.message}</p>}
-        </div>
-        <div className="field">
-          <label htmlFor="employment_type_id">Employment Type *</label>
-          <select
-            id="employment_type_id"
-            {...register('employment_type_id', { required: 'Employment type is required' })}
-          >
-            <option value="">Select employment type</option>
-            {employmentTypes.map((employmentType) => (
-              <option key={employmentType.id} value={employmentType.id}>{employmentType.name}</option>
-            ))}
-          </select>
-          {errors.employment_type_id && (
-            <p className="field-error">{errors.employment_type_id.message}</p>
-          )}
         </div>
         <div className="field">
           <label htmlFor="start_date">Start Date</label>

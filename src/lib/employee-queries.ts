@@ -1,48 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import {
-  employeeMutationError,
-  sanitizeEmployeeSearch,
-  type EmployeeFilters,
-  type EmployeeWithRelations,
-} from './employee-domain'
-import type { EmployeeInsert, EmployeeStatus, EmployeeUpdate } from './database.types'
+import { employeeMutationError, sanitizeEmployeeSearch, type EmployeeFilters } from './employee-domain'
+import type { Employee, EmployeeInsert, EmployeeStatus, EmployeeUpdate } from './database.types'
 
 export const EMPLOYEE_PAGE_SIZE = 20
-
-const employeeSelection = `
-  *,
-  department:departments!employees_department_id_fkey(id, name),
-  employment_type:employment_types!employees_employment_type_id_fkey(id, name)
-`
-
-export function useDepartments() {
-  return useQuery({
-    queryKey: ['departments'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name')
-      if (error) throw error
-      return data
-    },
-  })
-}
-
-export function useEmploymentTypes() {
-  return useQuery({
-    queryKey: ['employment-types'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employment_types')
-        .select('*')
-        .order('name')
-      if (error) throw error
-      return data
-    },
-  })
-}
 
 export function useEmployeeDirectory(filters: EmployeeFilters) {
   return useQuery({
@@ -51,7 +12,7 @@ export function useEmployeeDirectory(filters: EmployeeFilters) {
       const from = (filters.page - 1) * EMPLOYEE_PAGE_SIZE
       let query = supabase
         .from('employees')
-        .select(employeeSelection, { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, from + EMPLOYEE_PAGE_SIZE - 1)
 
@@ -66,15 +27,11 @@ export function useEmployeeDirectory(filters: EmployeeFilters) {
           `staff_id.ilike.${pattern}`,
         ].join(','))
       }
-      if (filters.departmentId) query = query.eq('department_id', filters.departmentId)
-      if (filters.employmentTypeId) {
-        query = query.eq('employment_type_id', filters.employmentTypeId)
-      }
       if (filters.status) query = query.eq('status', filters.status)
 
       const { data, error, count } = await query
       if (error) throw error
-      return { employees: (data ?? []) as EmployeeWithRelations[], count: count ?? 0 }
+      return { employees: (data ?? []) as Employee[], count: count ?? 0 }
     },
   })
 }
@@ -102,11 +59,11 @@ export function useRecentEmployees(limit: number, enabled: boolean) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select(employeeSelection)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(limit)
       if (error) throw error
-      return (data ?? []) as EmployeeWithRelations[]
+      return (data ?? []) as Employee[]
     },
     enabled,
   })
@@ -119,11 +76,11 @@ export function useEmployee(employeeId: string | undefined) {
       if (!employeeId) return null
       const { data, error } = await supabase
         .from('employees')
-        .select(employeeSelection)
+        .select('*')
         .eq('id', employeeId)
         .maybeSingle()
       if (error) throw error
-      return data as EmployeeWithRelations | null
+      return data
     },
     enabled: Boolean(employeeId),
   })

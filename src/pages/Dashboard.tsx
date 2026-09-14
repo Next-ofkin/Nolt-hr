@@ -126,7 +126,6 @@ function HrDashboard({ role, firstName }: { role: UserRole; firstName: string | 
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Department</th>
                   <th>Job Title</th>
                   <th>Status</th>
                   <th>Start Date</th>
@@ -138,7 +137,6 @@ function HrDashboard({ role, firstName }: { role: UserRole; firstName: string | 
                     <td>
                       <Link to={`/hr/employees/${employee.id}`}>{formatEmployeeName(employee)}</Link>
                     </td>
-                    <td>{employee.department?.name ?? '—'}</td>
                     <td>{employee.job_title ?? '—'}</td>
                     <td>
                       <EmployeeStatusBadge status={employee.status} />

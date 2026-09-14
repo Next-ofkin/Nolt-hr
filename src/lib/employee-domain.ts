@@ -1,10 +1,8 @@
 import type {
-  Department,
   Employee,
   EmployeeInsert,
   EmployeeStatus,
   EmployeeUpdate,
-  EmploymentType,
   UserRole,
 } from './database.types.ts'
 
@@ -42,31 +40,20 @@ export interface EmployeeFormValues {
   phone: string
   staff_id: string
   job_title: string
-  department_id: string
-  employment_type_id: string
   start_date: string
   status: EmployeeStatus
 }
 
 export interface EmployeeFilters {
   search: string
-  departmentId: string
-  employmentTypeId: string
   status: EmployeeStatus | ''
   page: number
-}
-
-export type EmployeeWithRelations = Employee & {
-  department: Pick<Department, 'id' | 'name'> | null
-  employment_type: Pick<EmploymentType, 'id' | 'name'> | null
 }
 
 export interface EmployeeValidationErrors {
   first_name?: string
   last_name?: string
   work_email?: string
-  department_id?: string
-  employment_type_id?: string
   status?: string
 }
 
@@ -90,8 +77,6 @@ export function validateEmployee(values: EmployeeFormValues): EmployeeValidation
   if (!values.first_name.trim()) errors.first_name = 'First name is required'
   if (!values.last_name.trim()) errors.last_name = 'Last name is required'
   if (!EMAIL_PATTERN.test(values.work_email.trim())) errors.work_email = 'Enter a valid work email'
-  if (!values.department_id) errors.department_id = 'Department is required'
-  if (!values.employment_type_id) errors.employment_type_id = 'Employment type is required'
   if (!isEmployeeStatus(values.status)) errors.status = 'Choose a valid lifecycle status'
   return errors
 }
@@ -105,8 +90,6 @@ export function createEmployeePayload(values: EmployeeFormValues): EmployeeInser
     phone: optional(values.phone),
     staff_id: optional(values.staff_id),
     job_title: optional(values.job_title),
-    department_id: values.department_id,
-    employment_type_id: values.employment_type_id,
     start_date: optional(values.start_date),
   }
 }
@@ -128,8 +111,6 @@ export function employeeFormValues(employee?: Employee | null): EmployeeFormValu
     phone: employee?.phone ?? '',
     staff_id: employee?.staff_id ?? '',
     job_title: employee?.job_title ?? '',
-    department_id: employee?.department_id ?? '',
-    employment_type_id: employee?.employment_type_id ?? '',
     start_date: employee?.start_date ?? '',
     status: employee?.status ?? 'DRAFT',
   }
@@ -139,14 +120,12 @@ export function formatEmployeeName(employee: Pick<Employee, 'first_name' | 'midd
   return [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ')
 }
 
-export function employeeDirectoryRow(employee: EmployeeWithRelations) {
+export function employeeDirectoryRow(employee: Employee) {
   return {
     id: employee.id,
     name: formatEmployeeName(employee),
     staffId: employee.staff_id ?? '—',
     workEmail: employee.work_email,
-    department: employee.department?.name ?? '—',
-    employmentType: employee.employment_type?.name ?? '—',
     jobTitle: employee.job_title ?? '—',
     startDate: employee.start_date ?? null,
     status: employee.status,
@@ -154,9 +133,7 @@ export function employeeDirectoryRow(employee: EmployeeWithRelations) {
 }
 
 export function hasActiveEmployeeFilters(filters: EmployeeFilters) {
-  return Boolean(
-    filters.search.trim() || filters.departmentId || filters.employmentTypeId || filters.status,
-  )
+  return Boolean(filters.search.trim() || filters.status)
 }
 
 export function sanitizeEmployeeSearch(value: string) {
@@ -171,6 +148,6 @@ export function employeeMutationError(error: unknown, fallback: string) {
     if (detail.includes('staff_id')) return 'An employee with this staff ID already exists.'
     return 'An employee with these details already exists.'
   }
-  if (databaseError.code === '23503') return 'Choose a valid department and employment type.'
+  if (databaseError.code === '23503') return 'One of the linked records for this employee is no longer valid.'
   return fallback
 }

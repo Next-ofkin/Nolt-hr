@@ -13,8 +13,8 @@ import {
   validateEmployee,
   type EmployeeFilters,
   type EmployeeFormValues,
-  type EmployeeWithRelations,
 } from '../src/lib/employee-domain.ts'
+import type { Employee } from '../src/lib/database.types.ts'
 
 const validForm: EmployeeFormValues = {
   first_name: ' Ada ',
@@ -24,28 +24,26 @@ const validForm: EmployeeFormValues = {
   phone: ' +234 800 000 0000 ',
   staff_id: ' NOLT-001 ',
   job_title: ' Analyst ',
-  department_id: 'department-id',
-  employment_type_id: 'type-id',
   start_date: '2026-09-15',
   status: 'HR_REVIEW',
 }
 
-test('employee validation requires identity, email, department, and employment type', () => {
+test('employee validation requires only identity and a valid email', () => {
   const errors = validateEmployee({
     ...validForm,
     first_name: ' ',
     last_name: '',
     work_email: 'invalid',
-    department_id: '',
-    employment_type_id: '',
   })
   assert.deepEqual(errors, {
     first_name: 'First name is required',
     last_name: 'Last name is required',
     work_email: 'Enter a valid work email',
-    department_id: 'Department is required',
-    employment_type_id: 'Employment type is required',
   })
+})
+
+test('department and employment type are not required to pass validation', () => {
+  assert.deepEqual(validateEmployee(validForm), {})
 })
 
 test('only the nine defined employee lifecycle statuses are valid', () => {
@@ -62,7 +60,7 @@ test('admin and HR may access employee management while employees may not', () =
 })
 
 test('employee directory rows render real record values with readable fallbacks', () => {
-  const employee = {
+  const employee: Employee = {
     id: 'employee-id',
     auth_user_id: null,
     first_name: 'Ada',
@@ -72,30 +70,26 @@ test('employee directory rows render real record values with readable fallbacks'
     phone: null,
     staff_id: null,
     job_title: 'Analyst',
-    department_id: 'department-id',
-    employment_type_id: 'type-id',
+    department_id: null,
+    employment_type_id: null,
     start_date: null,
     status: 'DRAFT',
     created_at: '2026-09-14T00:00:00Z',
     updated_at: '2026-09-14T00:00:00Z',
-    department: { id: 'department-id', name: 'Technology' },
-    employment_type: { id: 'type-id', name: 'Permanent' },
-  } satisfies EmployeeWithRelations
+  }
 
   assert.deepEqual(employeeDirectoryRow(employee), {
     id: 'employee-id',
     name: 'Ada Lovelace',
     staffId: '—',
     workEmail: 'ada@example.com',
-    department: 'Technology',
-    employmentType: 'Permanent',
     jobTitle: 'Analyst',
     startDate: null,
     status: 'DRAFT',
   })
 })
 
-test('create employee payload normalizes values and leaves status to the DRAFT database default', () => {
+test('create employee payload normalizes values and never invents department or employment type', () => {
   const payload = createEmployeePayload(validForm)
   assert.deepEqual(payload, {
     first_name: 'Ada',
@@ -105,18 +99,20 @@ test('create employee payload normalizes values and leaves status to the DRAFT d
     phone: '+234 800 000 0000',
     staff_id: 'NOLT-001',
     job_title: 'Analyst',
-    department_id: 'department-id',
-    employment_type_id: 'type-id',
     start_date: '2026-09-15',
   })
   assert.equal('status' in payload, false)
   assert.equal('auth_user_id' in payload, false)
+  assert.equal('department_id' in payload, false)
+  assert.equal('employment_type_id' in payload, false)
 })
 
-test('edit employee payload includes a valid lifecycle status but never auth_user_id', () => {
+test('edit employee payload includes a valid lifecycle status but never touches auth_user_id, department, or employment type', () => {
   const payload = updateEmployeePayload(validForm)
   assert.equal(payload.status, 'HR_REVIEW')
   assert.equal('auth_user_id' in payload, false)
+  assert.equal('department_id' in payload, false)
+  assert.equal('employment_type_id' in payload, false)
 })
 
 test('archive behavior retains the record and changes only its status', () => {
@@ -124,18 +120,10 @@ test('archive behavior retains the record and changes only its status', () => {
 })
 
 test('hasActiveEmployeeFilters distinguishes an empty directory from a filtered one', () => {
-  const noFilters: EmployeeFilters = {
-    search: '',
-    departmentId: '',
-    employmentTypeId: '',
-    status: '',
-    page: 1,
-  }
+  const noFilters: EmployeeFilters = { search: '', status: '', page: 1 }
   assert.equal(hasActiveEmployeeFilters(noFilters), false)
   assert.equal(hasActiveEmployeeFilters({ ...noFilters, search: '  ' }), false)
   assert.equal(hasActiveEmployeeFilters({ ...noFilters, search: 'ada' }), true)
-  assert.equal(hasActiveEmployeeFilters({ ...noFilters, departmentId: 'dept-1' }), true)
-  assert.equal(hasActiveEmployeeFilters({ ...noFilters, employmentTypeId: 'type-1' }), true)
   assert.equal(hasActiveEmployeeFilters({ ...noFilters, status: 'DRAFT' }), true)
 })
 
