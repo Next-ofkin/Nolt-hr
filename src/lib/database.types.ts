@@ -196,199 +196,6 @@ export type Database = {
         }
         Relationships: []
       }
-      form_fields: {
-        Row: {
-          configuration: Json
-          created_at: string
-          description: string | null
-          field_key: string
-          field_type: Database["public"]["Enums"]["form_field_type"]
-          form_version_id: string
-          id: string
-          label: string | null
-          placeholder: string | null
-          position: number
-          required: boolean
-          updated_at: string
-        }
-        Insert: {
-          configuration?: Json
-          created_at?: string
-          description?: string | null
-          field_key: string
-          field_type: Database["public"]["Enums"]["form_field_type"]
-          form_version_id: string
-          id?: string
-          label?: string | null
-          placeholder?: string | null
-          position: number
-          required?: boolean
-          updated_at?: string
-        }
-        Update: {
-          configuration?: Json
-          created_at?: string
-          description?: string | null
-          field_key?: string
-          field_type?: Database["public"]["Enums"]["form_field_type"]
-          form_version_id?: string
-          id?: string
-          label?: string | null
-          placeholder?: string | null
-          position?: number
-          required?: boolean
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_fields_form_version_id_fkey"
-            columns: ["form_version_id"]
-            isOneToOne: false
-            referencedRelation: "form_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_import_jobs: {
-        Row: {
-          accepted_at: string | null
-          cancelled_at: string | null
-          completed_at: string | null
-          created_at: string
-          created_by: string | null
-          error_code: string | null
-          error_message: string | null
-          id: string
-          model: string | null
-          original_filename: string
-          proposed_schema: Json | null
-          provider: string | null
-          source_object_path: string
-          status: Database["public"]["Enums"]["form_import_status"]
-          updated_at: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          model?: string | null
-          original_filename: string
-          proposed_schema?: Json | null
-          provider?: string | null
-          source_object_path: string
-          status?: Database["public"]["Enums"]["form_import_status"]
-          updated_at?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          model?: string | null
-          original_filename?: string
-          proposed_schema?: Json | null
-          provider?: string | null
-          source_object_path?: string
-          status?: Database["public"]["Enums"]["form_import_status"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      form_templates: {
-        Row: {
-          category: string | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          is_active: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      form_versions: {
-        Row: {
-          created_at: string
-          description: string | null
-          form_template_id: string
-          id: string
-          instructions: string | null
-          presentation_config: Json
-          published_at: string | null
-          published_by: string | null
-          status: Database["public"]["Enums"]["form_version_status"]
-          title: string
-          updated_at: string
-          version_number: number
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          form_template_id: string
-          id?: string
-          instructions?: string | null
-          presentation_config?: Json
-          published_at?: string | null
-          published_by?: string | null
-          status?: Database["public"]["Enums"]["form_version_status"]
-          title: string
-          updated_at?: string
-          version_number: number
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          form_template_id?: string
-          id?: string
-          instructions?: string | null
-          presentation_config?: Json
-          published_at?: string | null
-          published_by?: string | null
-          status?: Database["public"]["Enums"]["form_version_status"]
-          title?: string
-          updated_at?: string
-          version_number?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_versions_form_template_id_fkey"
-            columns: ["form_template_id"]
-            isOneToOne: false
-            referencedRelation: "form_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           created_at: string
@@ -421,23 +228,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_form_import_job: {
-        Args: {
-          p_category: string
-          p_description: string
-          p_fields: Json
-          p_instructions: string
-          p_job_id: string
-          p_name: string
-          p_presentation: Json
-        }
-        Returns: Json
-      }
       activate_my_employee_account: { Args: never; Returns: Json }
-      create_form_draft_from_version: {
-        Args: { p_form_version_id: string }
-        Returns: Json
-      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -450,10 +241,6 @@ export type Database = {
           p_invited_by: string
         }
         Returns: undefined
-      }
-      publish_form_version: {
-        Args: { p_form_version_id: string }
-        Returns: Json
       }
       update_user_role: {
         Args: { p_role: string; p_user_id: string }
@@ -477,31 +264,6 @@ export type Database = {
         | "COMPLETED"
         | "SUSPENDED"
         | "ARCHIVED"
-      form_field_type:
-        | "SHORT_TEXT"
-        | "LONG_TEXT"
-        | "EMAIL"
-        | "PHONE"
-        | "NUMBER"
-        | "DATE"
-        | "DROPDOWN"
-        | "RADIO"
-        | "CHECKBOX"
-        | "YES_NO"
-        | "FILE_UPLOAD"
-        | "SIGNATURE"
-        | "HEADING"
-        | "PARAGRAPH"
-        | "DIVIDER"
-        | "REPEATING_GROUP"
-      form_import_status:
-        | "UPLOADED"
-        | "ANALYZING"
-        | "READY_FOR_REVIEW"
-        | "ACCEPTED"
-        | "FAILED"
-        | "CANCELLED"
-      form_version_status: "DRAFT" | "PUBLISHED" | "ARCHIVED"
       user_role: "admin" | "hr" | "employee"
     }
     CompositeTypes: {
@@ -648,33 +410,6 @@ export const Constants = {
         "SUSPENDED",
         "ARCHIVED",
       ],
-      form_field_type: [
-        "SHORT_TEXT",
-        "LONG_TEXT",
-        "EMAIL",
-        "PHONE",
-        "NUMBER",
-        "DATE",
-        "DROPDOWN",
-        "RADIO",
-        "CHECKBOX",
-        "YES_NO",
-        "FILE_UPLOAD",
-        "SIGNATURE",
-        "HEADING",
-        "PARAGRAPH",
-        "DIVIDER",
-        "REPEATING_GROUP",
-      ],
-      form_import_status: [
-        "UPLOADED",
-        "ANALYZING",
-        "READY_FOR_REVIEW",
-        "ACCEPTED",
-        "FAILED",
-        "CANCELLED",
-      ],
-      form_version_status: ["DRAFT", "PUBLISHED", "ARCHIVED"],
       user_role: ["admin", "hr", "employee"],
     },
   },
@@ -684,9 +419,6 @@ export const Constants = {
 export type UserRole = Database["public"]["Enums"]["user_role"]
 export type EmployeeStatus = Database["public"]["Enums"]["employee_status"]
 export type EmployeeInvitationStatus = Database["public"]["Enums"]["employee_invitation_status"]
-export type FormFieldType = Database["public"]["Enums"]["form_field_type"]
-export type FormVersionStatus = Database["public"]["Enums"]["form_version_status"]
-export type FormImportStatus = Database["public"]["Enums"]["form_import_status"]
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 export type Department = Database["public"]["Tables"]["departments"]["Row"]
@@ -697,19 +429,3 @@ export type EmployeeUpdate = Database["public"]["Tables"]["employees"]["Update"]
 export type EmployeeInvitation = Database["public"]["Tables"]["employee_invitations"]["Row"]
 export type EmployeeInvitationInsert = Database["public"]["Tables"]["employee_invitations"]["Insert"]
 export type EmployeeInvitationUpdate = Database["public"]["Tables"]["employee_invitations"]["Update"]
-
-export type FormTemplate = Database["public"]["Tables"]["form_templates"]["Row"]
-export type FormTemplateInsert = Database["public"]["Tables"]["form_templates"]["Insert"]
-export type FormTemplateUpdate = Database["public"]["Tables"]["form_templates"]["Update"]
-
-export type FormVersion = Database["public"]["Tables"]["form_versions"]["Row"]
-export type FormVersionInsert = Database["public"]["Tables"]["form_versions"]["Insert"]
-export type FormVersionUpdate = Database["public"]["Tables"]["form_versions"]["Update"]
-
-export type FormField = Database["public"]["Tables"]["form_fields"]["Row"]
-export type FormFieldInsert = Database["public"]["Tables"]["form_fields"]["Insert"]
-export type FormFieldUpdate = Database["public"]["Tables"]["form_fields"]["Update"]
-
-export type FormImportJob = Database["public"]["Tables"]["form_import_jobs"]["Row"]
-export type FormImportJobInsert = Database["public"]["Tables"]["form_import_jobs"]["Insert"]
-export type FormImportJobUpdate = Database["public"]["Tables"]["form_import_jobs"]["Update"]

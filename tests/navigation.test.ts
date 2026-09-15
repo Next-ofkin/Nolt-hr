@@ -6,13 +6,13 @@ function flatten(role: 'admin' | 'hr' | 'employee' | null) {
   return getNavGroups(role).flatMap((group) => group.items)
 }
 
-test('admin navigation includes Dashboard, Employees, Forms, and User Access', () => {
+test('admin navigation includes Dashboard, Employees, and User Access', () => {
   const items = flatten('admin')
   const labels = items.map((item) => item.label)
-  assert.deepEqual(labels, ['Dashboard', 'Employees', 'Forms', 'User Access'])
+  assert.deepEqual(labels, ['Dashboard', 'Employees', 'User Access'])
   assert.deepEqual(
     items.map((item) => item.to),
-    ['/', '/hr/employees', '/hr/forms', '/admin'],
+    ['/', '/hr/employees', '/admin'],
   )
 })
 
@@ -24,9 +24,9 @@ test('admin navigation is grouped under Overview, People, and Administration', (
   )
 })
 
-test('HR navigation includes Dashboard, Employees, and Forms but not User Access', () => {
+test('HR navigation includes Dashboard and Employees but not User Access', () => {
   const labels = flatten('hr').map((item) => item.label)
-  assert.deepEqual(labels, ['Dashboard', 'Employees', 'Forms'])
+  assert.deepEqual(labels, ['Dashboard', 'Employees'])
   assert.equal(labels.includes('User Access'), false)
 })
 

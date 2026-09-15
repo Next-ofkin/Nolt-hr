@@ -13,11 +13,6 @@ import CreateEmployeePage from './pages/CreateEmployeePage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import EditEmployeePage from './pages/EditEmployeePage'
 import EmployeePortalPage from './pages/EmployeePortalPage'
-import FormsPage from './pages/FormsPage'
-import CreateFormPage from './pages/CreateFormPage'
-import FormDetailPage from './pages/FormDetailPage'
-import FormBuilderPage from './pages/FormBuilderPage'
-import FormImportReviewPage from './pages/FormImportReviewPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -81,46 +76,6 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <EditEmployeePage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/forms',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <FormsPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/forms/new',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <CreateFormPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/forms/import/:importJobId',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <FormImportReviewPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/forms/:templateId',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <FormDetailPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/forms/:templateId/builder/:versionId',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <FormBuilderPage />
           </RequireRole>
         ),
       },
