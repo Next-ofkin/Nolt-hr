@@ -13,6 +13,7 @@ import CreateEmployeePage from './pages/CreateEmployeePage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import EditEmployeePage from './pages/EditEmployeePage'
 import EmployeePortalPage from './pages/EmployeePortalPage'
+import FormsV2DemoPage from './pages/FormsV2DemoPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -76,6 +77,14 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <EditEmployeePage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/forms-v2/demo',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <FormsV2DemoPage />
           </RequireRole>
         ),
       },
