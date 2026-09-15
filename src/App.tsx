@@ -14,6 +14,7 @@ import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import EditEmployeePage from './pages/EditEmployeePage'
 import EmployeePortalPage from './pages/EmployeePortalPage'
 import FormsV2DemoPage from './pages/FormsV2DemoPage'
+import GoogleFormsPocPage from './pages/GoogleFormsPocPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -85,6 +86,14 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <FormsV2DemoPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/google-forms-poc',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <GoogleFormsPocPage />
           </RequireRole>
         ),
       },
