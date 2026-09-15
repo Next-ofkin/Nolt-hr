@@ -6,6 +6,7 @@ import {
   generateUniqueFieldKey,
   getDefaultConfiguration,
   getLatestPublishedVersion,
+  groupFieldsIntoSections,
   isFormVersionEditable,
   slugifyFieldKey,
   validateFieldKey,
@@ -577,11 +578,33 @@ test('Synthetic mock proposal preserves two-column layout grid, photo placement,
   // Validate structure & metadata preservation
   assert.equal(mockProposal.fields.length, 8)
   assert.equal(mockProposal.fields[0].configuration.displayVariant, 'photo')
-  assert.equal(mockProposal.fields[0].configuration.layout.placement, 'header_aside')
   assert.equal(mockProposal.fields[2].configuration.layout.span, 6)
   assert.equal(mockProposal.fields[3].configuration.layout.span, 6)
   assert.equal(mockProposal.fields[4].field_type, 'REPEATING_GROUP')
   assert.equal(mockProposal.fields[5].configuration.dataClassification, 'SENSITIVE_FINANCIAL')
   assert.equal(mockProposal.fields[6].configuration.dataClassification, 'SENSITIVE_HEALTH')
   assert.equal(mockProposal.fields[7].configuration.visibilityRule.fieldKey, 'has_health_issues')
+})
+
+test('groupFieldsIntoSections partitions fields into logical section cards using HEADING fields', () => {
+  const fields: FormField[] = [
+    createMockField({ id: 'f1', field_type: 'SHORT_TEXT', label: 'First Name', position: 0 }),
+    createMockField({ id: 'f2', field_type: 'HEADING', label: 'Contact Details', position: 1 }),
+    createMockField({ id: 'f3', field_type: 'EMAIL', label: 'Email', position: 2 }),
+    createMockField({ id: 'f4', field_type: 'PHONE', label: 'Phone', position: 3 }),
+    createMockField({ id: 'f5', field_type: 'HEADING', label: 'Financial Info', position: 4 }),
+    createMockField({ id: 'f6', field_type: 'SHORT_TEXT', label: 'Bank Account Number', position: 5 }),
+  ]
+
+  const sections = groupFieldsIntoSections(fields)
+  assert.equal(sections.length, 3)
+
+  assert.equal(sections[0].title, 'Form Details')
+  assert.equal(sections[0].fields.length, 1)
+
+  assert.equal(sections[1].title, 'Contact Details')
+  assert.equal(sections[1].fields.length, 2)
+
+  assert.equal(sections[2].title, 'Financial Info')
+  assert.equal(sections[2].fields.length, 1)
 })

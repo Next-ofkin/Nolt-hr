@@ -415,18 +415,18 @@ Deno.serve(async (req: Request) => {
     const base64Pdf = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
 
     // Canonical prompt text
-    const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its structured digital template schema.
+    const promptText = `You are an expert HR form analyzer. Analyze this blank HR form PDF document and extract its semantic structured questionnaire schema for a modern web form.
 CRITICAL INSTRUCTIONS:
-1. EXTRACT and STRUCTURE the document accurately, respecting visual layout and visual row groupings.
-2. DO NOT rewrite legal wording, summarize contractual clauses, or alter agreement text. Preserve legal content verbatim as PARAGRAPH or HEADING fields.
-3. DO NOT invent employee questions or declarations not present in the source document.
+1. EXTRACT questions, sections, options, required flags, repeating groups, and conditional rules.
+2. DO NOT spend effort trying to reproduce physical PDF paper layout, x/y coordinates, page borders, header-aside boxes, or table grid coordinates. Focus on converting the document into a clean, logical online questionnaire.
+3. Group questions into meaningful sections using HEADING fields (e.g., "Personal Information", "Contact Information", "Financial Information", "Next of Kin", "Health Information").
 4. Field keys MUST be snake_case with clear word boundaries (e.g. "place_of_birth" NOT "placeofbirth", "date_employed" NOT "dateemployed").
-5. Layout Spans: Assign "configuration.layout.span" = 12 for full-width fields, 6 for two-column side-by-side rows, 4 for three-column rows. Set "configuration.layout.newRow" = true when a field starts a new visual line.
-6. Photo Boxes: Labelled or unlabelled passport/photograph boxes near page headers MUST be extracted as FILE_UPLOAD with "configuration.displayVariant": "photo", "configuration.layout.placement": "header_aside", "configuration.layout.span": 4.
-7. Repeating Tables/Data: Numbered lists or tables (e.g., Schools Attended, Beneficiary rows) MUST be extracted as REPEATING_GROUP with "configuration.repeatingGroup": { "columns": [{ "name": "School", "type": "SHORT_TEXT" }, ...] }.
-8. Conditional Fields: Fields that appear conditionally (e.g. "If YES, explain below") MUST include "configuration.visibilityRule": { "fieldKey": "parent_field_key", "operator": "equals", "value": true }.
+5. Default field layout span is 12 (full-width single-column). Assign span = 6 ONLY for short logically-related pairs (e.g. First Name / Last Name, Start Date / Employment Type).
+6. Passport/photograph attachment requests MUST be extracted as FILE_UPLOAD with label "Passport Photograph".
+7. Numbered lists or multi-row entries (e.g. Education history, Previous Employment) MUST be extracted as REPEATING_GROUP with "configuration.repeatingGroup": { "columns": [{ "name": "Institution", "type": "SHORT_TEXT" }, ...] }.
+8. Conditional Fields: Questions that depend on a previous answer (e.g. "If YES, explain below") MUST include "configuration.visibilityRule": { "fieldKey": "parent_field_key", "operator": "equals", "value": "Yes" }.
 9. Data Classification: Assign "configuration.dataClassification" = "SENSITIVE_HEALTH" for health questions/medical data, "SENSITIVE_FINANCIAL" for bank/tax/pension fields, or "GENERAL" for standard biodata.
-10. Set "needs_review": true on any field where type interpretation or visual layout is uncertain.
+10. Set "needs_review": true on any field where question wording or field type interpretation is uncertain.
 
 Return ONLY a JSON object matching this strict schema:
 {
@@ -435,7 +435,7 @@ Return ONLY a JSON object matching this strict schema:
     "category": "General",
     "description": "Brief description of the form",
     "instructions": "Instructions or guidance text",
-    "presentation": { "mode": "DOCUMENT" }
+    "presentation": { "mode": "STANDARD" }
   },
   "fields": [
     {
@@ -446,7 +446,7 @@ Return ONLY a JSON object matching this strict schema:
       "description": null,
       "placeholder": null,
       "configuration": {
-        "layout": { "span": 12, "newRow": true, "placement": "flow" },
+        "layout": { "span": 12 },
         "dataClassification": "GENERAL"
       },
       "position": 0,

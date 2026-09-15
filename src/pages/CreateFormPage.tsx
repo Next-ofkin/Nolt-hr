@@ -14,7 +14,6 @@ export default function CreateFormPage() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('General')
   const [description, setDescription] = useState('')
-  const [presentationMode, setPresentationMode] = useState<'STANDARD' | 'DOCUMENT' | 'AGREEMENT'>('STANDARD')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,70 +98,14 @@ export default function CreateFormPage() {
               />
             </div>
 
-            <div className="space-y-2 pt-2 border-t">
-              <Label>Default Presentation Style</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                <label
-                  className={`p-3 border rounded-md cursor-pointer transition-all ${
-                    presentationMode === 'STANDARD' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
-                  }`}
-                  onClick={() => setPresentationMode('STANDARD')}
-                >
-                  <input
-                    type="radio"
-                    name="presentation"
-                    checked={presentationMode === 'STANDARD'}
-                    onChange={() => setPresentationMode('STANDARD')}
-                    className="sr-only"
-                  />
-                  <div className="font-semibold text-sm">Standard</div>
-                  <div className="text-xs text-gray-500 mt-1">Modern digital questionnaire</div>
-                </label>
-
-                <label
-                  className={`p-3 border rounded-md cursor-pointer transition-all ${
-                    presentationMode === 'DOCUMENT' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
-                  }`}
-                  onClick={() => setPresentationMode('DOCUMENT')}
-                >
-                  <input
-                    type="radio"
-                    name="presentation"
-                    checked={presentationMode === 'DOCUMENT'}
-                    onChange={() => setPresentationMode('DOCUMENT')}
-                    className="sr-only"
-                  />
-                  <div className="font-semibold text-sm">Document</div>
-                  <div className="text-xs text-gray-500 mt-1">Official HR paper layout with sections</div>
-                </label>
-
-                <label
-                  className={`p-3 border rounded-md cursor-pointer transition-all ${
-                    presentationMode === 'AGREEMENT' ? 'border-blue-600 bg-blue-50/50' : 'hover:border-gray-300'
-                  }`}
-                  onClick={() => setPresentationMode('AGREEMENT')}
-                >
-                  <input
-                    type="radio"
-                    name="presentation"
-                    checked={presentationMode === 'AGREEMENT'}
-                    onChange={() => setPresentationMode('AGREEMENT')}
-                    className="sr-only"
-                  />
-                  <div className="font-semibold text-sm">Agreement</div>
-                  <div className="text-xs text-gray-500 mt-1">Legal contract with clauses & signatures</div>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="pt-4 flex justify-end gap-3">
               <Link to="/hr/forms">
-                <Button variant="ghost" type="button">
+                <Button variant="outline" type="button">
                   Cancel
                 </Button>
               </Link>
-              <Button variant="primary" type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Creating…' : 'Create & Open Studio'}
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Creating...' : 'Create Form & Open Studio'}
               </Button>
             </div>
           </form>

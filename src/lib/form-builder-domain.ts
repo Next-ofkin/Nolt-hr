@@ -291,3 +291,47 @@ export function getLatestPublishedVersion(versions: FormVersion[]): FormVersion 
     current.version_number > latest.version_number ? current : latest
   )
 }
+
+export interface FormSection {
+  id: string
+  title: string
+  description?: string | null
+  fields: FormField[]
+}
+
+export function groupFieldsIntoSections(fields: FormField[]): FormSection[] {
+  const sorted = [...fields].sort((a, b) => a.position - b.position)
+  const sections: FormSection[] = []
+
+  let currentSection: FormSection | null = null
+
+  for (const field of sorted) {
+    if (field.field_type === 'HEADING') {
+      if (currentSection && currentSection.fields.length > 0) {
+        sections.push(currentSection)
+      }
+      const config = (field.configuration as Record<string, unknown>) || {}
+      currentSection = {
+        id: field.id,
+        title: field.label || String(config.content || 'Section'),
+        description: field.description || null,
+        fields: [],
+      }
+    } else {
+      if (!currentSection) {
+        currentSection = {
+          id: 'section-initial',
+          title: 'Form Details',
+          fields: [],
+        }
+      }
+      currentSection.fields.push(field)
+    }
+  }
+
+  if (currentSection && currentSection.fields.length > 0) {
+    sections.push(currentSection)
+  }
+
+  return sections
+}

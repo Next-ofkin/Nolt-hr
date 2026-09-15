@@ -376,7 +376,7 @@ export default function FormImportReviewPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Badge variant="neutral">Mode: {presentationMode}</Badge>
+                <Badge variant="neutral">{mockFields.length} Questions Extracted</Badge>
               </div>
             </div>
 
