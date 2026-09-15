@@ -110,3 +110,88 @@ export function shouldShowField(
   const watchedValue = formValues[field.visibilityRule.fieldKey]
   return String(watchedValue) === String(field.visibilityRule.value)
 }
+
+export interface FormProgressStats {
+  totalInputFields: number
+  completedInputFields: number
+  totalRequiredFields: number
+  completedRequiredFields: number
+  percentComplete: number
+}
+
+export function isInputField(type: NoltFieldType): boolean {
+  return type !== 'HEADING' && type !== 'PARAGRAPH' && type !== 'DIVIDER'
+}
+
+export function isFieldValueFilled(val: unknown): boolean {
+  if (val === undefined || val === null || val === '') return false
+  if (Array.isArray(val)) return val.length > 0
+  if (typeof val === 'boolean') return val === true
+  return true
+}
+
+export function calculateFormProgress(
+  formDef: NoltFormDefinition,
+  formValues: Record<string, unknown>,
+): FormProgressStats {
+  let totalInputFields = 0
+  let completedInputFields = 0
+  let totalRequiredFields = 0
+  let completedRequiredFields = 0
+
+  for (const section of formDef.sections) {
+    for (const field of section.fields) {
+      if (!isInputField(field.type)) continue
+      if (!shouldShowField(field, formValues)) continue
+
+      totalInputFields++
+      const val = formValues[field.key]
+      const filled = isFieldValueFilled(val)
+
+      if (filled) {
+        completedInputFields++
+      }
+
+      if (field.required) {
+        totalRequiredFields++
+        if (filled) {
+          completedRequiredFields++
+        }
+      }
+    }
+  }
+
+  const percentComplete =
+    totalInputFields > 0 ? Math.round((completedInputFields / totalInputFields) * 100) : 0
+
+  return {
+    totalInputFields,
+    completedInputFields,
+    totalRequiredFields,
+    completedRequiredFields,
+    percentComplete,
+  }
+}
+
+export function calculateSectionCompletion(
+  section: NoltFormSectionDefinition,
+  formValues: Record<string, unknown>,
+): { isComplete: boolean; isStarted: boolean } {
+  let inputCount = 0
+  let filledCount = 0
+
+  for (const field of section.fields) {
+    if (!isInputField(field.type)) continue
+    if (!shouldShowField(field, formValues)) continue
+
+    inputCount++
+    if (isFieldValueFilled(formValues[field.key])) {
+      filledCount++
+    }
+  }
+
+  return {
+    isComplete: inputCount > 0 && filledCount === inputCount,
+    isStarted: filledCount > 0,
+  }
+}

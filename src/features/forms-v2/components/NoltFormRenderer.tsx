@@ -1,119 +1,167 @@
-import { useState } from 'react'
-import { FormProvider, useForm } from 'react-hook-form'
+import { useState, useMemo } from 'react'
+import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import type { NoltFormDefinition } from '../domain/form-definition'
+import { Check, Loader2 } from 'lucide-react'
+import {
+  type NoltFormDefinition,
+  calculateFormProgress,
+} from '../domain/form-definition'
 import { buildZodSchemaFromFormDefinition } from '../domain/form-schema-builder'
 import { buildDefaultValues } from '../domain/form-default-values'
+import { NoltFormHeader } from './NoltFormHeader'
+import { NoltFormNav } from './NoltFormNav'
 import { NoltFormSection } from './NoltFormSection'
-import { Card } from '../../../components/ui/card'
 import { Button } from '../../../components/ui/button'
 
 interface NoltFormRendererProps {
   definition: NoltFormDefinition
-  initialValues?: Record<string, unknown>
-  onSaveDraft?: (values: Record<string, unknown>) => void
-  onSubmit: (values: Record<string, unknown>) => void
+  onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
+  onSaveDraft?: (data: Record<string, unknown>) => void
 }
 
-export function NoltFormRenderer({
-  definition,
-  initialValues,
-  onSaveDraft,
-  onSubmit,
-}: NoltFormRendererProps) {
-  const [submittedData, setSubmittedData] = useState<Record<string, unknown> | null>(null)
+export function NoltFormRenderer({ definition, onSubmit, onSaveDraft }: NoltFormRendererProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeSectionId, setActiveSectionId] = useState<string>(
+    definition.sections[0]?.id || '',
+  )
+  const [isDraftSaved, setIsDraftSaved] = useState(false)
 
-  const schema = buildZodSchemaFromFormDefinition(definition)
-  const defaultValues = {
-    ...buildDefaultValues(definition),
-    ...initialValues,
-  }
+  // Dynamically build Zod schema from form definition
+  const validationSchema = useMemo(
+    () => buildZodSchemaFromFormDefinition(definition),
+    [definition],
+  )
 
-  const methods = useForm({
-    resolver: zodResolver(schema),
+  // Dynamically generate default values for form fields
+  const defaultValues = useMemo(
+    () => buildDefaultValues(definition),
+    [definition],
+  )
+
+  const methods = useForm<Record<string, unknown>>({
+    resolver: zodResolver(validationSchema),
     defaultValues,
-    mode: 'onTouched',
+    mode: 'onBlur',
   })
 
-  const {
-    handleSubmit,
-    getValues,
-    formState: { isSubmitting },
-  } = methods
+  const formValues = methods.watch()
 
-  const handleFormSubmit = (data: Record<string, unknown>) => {
-    setSubmittedData(data)
-    onSubmit(data)
+  // Calculate completion progress
+  const progressStats = useMemo(
+    () => calculateFormProgress(definition, formValues),
+    [definition, formValues],
+  )
+
+  const handleSelectSection = (sectionId: string) => {
+    setActiveSectionId(sectionId)
+    const element = document.getElementById(`section-${sectionId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  const handleFormSubmit = methods.handleSubmit(
+    async (data) => {
+      setIsSubmitting(true)
+      try {
+        if (onSubmit) {
+          await onSubmit(data)
+        }
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    (errors) => {
+      // Scroll to first invalid field
+      const firstErrorKey = Object.keys(errors)[0]
+      if (firstErrorKey) {
+        const firstErrorField = definition.sections
+          .flatMap((s) => s.fields)
+          .find((f) => f.key === firstErrorKey)
+
+        if (firstErrorField) {
+          const element = document.getElementById(firstErrorField.id)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            element.focus()
+          }
+        }
+      }
+    },
+  )
+
+  const handleDraftClick = () => {
+    const currentValues = methods.getValues()
+    if (onSaveDraft) {
+      onSaveDraft(currentValues)
+    }
+    setIsDraftSaved(true)
+    setTimeout(() => setIsDraftSaved(false), 3000)
   }
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="nolt-form-v2 max-w-3xl mx-auto space-y-6 font-sans text-gray-900 pb-12">
-        {/* Polished Header Card */}
-        <Card className="bg-white border rounded-xl shadow-sm border-t-4 border-t-blue-600 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-900 uppercase tracking-widest">
-            <div className="w-5 h-5 rounded bg-blue-900 text-white flex items-center justify-center text-[10px] font-extrabold">
-              N
+      <form onSubmit={handleFormSubmit} className="space-y-8">
+        {/* Form Header Card */}
+        <NoltFormHeader definition={definition} progress={progressStats} />
+
+        {/* 2-Column Application Shell Layout */}
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Sticky Section Navigation */}
+          <NoltFormNav
+            sections={definition.sections}
+            activeSectionId={activeSectionId}
+            onSelectSection={handleSelectSection}
+            formValues={formValues}
+            progress={progressStats}
+          />
+
+          {/* Form Content Sections */}
+          <main className="flex-1 w-full min-w-0">
+            {definition.sections.map((section) => (
+              <NoltFormSection key={section.id} section={section} />
+            ))}
+
+            {/* Sticky Action Bar */}
+            <div className="sticky bottom-4 z-30 py-4 px-6 bg-white/95 backdrop-blur-md border border-gray-200/90 shadow-xl rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-10">
+              <div className="text-xs text-gray-500 text-center sm:text-left">
+                {isDraftSaved ? (
+                  <span className="text-emerald-600 font-semibold flex items-center gap-1.5">
+                    <Check className="w-4 h-4" /> Draft saved successfully!
+                  </span>
+                ) : (
+                  <span>All responses are validated dynamically before submission.</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={handleDraftClick}
+                  className="h-11 md:h-12 px-6 rounded-xl font-medium border-gray-300 text-gray-700 hover:bg-gray-50 flex-1 sm:flex-initial"
+                >
+                  Save Draft
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="h-11 md:h-12 px-8 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 flex-1 sm:flex-initial text-base flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    'Submit Form'
+                  )}
+                </Button>
+              </div>
             </div>
-            <span>NOLT FINANCE</span>
-          </div>
-
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{definition.title}</h1>
-
-          {definition.description && <p className="text-sm text-gray-600 leading-relaxed">{definition.description}</p>}
-
-          {definition.instructions && (
-            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-md text-xs text-blue-950">
-              <strong className="font-semibold block mb-0.5">Instructions:</strong>
-              <span>{definition.instructions}</span>
-            </div>
-          )}
-
-          <div className="pt-2 text-xs text-gray-500 border-t border-gray-100 flex items-center gap-1">
-            <span className="text-red-500 font-bold">*</span>
-            <span>Indicates required question</span>
-          </div>
-        </Card>
-
-        {/* Render Form Sections */}
-        {definition.sections.map((section) => (
-          <NoltFormSection key={section.id} section={section} />
-        ))}
-
-        {/* Bottom Form Actions */}
-        <Card className="bg-white border rounded-xl shadow-sm p-4 flex items-center justify-between">
-          <div>
-            {onSaveDraft && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onSaveDraft(getValues())}
-                className="text-xs h-9 px-4 text-gray-600"
-              >
-                Save Draft
-              </Button>
-            )}
-          </div>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-9 px-6 font-medium shadow-sm"
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Form'}
-          </Button>
-        </Card>
-
-        {/* Dev Submitted Result Panel */}
-        {submittedData && (
-          <Card className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
-            <h3 className="text-xs font-bold text-emerald-900 uppercase tracking-wide">
-              ✓ Demo Submission Data Captured (RHF Validated)
-            </h3>
-            <pre className="text-[11px] font-mono bg-white p-3 border rounded text-emerald-950 overflow-x-auto max-h-60">
-              {JSON.stringify(submittedData, null, 2)}
-            </pre>
-          </Card>
-        )}
+          </main>
+        </div>
       </form>
     </FormProvider>
   )

@@ -5,8 +5,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { buildZodSchemaFromFormDefinition } from '../src/features/forms-v2/domain/form-schema-builder.ts'
 import { buildDefaultValues } from '../src/features/forms-v2/domain/form-default-values.ts'
-import { shouldShowField } from '../src/features/forms-v2/domain/form-definition.ts'
-import type { NoltFormDefinition, NoltFormFieldDefinition } from '../src/features/forms-v2/domain/form-definition.ts'
+import {
+  shouldShowField,
+  calculateFormProgress,
+  calculateSectionCompletion,
+  type NoltFormDefinition,
+  type NoltFormFieldDefinition,
+} from '../src/features/forms-v2/domain/form-definition.ts'
 import { employeeDataFormDefinition } from '../src/features/forms-v2/demo/employee-data-form.demo.ts'
 import { EMPLOYEE_MANAGER_ROLES } from '../src/lib/employee-domain.ts'
 
@@ -167,6 +172,55 @@ test('shouldShowField accurately evaluates conditional visibility rules', () => 
   assert.equal(shouldShowField(conditionalField, {}), false)
 })
 
+test('calculateFormProgress ignores HEADING, PARAGRAPH, and DIVIDER non-input fields', () => {
+  const def: NoltFormDefinition = {
+    id: 'progress_test',
+    title: 'Progress Test',
+    sections: [
+      {
+        id: 'sec_1',
+        title: 'Section 1',
+        fields: [
+          { id: 'h1', key: 'h1', label: 'Header', type: 'HEADING' },
+          { id: 'p1', key: 'p1', label: 'Paragraph', type: 'PARAGRAPH' },
+          { id: 'd1', key: 'd1', label: 'Divider', type: 'DIVIDER' },
+          { id: 'f1', key: 'f1', label: 'Input 1', type: 'SHORT_TEXT', required: true },
+          { id: 'f2', key: 'f2', label: 'Input 2', type: 'SHORT_TEXT', required: false },
+        ],
+      },
+    ],
+  }
+
+  const emptyProgress = calculateFormProgress(def, {})
+  assert.equal(emptyProgress.totalInputFields, 2)
+  assert.equal(emptyProgress.completedInputFields, 0)
+  assert.equal(emptyProgress.totalRequiredFields, 1)
+  assert.equal(emptyProgress.percentComplete, 0)
+
+  const partialProgress = calculateFormProgress(def, { f1: 'Filled' })
+  assert.equal(partialProgress.completedInputFields, 1)
+  assert.equal(partialProgress.completedRequiredFields, 1)
+  assert.equal(partialProgress.percentComplete, 50)
+})
+
+test('calculateSectionCompletion tracks section completion accurately', () => {
+  const section = employeeDataFormDefinition.sections[0]
+  const emptyState = calculateSectionCompletion(section, {})
+  assert.equal(emptyState.isStarted, false)
+  assert.equal(emptyState.isComplete, false)
+
+  const filledValues: Record<string, unknown> = {}
+  for (const f of section.fields) {
+    if (f.type !== 'HEADING' && f.type !== 'PARAGRAPH' && f.type !== 'DIVIDER') {
+      filledValues[f.key] = 'Sample Value'
+    }
+  }
+
+  const fullState = calculateSectionCompletion(section, filledValues)
+  assert.equal(fullState.isStarted, true)
+  assert.equal(fullState.isComplete, true)
+})
+
 test('internal classifications and machine keys are present in domain metadata but separated from UI labels', () => {
   const form = employeeDataFormDefinition
   const healthField = form.sections
@@ -182,7 +236,10 @@ test('internal classifications and machine keys are present in domain metadata b
 test('demo route /hr/forms-v2/demo is protected for HR/Admin roles only', () => {
   assert.ok(EMPLOYEE_MANAGER_ROLES.includes('admin'))
   assert.ok(EMPLOYEE_MANAGER_ROLES.includes('hr'))
-  assert.equal(EMPLOYEE_MANAGER_ROLES.includes('employee' as unknown as typeof EMPLOYEE_MANAGER_ROLES[number]), false)
+  assert.equal(
+    EMPLOYEE_MANAGER_ROLES.includes('employee' as unknown as typeof EMPLOYEE_MANAGER_ROLES[number]),
+    false,
+  )
 })
 
 test('forms v2 has zero database tables or migrations in this phase', () => {
