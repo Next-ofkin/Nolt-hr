@@ -221,3 +221,43 @@ test('production forms persistence code has no SurveyJS or Google Forms dependen
   assert.doesNotMatch(phaseSource, /survey(?:js|-core|-react)/i)
   assert.doesNotMatch(phaseSource, /google[\s_-]*forms/i)
 })
+
+test('migration 0017 revokes direct table DML and converts RPCs to SECURITY DEFINER', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0017_harden_forms_mutation_boundary.sql')
+
+  assert.match(migration, /revoke insert, update, delete on public\.form_definitions from authenticated, anon, public/i)
+  assert.match(migration, /revoke insert, update, delete on public\.form_definition_versions from authenticated, anon, public/i)
+  assert.match(migration, /drop policy if exists form_definitions_insert/i)
+  assert.match(migration, /drop policy if exists form_definitions_update/i)
+  assert.match(migration, /drop policy if exists form_definition_versions_insert/i)
+  assert.match(migration, /drop policy if exists form_definition_versions_update/i)
+
+  for (const fn of [
+    'create_form_definition',
+    'save_form_definition_draft',
+    'publish_form_definition_draft',
+    'create_form_definition_draft',
+  ]) {
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?security definer`, 'i'))
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?set search_path = ''`, 'i'))
+    assert.match(migration, new RegExp(`revoke all on function public\\.${fn}`, 'i'))
+    assert.match(migration, new RegExp(`grant execute on function public\\.${fn}[^;]*to authenticated`, 'i'))
+  }
+})
+
+test('frontend production code contains no direct form table inserts, updates, or deletes', async () => {
+  const browserSource = await readTypeScriptFiles(path.join(repositoryRoot, 'src'))
+
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definitions['"]\s*\)\s*\.insert/i)
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definitions['"]\s*\)\s*\.update/i)
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definitions['"]\s*\)\s*\.delete/i)
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definition_versions['"]\s*\)\s*\.insert/i)
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definition_versions['"]\s*\)\s*\.update/i)
+  assert.doesNotMatch(browserSource, /\.from\(\s*['"]form_definition_versions['"]\s*\)\s*\.delete/i)
+})
+
+test('unauthorized error mapping returns user-facing access error message', () => {
+  const error = new FormPersistenceError('UNAUTHORIZED', 'Only admin or HR can edit forms.')
+  assert.equal(error.code, 'UNAUTHORIZED')
+  assert.equal(formPersistenceMessage(error, 'Fallback'), 'Only admin or HR can edit forms.')
+})
