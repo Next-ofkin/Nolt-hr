@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, Search, Check, AlertCircle, Loader2, X } from 'lucide-react'
+import { FileText, Search, Check, AlertCircle, Loader2 } from 'lucide-react'
 import {
   listPublishedFormVersions,
   type PublishedFormVersionOption,
 } from '../data/onboarding-packages-repository'
+import { formatPackageDate } from '../data/onboarding-packages-types'
 
 interface PackageFormPickerProps {
   isOpen: boolean
@@ -46,12 +47,9 @@ export const PackageFormPicker: React.FC<PackageFormPickerProps> = ({
     return () => {
       isMounted = false
     }
-
   }, [isOpen])
 
   if (!isOpen) return null
-
-
 
   const filteredOptions = options.filter(
     (opt) =>
@@ -60,117 +58,96 @@ export const PackageFormPicker: React.FC<PackageFormPickerProps> = ({
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal-card modal-card-wide no-padding">
+        <div className="modal-header">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Add Published Form</h3>
-            <p className="text-xs text-slate-500">Select an immutable published form version to pin to this package.</p>
+            <h3>Add Published Form</h3>
+            <p>Select an immutable published form version to pin to this package.</p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="p-4 border-b border-slate-100 bg-white">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="picker-search">
+          <div className="search-input-wrap">
+            <Search style={{ width: 15, height: 15 }} />
+            <label htmlFor="form-picker-search" className="sr-only">Search published forms</label>
             <input
-              type="text"
+              id="form-picker-search"
+              type="search"
               placeholder="Search published forms..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              autoFocus
             />
           </div>
         </div>
 
-        {/* Content */}
-        <div className="max-h-80 overflow-y-auto p-4 space-y-2">
+        <div className="modal-body">
           {isLoading && (
-            <div className="flex items-center justify-center py-8 text-sm text-slate-500 space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
-              <span>Loading published forms...</span>
+            <div className="package-items-empty" style={{ border: 'none', padding: '1.5rem' }}>
+              <Loader2 style={{ width: 22, height: 22 }} className="spin" />
+              <div className="package-items-empty-hint">Loading published forms…</div>
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-xs text-red-600 flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            <div className="alert alert-error">
+              <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle style={{ width: 15, height: 15 }} /> {error}
+              </p>
             </div>
           )}
 
           {!isLoading && !error && filteredOptions.length === 0 && (
-            <div className="text-center py-8 text-slate-500 text-sm">
+            <p className="package-items-empty-hint" style={{ textAlign: 'center', padding: '1.5rem' }}>
               No published form versions found matching your search.
-            </div>
+            </p>
           )}
 
-          {!isLoading &&
-            !error &&
-            filteredOptions.map((opt) => {
-              const isSelected = existingFormVersionIds.includes(opt.formVersionId)
-              return (
-                <div
-                  key={opt.formVersionId}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                    isSelected
-                      ? 'border-slate-200 bg-slate-50 opacity-60'
-                      : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer'
-                  }`}
-                  onClick={() => {
-                    if (!isSelected) {
+          {!isLoading && !error && filteredOptions.length > 0 && (
+            <div className="picker-option-list">
+              {filteredOptions.map((opt) => {
+                const isSelected = existingFormVersionIds.includes(opt.formVersionId)
+                return (
+                  <button
+                    type="button"
+                    key={opt.formVersionId}
+                    className={`picker-option${isSelected ? ' picker-option-added' : ''}`}
+                    disabled={isSelected}
+                    onClick={() => {
                       onSelectFormVersion(opt)
                       onClose()
-                    }
-                  }}
-                >
-                  <div className="flex items-start space-x-3">
-                    <div className="rounded-md bg-indigo-50 p-2 text-indigo-600 mt-0.5">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-900">{opt.title}</h4>
-                      <div className="flex items-center space-x-2 text-xs text-slate-500 mt-0.5">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                          Version {opt.versionNumber}
+                    }}
+                  >
+                    <span className="picker-option-info">
+                      <span className="picker-option-icon">
+                        <FileText style={{ width: 15, height: 15 }} />
+                      </span>
+                      <span>
+                        <span className="picker-option-title">{opt.title}</span>
+                        <span className="picker-option-meta">
+                          <span className="badge badge-success">Version {opt.versionNumber}</span>
+                          {opt.publishedAt && <span>Published {formatPackageDate(opt.publishedAt)}</span>}
                         </span>
-                        {opt.publishedAt && (
-                          <span>
-                            Published {new Date(opt.publishedAt).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
 
-                  {isSelected ? (
-                    <span className="inline-flex items-center space-x-1 text-xs text-slate-400 font-medium">
-                      <Check className="h-3.5 w-3.5" />
-                      <span>Added</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-indigo-600 font-semibold group-hover:underline">
-                      Select
-                    </span>
-                  )}
-                </div>
-              )
-            })}
+                    {isSelected ? (
+                      <span className="picker-option-check">
+                        <Check style={{ width: 14, height: 14 }} /> Added
+                      </span>
+                    ) : (
+                      <span className="picker-option-select">Select</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-          >
+        <div className="modal-footer">
+          <button type="button" onClick={onClose} className="btn btn-ghost">
             Cancel
           </button>
         </div>

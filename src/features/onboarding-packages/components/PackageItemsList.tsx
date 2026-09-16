@@ -21,85 +21,59 @@ export const PackageItemsList: React.FC<PackageItemsListProps> = ({
 }) => {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center bg-slate-50/50">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3">
-          <FileText className="h-6 w-6" />
-        </div>
-        <h4 className="text-sm font-semibold text-slate-700">No items added to this package yet</h4>
-        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+      <div className="package-items-empty">
+        <FileText style={{ width: 26, height: 26 }} />
+        <div className="package-items-empty-title">No items added to this package yet</div>
+        <div className="package-items-empty-hint">
           Add published form versions or required document specifications using the actions above.
-        </p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="package-item-list">
       {items.map((item, index) => {
         const isFirst = index === 0
         const isLast = index === items.length - 1
         const isForm = item.itemType === 'form'
 
         return (
-          <div
-            key={item.id || `${item.itemType}-${index}`}
-            className="group flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 shadow-sm transition-all"
-          >
-            <div className="flex items-center space-x-3.5 min-w-0">
-              {/* Item Index / Icon */}
-              <div className="flex items-center space-x-2 shrink-0">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">
-                  {index + 1}
-                </span>
-                <div
-                  className={`rounded-lg p-2 ${
-                    isForm ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
-                  }`}
-                >
-                  {isForm ? <FileText className="h-4 w-4" /> : <FileCheck className="h-4 w-4" />}
-                </div>
-              </div>
+          <div key={item.id || `${item.itemType}-${index}`} className="package-item-row">
+            <div className="package-item-info">
+              <span className="package-item-index">{index + 1}</span>
+              <span className={`package-item-icon ${isForm ? 'package-item-icon-form' : 'package-item-icon-document'}`}>
+                {isForm ? <FileText style={{ width: 16, height: 16 }} /> : <FileCheck style={{ width: 16, height: 16 }} />}
+              </span>
 
-              {/* Details */}
-              <div className="min-w-0">
-                <div className="flex items-center space-x-2">
-                  <h4 className="text-sm font-semibold text-slate-900 truncate">
+              <div className="package-item-details">
+                <div className="package-item-title-row">
+                  <span className="package-item-title">
                     {isForm ? item.formTitle || 'Form' : item.documentTitle}
-                  </h4>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                      isForm ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
+                  </span>
+                  <span className={`package-item-tag ${isForm ? 'package-item-tag-form' : 'package-item-tag-document'}`}>
                     {isForm ? `Form (Version ${item.formVersionNumber ?? 1})` : 'Document Requirement'}
                   </span>
-                  {item.required ? (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
-                      Required
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                      Optional
-                    </span>
-                  )}
+                  <span className={`package-item-tag ${item.required ? 'package-item-tag-required' : 'package-item-tag-optional'}`}>
+                    {item.required ? 'Required' : 'Optional'}
+                  </span>
                 </div>
 
                 {!isForm && item.documentDescription && (
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">{item.documentDescription}</p>
+                  <p className="package-item-desc">{item.documentDescription}</p>
                 )}
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center space-x-1 shrink-0 ml-4">
+            <div className="package-item-actions">
               {isForm && onPreviewForm && item.formVersionId && (
                 <button
                   type="button"
                   onClick={() => onPreviewForm(item.formVersionId, item.formTitle)}
-                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  className="btn-icon"
                   title="Preview Form"
                 >
-                  <Eye className="h-4 w-4" />
+                  <Eye style={{ width: 15, height: 15 }} />
                 </button>
               )}
 
@@ -109,27 +83,27 @@ export const PackageItemsList: React.FC<PackageItemsListProps> = ({
                     type="button"
                     disabled={isFirst}
                     onClick={() => onMoveUp?.(index)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                    title="Move Up"
+                    className="btn-icon"
+                    title="Move up"
                   >
-                    <ArrowUp className="h-4 w-4" />
+                    <ArrowUp style={{ width: 15, height: 15 }} />
                   </button>
                   <button
                     type="button"
                     disabled={isLast}
                     onClick={() => onMoveDown?.(index)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                    title="Move Down"
+                    className="btn-icon"
+                    title="Move down"
                   >
-                    <ArrowDown className="h-4 w-4" />
+                    <ArrowDown style={{ width: 15, height: 15 }} />
                   </button>
                   <button
                     type="button"
                     onClick={() => onRemove?.(index)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title="Remove Item"
+                    className="btn-icon danger"
+                    title="Remove item"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 style={{ width: 15, height: 15 }} />
                   </button>
                 </>
               )}

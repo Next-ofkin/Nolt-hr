@@ -38,55 +38,41 @@ export const OnboardingPackageEditorPage: React.FC = () => {
     }
   }, [packageId])
 
-
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
-      {/* Top Breadcrumb Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-        <div className="flex items-center space-x-3">
-          <Link
-            to="/hr/onboarding-packages"
-            className="flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back to Packages</span>
-          </Link>
-          <div className="h-4 w-px bg-slate-200" />
-          <div className="flex items-center space-x-2">
-            <Package className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-bold text-slate-900 truncate">
-              {detail ? detail.title : 'Onboarding Package Editor'}
-            </span>
-          </div>
-        </div>
+    <div className="page package-editor-page">
+      <div className="package-editor-topbar">
+        <Link to="/hr/onboarding-packages" className="btn btn-ghost" style={{ padding: '0.4rem 0.75rem' }}>
+          <ArrowLeft style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Back to Packages
+        </Link>
+        <span className="package-editor-topbar-divider" />
+        <span className="package-editor-name">
+          <Package style={{ width: 16, height: 16, color: 'var(--primary)', flexShrink: 0 }} />
+          <span>{detail ? detail.title : 'Onboarding Package Editor'}</span>
+        </span>
       </div>
 
-      {/* Loading State */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-          <p className="text-sm font-medium">Loading onboarding package editor...</p>
+        <div className="package-items-empty" style={{ border: 'none', marginTop: '1.25rem' }}>
+          <Loader2 style={{ width: 26, height: 26 }} className="spin" />
+          <div className="package-items-empty-title">Loading onboarding package editor…</div>
         </div>
       )}
 
-      {/* Error State */}
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
-          <AlertCircle className="mx-auto h-8 w-8 text-red-500 mb-2" />
-          <h3 className="text-base font-bold text-red-900">Error Loading Package</h3>
-          <p className="text-xs text-red-700 mt-1">{error}</p>
-          <button
-            onClick={() => navigate('/hr/onboarding-packages')}
-            className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
-          >
+        <div className="card" style={{ textAlign: 'center', marginTop: '1.25rem', padding: '2.5rem 1.5rem' }}>
+          <AlertCircle style={{ width: 28, height: 28, color: 'var(--danger)', margin: '0 auto 0.6rem' }} />
+          <h3 style={{ margin: 0, color: 'var(--danger)' }}>Error Loading Package</h3>
+          <p className="subtitle" style={{ margin: '0.35rem 0 0' }}>{error}</p>
+          <button type="button" onClick={() => navigate('/hr/onboarding-packages')} className="btn btn-primary" style={{ marginTop: '1rem' }}>
             Return to Onboarding Packages
           </button>
         </div>
       )}
 
-      {/* Editor Content */}
       {!isLoading && !error && detail && (
-        <PackageEditor initialDetail={detail} onPackageUpdated={setDetail} />
+        <div style={{ marginTop: '1.25rem' }}>
+          <PackageEditor initialDetail={detail} onPackageUpdated={setDetail} />
+        </div>
       )}
     </div>
   )

@@ -339,3 +339,31 @@ test('onboarding packages list page renders no unstyled Tailwind utility classes
     assert.doesNotMatch(source, new RegExp(utility))
   }
 })
+
+test('onboarding package editor page and its components render no unstyled Tailwind utility classes', async () => {
+  const editorFiles = [
+    'src/features/onboarding-packages/pages/OnboardingPackageEditorPage.tsx',
+    'src/features/onboarding-packages/components/PackageEditor.tsx',
+    'src/features/onboarding-packages/components/PackageItemsList.tsx',
+    'src/features/onboarding-packages/components/PackageFormPicker.tsx',
+    'src/features/onboarding-packages/components/PackageDocumentModal.tsx',
+    'src/features/onboarding-packages/components/PackagePublishDialog.tsx',
+    'src/features/onboarding-packages/components/PackageVersionHistory.tsx',
+    'src/features/onboarding-packages/components/PackagePreviewModal.tsx',
+  ]
+
+  for (const file of editorFiles) {
+    const source = await readRepositoryFile(file)
+    for (const utility of ['bg-indigo-600', 'text-slate-900', 'rounded-2xl', 'rounded-xl', 'max-w-7xl', 'grid-cols-1', 'shadow-sm', 'space-x-', 'space-y-', 'backdrop-blur', 'z-50']) {
+      assert.doesNotMatch(source, new RegExp(utility), `${file} should not contain unstyled Tailwind utility "${utility}"`)
+    }
+  }
+})
+
+test('onboarding package editor: save draft, publish, and create-new-draft actions remain wired to the repository', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/components/PackageEditor.tsx')
+
+  assert.match(source, /saveOnboardingPackageDraft\(/)
+  assert.match(source, /publishOnboardingPackageDraft\(/)
+  assert.match(source, /createOnboardingPackageDraft\(/)
+})

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Eye, FileText, FileCheck, X, Loader2, ArrowLeft } from 'lucide-react'
+import { Eye, FileText, FileCheck, Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import { NoltDynamicForm } from '../../shadcn-form-poc/renderer/NoltDynamicForm'
@@ -45,7 +45,6 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
         setSelectedFormSchema(data.definition as unknown as FormSchema)
       }
     } catch {
-      // Fallback preview
       setSelectedFormSchema(null)
     } finally {
       setIsLoadingSchema(false)
@@ -53,129 +52,82 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden my-8">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50">
-          <div className="flex items-center space-x-3">
-            {selectedFormSchema ? (
-              <button
-                onClick={() => setSelectedFormSchema(null)}
-                className="flex items-center space-x-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back to Package Summary</span>
-              </button>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600">
-                  <Eye className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">{packageTitle}</h3>
-                  <div className="flex items-center space-x-2 text-xs text-slate-500">
-                    <span className="font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full text-[10px]">
-                      Version {versionNumber} Preview
-                    </span>
-                    <span>• {items.length} items total</span>
-                  </div>
-                </div>
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal-card modal-card-xl no-padding">
+        <div className="modal-header">
+          {selectedFormSchema ? (
+            <button type="button" onClick={() => setSelectedFormSchema(null)} className="btn btn-ghost" style={{ padding: '0.4rem 0.75rem' }}>
+              <ArrowLeft style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Back to Package Summary
+            </button>
+          ) : (
+            <div className="modal-header-info">
+              <span className="modal-header-icon">
+                <Eye style={{ width: 18, height: 18 }} />
+              </span>
+              <div>
+                <h3>{packageTitle}</h3>
+                <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span className="badge badge-success">Version {versionNumber} Preview</span>
+                  <span>{items.length} items total</span>
+                </p>
               </div>
-            )}
-          </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+            </div>
+          )}
         </div>
 
-        {/* Modal Content */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto">
+        <div className="modal-body">
           {isLoadingSchema && (
-            <div className="flex items-center justify-center py-12 text-sm text-slate-500 space-x-2">
-              <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-              <span>Loading form schema preview...</span>
+            <div className="package-items-empty" style={{ border: 'none' }}>
+              <Loader2 style={{ width: 22, height: 22 }} className="spin" />
+              <div className="package-items-empty-hint">Loading form schema preview…</div>
             </div>
           )}
 
           {!isLoadingSchema && selectedFormSchema && (
-            <div className="space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h4 className="text-sm font-semibold text-slate-900">Form Preview: {selectedFormTitle}</h4>
-                <p className="text-xs text-slate-500">
-                  Interactive preview using approved NoltDynamicForm schema renderer.
+            <div>
+              <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Form Preview: {selectedFormTitle}</h4>
+                <p className="subtitle" style={{ margin: '0.15rem 0 0' }}>
+                  Interactive preview using the approved form schema renderer.
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
-                <NoltDynamicForm schema={selectedFormSchema} />
-              </div>
+              <NoltDynamicForm schema={selectedFormSchema} />
             </div>
           )}
 
           {!isLoadingSchema && !selectedFormSchema && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {packageDescription && (
-                <p className="text-sm text-slate-600 bg-slate-50 p-3.5 rounded-lg border border-slate-100">
+                <p className="package-editor-readonly-desc" style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.85rem 1rem' }}>
                   {packageDescription}
                 </p>
               )}
 
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Package Content & Requirements
-                </h4>
+              <div>
+                <p className="package-editor-field-label" style={{ marginBottom: '0.6rem' }}>Package Content &amp; Requirements</p>
 
-                <div className="space-y-2.5">
+                <div className="package-item-list">
                   {items.map((item, idx) => {
                     const isForm = item.itemType === 'form'
                     return (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all"
-                      >
-                        <div className="flex items-start space-x-3 min-w-0">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 mt-0.5">
-                            {idx + 1}
+                      <div key={idx} className="package-item-row">
+                        <div className="package-item-info">
+                          <span className="package-item-index">{idx + 1}</span>
+                          <span className={`package-item-icon ${isForm ? 'package-item-icon-form' : 'package-item-icon-document'}`}>
+                            {isForm ? <FileText style={{ width: 16, height: 16 }} /> : <FileCheck style={{ width: 16, height: 16 }} />}
                           </span>
-                          <div
-                            className={`rounded-lg p-2 shrink-0 ${
-                              isForm ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
-                            }`}
-                          >
-                            {isForm ? <FileText className="h-4 w-4" /> : <FileCheck className="h-4 w-4" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center space-x-2">
-                              <h5 className="text-sm font-semibold text-slate-900">
-                                {isForm ? item.formTitle || 'Form' : item.documentTitle}
-                              </h5>
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                                  isForm
-                                    ? 'bg-indigo-100 text-indigo-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {isForm
-                                  ? `Form (Version ${item.formVersionNumber ?? 1})`
-                                  : 'Document Requirement'}
+                          <div className="package-item-details">
+                            <div className="package-item-title-row">
+                              <span className="package-item-title">{isForm ? item.formTitle || 'Form' : item.documentTitle}</span>
+                              <span className={`package-item-tag ${isForm ? 'package-item-tag-form' : 'package-item-tag-document'}`}>
+                                {isForm ? `Form (Version ${item.formVersionNumber ?? 1})` : 'Document Requirement'}
                               </span>
-                              {item.required ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800">
-                                  Required
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                  Optional
-                                </span>
-                              )}
+                              <span className={`package-item-tag ${item.required ? 'package-item-tag-required' : 'package-item-tag-optional'}`}>
+                                {item.required ? 'Required' : 'Optional'}
+                              </span>
                             </div>
-
                             {!isForm && item.documentDescription && (
-                              <p className="text-xs text-slate-500 mt-1">{item.documentDescription}</p>
+                              <p className="package-item-desc">{item.documentDescription}</p>
                             )}
                           </div>
                         </div>
@@ -184,10 +136,9 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handlePreviewForm(item.formVersionId, item.formTitle)}
-                            className="flex items-center space-x-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors ml-4 shrink-0"
+                            className="btn-tinted btn-tinted-primary"
                           >
-                            <Eye className="h-3.5 w-3.5" />
-                            <span>Preview Form</span>
+                            <Eye style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Preview Form
                           </button>
                         )}
                       </div>
@@ -199,12 +150,8 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-          >
+        <div className="modal-footer">
+          <button type="button" onClick={onClose} className="btn btn-ghost">
             Close Preview
           </button>
         </div>

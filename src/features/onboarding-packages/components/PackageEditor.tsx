@@ -7,7 +7,6 @@ import {
   Plus,
   AlertCircle,
   CheckCircle2,
-  Loader2,
   Eye,
   PlusCircle,
 } from 'lucide-react'
@@ -42,14 +41,12 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
 }) => {
   const [detail, setDetail] = useState<OnboardingPackageDetail>(initialDetail)
 
-  // Select active draft or highest version
   const activeVersionIndex = detail.versions.findIndex((v) => v.state === 'draft')
   const initialActiveVersion =
     activeVersionIndex !== -1 ? detail.versions[activeVersionIndex] : detail.versions[0]
 
   const [activeVersion, setActiveVersion] = useState<PackageVersion>(initialActiveVersion)
 
-  // Editor State
   const [title, setTitle] = useState(detail.title)
   const [description, setDescription] = useState(detail.description || '')
   const [items, setItems] = useState<PackageItemInput[]>(
@@ -78,7 +75,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
 
   const [expectedRevision, setExpectedRevision] = useState(activeVersion?.revision || 1)
 
-  // Dialog & Feedback state
   const [isFormPickerOpen, setIsFormPickerOpen] = useState(false)
   const [isDocModalOpen, setIsDocModalOpen] = useState(false)
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
@@ -94,12 +90,10 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   const isDraft = activeVersion?.state === 'draft'
   const isReadOnly = !isDraft || !!detail.archivedAt
 
-  // Item Handlers
   const handleAddFormVersion = (option: { formVersionId: string; title: string; versionNumber: number }) => {
     setErrorMessage(null)
     setSuccessMessage(null)
 
-    // Check duplicate
     if (items.some((i) => i.itemType === 'form' && i.formVersionId === option.formVersionId)) {
       setErrorMessage('A package cannot contain the same form version multiple times.')
       return
@@ -155,7 +149,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setItems(updated)
   }
 
-  // Save Draft Handler
   const handleSaveDraft = async () => {
     if (!isDraft) return
     setIsSaving(true)
@@ -174,7 +167,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       setExpectedRevision(result.revision)
       setSuccessMessage('Draft saved successfully.')
 
-      // Sync active version revision
       const updatedVersion = {
         ...activeVersion,
         revision: result.revision,
@@ -196,7 +188,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  // Publish Handler
   const handleConfirmPublish = async () => {
     if (!isDraft) return
     setIsPublishing(true)
@@ -204,7 +195,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
 
     try {
-      // First save latest edits
       await saveOnboardingPackageDraft({
         onboardingPackageId: detail.id,
         title,
@@ -218,7 +208,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       setSuccessMessage(`Package Version ${publishRes.versionNumber} published successfully.`)
       setIsPublishDialogOpen(false)
 
-      // Reload detail or update state to published
       const publishedVer: PackageVersion = {
         ...activeVersion,
         state: 'published',
@@ -242,7 +231,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  // Create New Draft Handler
   const handleCreateNewDraft = async () => {
     setIsCreatingDraft(true)
     setErrorMessage(null)
@@ -256,7 +244,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
           : `Switched to open Version ${draftRes.versionNumber} Draft.`,
       )
 
-      // Reload page state via parent refresh or construct draft version
       window.location.reload()
     } catch (err) {
       setErrorMessage(onboardingPackagePersistenceMessage(err))
@@ -265,7 +252,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  // Switch Active Version Handler
   const handleSelectVersion = (version: PackageVersion) => {
     setActiveVersion(version)
     setExpectedRevision(version.revision)
@@ -297,203 +283,134 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Messages */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {errorMessage && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-start space-x-3 shadow-sm">
-          <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <span className="font-semibold">Save Error: </span>
-            <span>{errorMessage}</span>
-          </div>
+        <div className="alert alert-error">
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+            <span><strong>Save error: </strong>{errorMessage}</span>
+          </p>
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 flex items-center space-x-3 shadow-sm">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          <span className="font-medium">{successMessage}</span>
+        <div className="alert alert-success">
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 style={{ width: 16, height: 16, flexShrink: 0 }} /> {successMessage}
+          </p>
         </div>
       )}
 
-      {/* Primary Editor Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Section (2 cols) */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Metadata Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    isDraft ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                  }`}
-                >
-                  {isDraft ? (
-                    <>
-                      <Clock className="h-3 w-3 mr-1" />
-                      Version {activeVersion?.versionNumber} Draft (Rev {expectedRevision})
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-3 w-3 mr-1" />
-                      Version {activeVersion?.versionNumber} Published
-                    </>
-                  )}
+      <div className="package-editor-grid">
+        <div className="package-editor-main">
+          <div className="card">
+            <div className="package-editor-card-top">
+              <div className="package-editor-badges">
+                <span className={`badge ${isDraft ? 'badge-warning' : 'badge-success'}`}>
+                  {isDraft ? <Clock style={{ width: 12, height: 12 }} /> : <Lock style={{ width: 12, height: 12 }} />}
+                  {isDraft ? `Version ${activeVersion?.versionNumber} Draft (Rev ${expectedRevision})` : `Version ${activeVersion?.versionNumber} Published`}
                 </span>
-                {detail.archivedAt && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700">
-                    Archived
-                  </span>
-                )}
+                {detail.archivedAt && <span className="badge badge-neutral">Archived</span>}
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsPreviewOpen(true)}
-                  className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  <span>Preview Package</span>
-                </button>
-              </div>
+              <button type="button" onClick={() => setIsPreviewOpen(true)} className="btn btn-ghost">
+                <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview Package
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                Package Title
-              </label>
+            <div style={{ marginTop: '1.1rem' }}>
+              <span className="package-editor-field-label">Package Title</span>
               {isReadOnly ? (
-                <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+                <h2 className="package-editor-readonly-title">{title}</h2>
               ) : (
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Standard UK New Starter Package"
-                  className="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-base font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  style={{ fontSize: '1rem', fontWeight: 600 }}
                 />
               )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                Description / Purpose
-              </label>
+            <div style={{ marginTop: '1rem' }}>
+              <span className="package-editor-field-label">Description / Purpose</span>
               {isReadOnly ? (
-                <p className="text-sm text-slate-600">{description || 'No description provided.'}</p>
+                <p className="package-editor-readonly-desc">{description || 'No description provided.'}</p>
               ) : (
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe which employee roles or departments this onboarding package is designed for..."
                   rows={2}
-                  className="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               )}
             </div>
           </div>
 
-          {/* Included Items Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="card">
+            <div className="package-items-header">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Package Items & Requirements</h3>
-                <p className="text-xs text-slate-500">
-                  Group exact published form versions and required document specifications.
-                </p>
+                <h3>Package Items &amp; Requirements</h3>
+                <p>Group exact published form versions and required document specifications.</p>
               </div>
 
               {!isReadOnly && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormPickerOpen(true)}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Published Form</span>
+                <div className="package-items-actions">
+                  <button type="button" onClick={() => setIsFormPickerOpen(true)} className="btn-tinted btn-tinted-primary">
+                    <Plus style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Add Published Form
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsDocModalOpen(true)}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Document Requirement</span>
+                  <button type="button" onClick={() => setIsDocModalOpen(true)} className="btn-tinted btn-tinted-amber">
+                    <Plus style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Add Document Requirement
                   </button>
                 </div>
               )}
             </div>
 
-            <PackageItemsList
-              items={items}
-              isReadOnly={isReadOnly}
-              onMoveUp={handleMoveUp}
-              onMoveDown={handleMoveDown}
-              onRemove={handleRemoveItem}
-            />
+            <div style={{ marginTop: '1.1rem' }}>
+              <PackageItemsList
+                items={items}
+                isReadOnly={isReadOnly}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onRemove={handleRemoveItem}
+              />
+            </div>
           </div>
 
-          {/* Action Footer */}
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">
-              {isDraft ? (
-                <span>Unsaved changes will be stored as revision {expectedRevision + 1}.</span>
-              ) : (
-                <span>Published versions cannot be modified. Branch a new draft to edit.</span>
-              )}
-            </div>
+          <div className="card package-editor-footer">
+            <span className="package-editor-footer-note">
+              {isDraft
+                ? `Unsaved changes will be stored as revision ${expectedRevision + 1}.`
+                : 'Published versions cannot be modified. Branch a new draft to edit.'}
+            </span>
 
-            <div className="flex items-center space-x-3">
+            <div className="package-editor-footer-actions">
               {isDraft ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    disabled={isSaving || isPublishing}
-                    className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-3.5 w-3.5 text-slate-500" />
-                        <span>Save Draft</span>
-                      </>
-                    )}
+                  <button type="button" onClick={handleSaveDraft} disabled={isSaving || isPublishing} className="btn btn-ghost">
+                    <Save style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
+                    {isSaving ? 'Saving…' : 'Save Draft'}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setIsPublishDialogOpen(true)}
                     disabled={isSaving || isPublishing || items.length === 0}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+                    className="btn btn-primary"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>Publish Version {activeVersion?.versionNumber}</span>
+                    <Sparkles style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
+                    Publish Version {activeVersion?.versionNumber}
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleCreateNewDraft}
-                  disabled={isCreatingDraft}
-                  className="inline-flex items-center space-x-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
-                >
+                <button type="button" onClick={handleCreateNewDraft} disabled={isCreatingDraft} className="btn btn-primary">
                   {isCreatingDraft ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Creating Draft...</span>
-                    </>
+                    <>Creating Draft…</>
                   ) : (
                     <>
-                      <PlusCircle className="h-3.5 w-3.5" />
-                      <span>Create Version {(activeVersion?.versionNumber || 1) + 1} Draft</span>
+                      <PlusCircle style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
+                      Create Version {(activeVersion?.versionNumber || 1) + 1} Draft
                     </>
                   )}
                 </button>
@@ -502,8 +419,7 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
           </div>
         </div>
 
-        {/* Sidebar (1 col) */}
-        <div className="space-y-6">
+        <div>
           <PackageVersionHistory
             versions={detail.versions}
             activeVersionId={activeVersion?.id || ''}
@@ -512,7 +428,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
         </div>
       </div>
 
-      {/* Modals */}
       <PackageFormPicker
         isOpen={isFormPickerOpen}
         onClose={() => setIsFormPickerOpen(false)}
@@ -521,7 +436,6 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
           .filter((i): i is PackageFormItemInput => i.itemType === 'form' && !!i.formVersionId)
           .map((i) => i.formVersionId)}
       />
-
 
       <PackageDocumentModal
         isOpen={isDocModalOpen}
