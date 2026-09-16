@@ -2249,43 +2249,50 @@ textarea:focus {
   padding-left: 2.25rem;
 }
 
-/* ---------- Onboarding Packages library ---------- */
+/* ---------- Resource library (card list) — shared by Onboarding Packages and Forms ---------- */
 
-.package-library {
+.package-library,
+.resource-library {
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
   padding-inline: clamp(16px, 3vw, 24px);
 }
 
-.package-toolbar {
+.package-toolbar,
+.resource-toolbar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
 
-.package-toolbar .field {
+.package-toolbar .field,
+.resource-toolbar .field {
   margin: 0;
 }
 
-.package-status-filter {
+.package-status-filter,
+.resource-status-filter {
   width: auto;
   min-width: 170px;
 }
 
-.package-result-count {
+.package-result-count,
+.resource-result-count {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
 
-.package-list {
+.package-list,
+.resource-card-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.package-card {
+.package-card,
+.resource-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -2296,12 +2303,14 @@ textarea:focus {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.package-card:hover {
+.package-card:hover,
+.resource-card:hover {
   border-color: #cbd5e1;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
-.package-card-top {
+.package-card-top,
+.resource-card-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2309,28 +2318,32 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
-.package-card-heading {
+.package-card-heading,
+.resource-card-heading {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   min-width: 0;
 }
 
-.package-card-title {
+.package-card-title,
+.resource-card-title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-strong);
 }
 
-.package-card-description {
+.package-card-description,
+.resource-card-description {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text-muted);
   max-width: 60ch;
 }
 
-.package-card-badges {
+.package-card-badges,
+.resource-card-badges {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2338,7 +2351,8 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
-.package-metrics {
+.package-metrics,
+.resource-metrics {
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -2349,7 +2363,8 @@ textarea:focus {
   border-radius: 10px;
 }
 
-.package-metric {
+.package-metric,
+.resource-metric {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2358,12 +2373,14 @@ textarea:focus {
   font-weight: 600;
 }
 
-.package-metric svg {
+.package-metric svg,
+.resource-metric svg {
   color: var(--primary);
   flex-shrink: 0;
 }
 
-.package-card-footer {
+.package-card-footer,
+.resource-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2372,7 +2389,8 @@ textarea:focus {
   padding-top: 0.15rem;
 }
 
-.package-card-updated {
+.package-card-updated,
+.resource-card-updated {
   font-size: 0.82rem;
   color: var(--text-muted);
   display: inline-flex;
@@ -2380,20 +2398,23 @@ textarea:focus {
   gap: 0.4rem;
 }
 
-.package-card-actions {
+.package-card-actions,
+.resource-card-actions {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
 }
 
-.package-skeleton-list {
+.package-skeleton-list,
+.resource-skeleton-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.package-skeleton-card {
+.package-skeleton-card,
+.resource-skeleton-card {
   height: 168px;
   border-radius: 14px;
   background: linear-gradient(100deg, var(--bg) 30%, #eef1f5 50%, var(--bg) 70%);
@@ -2412,33 +2433,40 @@ textarea:focus {
 }
 
 @media (max-width: 640px) {
-  .package-toolbar {
+  .package-toolbar,
+  .resource-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .package-status-filter {
+  .package-status-filter,
+  .resource-status-filter {
     width: 100%;
   }
 
-  .package-card {
+  .package-card,
+  .resource-card {
     padding: 1.25rem;
   }
 
-  .package-card-badges {
+  .package-card-badges,
+  .resource-card-badges {
     width: 100%;
   }
 
-  .package-metrics {
+  .package-metrics,
+  .resource-metrics {
     gap: 0.85rem 1.25rem;
   }
 
-  .package-card-footer {
+  .package-card-footer,
+  .resource-card-footer {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .package-card-actions .btn {
+  .package-card-actions .btn,
+  .resource-card-actions .btn {
     flex: 1;
   }
 }

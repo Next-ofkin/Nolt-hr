@@ -9,6 +9,10 @@ import {
   formPersistenceMessage,
   mapFormVersion,
   summarizeFormDefinition,
+  filterFormsBySearch,
+  filterFormsByStatus,
+  formatFormDate,
+  type FormDefinitionSummary,
 } from '../src/features/forms/data/forms-types.ts'
 import type { FormDefinitionVersionRow } from '../src/lib/database.types.ts'
 import { isRouteAllowedForRole } from '../src/lib/roles.ts'
@@ -260,4 +264,79 @@ test('unauthorized error mapping returns user-facing access error message', () =
   const error = new FormPersistenceError('UNAUTHORIZED', 'Only admin or HR can edit forms.')
   assert.equal(error.code, 'UNAUTHORIZED')
   assert.equal(formPersistenceMessage(error, 'Fallback'), 'Only admin or HR can edit forms.')
+})
+
+function sampleFormSummary(overrides: Partial<FormDefinitionSummary> = {}): FormDefinitionSummary {
+  return {
+    id: 'form-1',
+    title: 'Employee Data Form',
+    description: 'Standard onboarding paperwork.',
+    createdAt: '2026-09-16T10:00:00.000Z',
+    updatedAt: '2026-09-16T10:00:00.000Z',
+    archivedAt: null,
+    draftVersionNumber: null,
+    draftRevision: null,
+    latestPublishedVersionNumber: null,
+    latestPublishedAt: null,
+    ...overrides,
+  }
+}
+
+test('filterFormsBySearch matches title or description, case-insensitively', () => {
+  const forms = [
+    sampleFormSummary({ id: 'a', title: 'Employee Data Form', description: 'For new hires' }),
+    sampleFormSummary({ id: 'b', title: 'Bank Details', description: 'Payroll setup' }),
+  ]
+
+  assert.deepEqual(filterFormsBySearch(forms, 'employee').map((f) => f.id), ['a'])
+  assert.deepEqual(filterFormsBySearch(forms, 'PAYROLL').map((f) => f.id), ['b'])
+  assert.deepEqual(filterFormsBySearch(forms, '').map((f) => f.id), ['a', 'b'])
+  assert.deepEqual(filterFormsBySearch(forms, '   ').map((f) => f.id), ['a', 'b'])
+  assert.deepEqual(filterFormsBySearch(forms, 'nonexistent'), [])
+})
+
+test('filterFormsByStatus separates draft, published-only, and archived forms', () => {
+  const forms = [
+    sampleFormSummary({ id: 'draft-only', draftVersionNumber: 1 }),
+    sampleFormSummary({ id: 'published-only', latestPublishedVersionNumber: 1 }),
+    sampleFormSummary({ id: 'draft-with-published-history', draftVersionNumber: 2, latestPublishedVersionNumber: 1 }),
+    sampleFormSummary({ id: 'archived-form', archivedAt: '2026-09-10T00:00:00.000Z', latestPublishedVersionNumber: 1 }),
+    sampleFormSummary({ id: 'untouched' }),
+  ]
+
+  assert.deepEqual(
+    filterFormsByStatus(forms, 'draft').map((f) => f.id),
+    ['draft-only', 'draft-with-published-history'],
+  )
+  assert.deepEqual(
+    filterFormsByStatus(forms, 'published').map((f) => f.id),
+    ['published-only'],
+  )
+  assert.deepEqual(
+    filterFormsByStatus(forms, 'archived').map((f) => f.id),
+    ['archived-form'],
+  )
+  assert.deepEqual(filterFormsByStatus(forms, 'all'), forms)
+})
+
+test('formatFormDate renders a readable "16 Sep 2026" style date', () => {
+  assert.equal(formatFormDate('2026-09-16T10:00:00.000Z'), '16 Sep 2026')
+})
+
+test('forms library page: New Form and Create New Draft actions remain wired to the repository, and no form is hardcoded', async () => {
+  const source = await readRepositoryFile('src/features/forms/pages/FormsLibraryPage.tsx')
+
+  assert.match(source, /useCreateFormDefinition\(/)
+  assert.match(source, /useCreateDraftFromPublished\(/)
+  assert.match(source, /useFormDefinitions\(/)
+  assert.match(source, /navigate\(`\/hr\/forms\/\$\{created\.formDefinitionId\}\/edit`\)/)
+  assert.match(source, /navigate\(`\/hr\/forms\/\$\{formDefinitionId\}\/edit`\)/)
+})
+
+test('forms library page renders no unstyled Tailwind utility classes (this app ships no Tailwind build)', async () => {
+  const source = await readRepositoryFile('src/features/forms/pages/FormsLibraryPage.tsx')
+
+  for (const utility of ['bg-indigo-600', 'text-slate-900', 'rounded-2xl', 'rounded-xl', 'max-w-7xl', 'grid-cols-1', 'shadow-sm', 'space-x-', 'space-y-']) {
+    assert.doesNotMatch(source, new RegExp(utility))
+  }
 })

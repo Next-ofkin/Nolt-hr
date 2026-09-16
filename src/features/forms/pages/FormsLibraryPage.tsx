@@ -1,38 +1,32 @@
 import { useState } from 'react'
-import { FileText, Plus } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { FileText, Plus, Search, Clock, Eye, History, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { createBlankFormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import {
   useCreateDraftFromPublished,
   useCreateFormDefinition,
   useFormDefinitions,
 } from '../data/forms-queries'
-import { formPersistenceMessage, type FormDefinitionSummary } from '../data/forms-types'
-
-function displayDateTime(value: string | null) {
-  return value ? new Date(value).toLocaleString() : '—'
-}
-
-function FormStatus({ form }: { form: FormDefinitionSummary }) {
-  if (form.archivedAt) {
-    return <span className="employee-status employee-status-archived">Archived</span>
-  }
-  if (form.draftVersionNumber !== null) {
-    return <span className="employee-status employee-status-draft">Draft</span>
-  }
-  if (form.latestPublishedVersionNumber !== null) {
-    return <span className="employee-status employee-status-completed">Published</span>
-  }
-  return <span className="employee-status employee-status-draft">Unavailable</span>
-}
+import {
+  filterFormsBySearch,
+  filterFormsByStatus,
+  formatFormDate,
+  formPersistenceMessage,
+  type FormStatusFilter,
+  type FormDefinitionSummary,
+} from '../data/forms-types'
 
 export default function FormsLibraryPage() {
   const navigate = useNavigate()
   const formsQuery = useFormDefinitions()
   const createFormMutation = useCreateFormDefinition()
   const createDraftMutation = useCreateDraftFromPublished()
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<FormStatusFilter>('all')
   const [actionFormId, setActionFormId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
   const forms = formsQuery.data ?? []
 
   const handleCreateForm = async () => {
@@ -63,110 +57,191 @@ export default function FormsLibraryPage() {
     }
   }
 
+  const searchFiltered = filterFormsBySearch(forms, search)
+  const filteredForms = filterFormsByStatus(searchFiltered, statusFilter)
+  const hasActiveFilters = search.trim() !== '' || statusFilter !== 'all'
+  const isLoading = formsQuery.isLoading
+
   return (
-    <div className="page employee-page">
+    <div className="page resource-library">
       <div className="page-heading">
         <div>
           <p className="eyebrow">Form management</p>
           <h1>Forms</h1>
           <p className="subtitle">Create and manage employee forms.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={createFormMutation.isPending}
-          onClick={() => void handleCreateForm()}
-        >
-          <Plus size={16} aria-hidden="true" />
+
+        <button type="button" onClick={() => void handleCreateForm()} disabled={createFormMutation.isPending} className="btn btn-primary">
+          <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} />
           {createFormMutation.isPending ? 'Creating…' : 'New Form'}
         </button>
       </div>
 
-      {actionError && <p className="error" role="alert">{actionError}</p>}
+      {actionError && (
+        <div className="alert alert-error" role="alert">
+          <p style={{ margin: 0 }}>{actionError}</p>
+        </div>
+      )}
 
-      <section className="card directory-card" aria-label="Forms library">
-        {formsQuery.isLoading && <p className="empty-state">Loading forms…</p>}
-        {formsQuery.error && <p className="error">Unable to load forms.</p>}
+      {formsQuery.error && (
+        <div className="alert alert-error" role="alert">
+          <p style={{ margin: 0 }}>Unable to load forms.</p>
+        </div>
+      )}
 
-        {!formsQuery.isLoading && !formsQuery.error && forms.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <FileText size={22} aria-hidden="true" />
-            </div>
-            <h2>No forms yet</h2>
-            <p>Create your first employee form to start building its draft.</p>
-            <button type="button" className="btn btn-primary" onClick={() => void handleCreateForm()}>
-              New Form
+      <div className="resource-toolbar">
+        <div className="search-input-wrap">
+          <Search style={{ width: 16, height: 16 }} />
+          <label htmlFor="form-search" className="sr-only">Search forms</label>
+          <input
+            id="form-search"
+            type="search"
+            placeholder="Search forms..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="form-status-filter" className="sr-only">Filter by status</label>
+          <select
+            id="form-status-filter"
+            className="resource-status-filter"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as FormStatusFilter)}
+          >
+            <option value="all">All Forms</option>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+      </div>
+
+      {!isLoading && !formsQuery.error && (
+        <p className="resource-result-count">
+          Showing {filteredForms.length} {filteredForms.length === 1 ? 'form' : 'forms'}
+        </p>
+      )}
+
+      {isLoading && (
+        <div className="resource-skeleton-list" aria-label="Loading forms" aria-busy="true">
+          <div className="resource-skeleton-card" />
+          <div className="resource-skeleton-card" />
+          <div className="resource-skeleton-card" />
+        </div>
+      )}
+
+      {!isLoading && !formsQuery.error && filteredForms.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <FileText size={22} aria-hidden="true" />
+          </div>
+          {hasActiveFilters ? (
+            <>
+              <h2>No forms found</h2>
+              <p>Try changing your search or filters.</p>
+            </>
+          ) : (
+            <>
+              <h2>No forms yet</h2>
+              <p style={{ maxWidth: '46ch', marginInline: 'auto' }}>
+                Create your first employee form to start building its draft.
+              </p>
+              <button type="button" onClick={() => void handleCreateForm()} disabled={createFormMutation.isPending} className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> New Form
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isLoading && !formsQuery.error && filteredForms.length > 0 && (
+        <div className="resource-card-list">
+          {filteredForms.map((form) => (
+            <FormCard
+              key={form.id}
+              form={form}
+              isCreatingDraft={actionFormId === form.id}
+              onEditDraft={() => navigate(`/hr/forms/${form.id}/edit`)}
+              onCreateDraft={() => void handleCreateDraft(form.id)}
+              onPreview={() => navigate(`/hr/forms/${form.id}/edit?view=preview`)}
+              onVersionHistory={() => navigate(`/hr/forms/${form.id}/edit?view=history`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FormCard({
+  form,
+  isCreatingDraft,
+  onEditDraft,
+  onCreateDraft,
+  onPreview,
+  onVersionHistory,
+}: {
+  form: FormDefinitionSummary
+  isCreatingDraft: boolean
+  onEditDraft: () => void
+  onCreateDraft: () => void
+  onPreview: () => void
+  onVersionHistory: () => void
+}) {
+  const hasDraft = form.draftVersionNumber !== null
+  const hasPublished = form.latestPublishedVersionNumber !== null
+  const canPreviewOrHistory = hasDraft || hasPublished
+
+  return (
+    <div className="resource-card">
+      <div className="resource-card-top">
+        <div className="resource-card-heading">
+          <h3 className="resource-card-title">{form.title}</h3>
+          {form.description && <p className="resource-card-description">{form.description}</p>}
+        </div>
+
+        <div className="resource-card-badges">
+          {form.archivedAt && <span className="badge badge-neutral">Archived</span>}
+          {hasDraft && (
+            <span className="badge badge-warning">
+              <Clock style={{ width: 12, height: 12 }} /> Draft V{form.draftVersionNumber}
+            </span>
+          )}
+          {hasPublished && (
+            <span className="badge badge-success">Published V{form.latestPublishedVersionNumber}</span>
+          )}
+          {!hasDraft && !hasPublished && !form.archivedAt && <span className="badge badge-neutral">Unavailable</span>}
+        </div>
+      </div>
+
+      <div className="resource-card-footer">
+        <span className="resource-card-updated">Updated {formatFormDate(form.updatedAt)}</span>
+
+        <div className="resource-card-actions">
+          {hasDraft && !form.archivedAt && (
+            <button type="button" onClick={onEditDraft} className="btn btn-primary">
+              Edit Draft <ArrowRight style={{ width: 15, height: 15, marginLeft: '0.4rem' }} />
             </button>
-          </div>
-        )}
-
-        {!formsQuery.isLoading && !formsQuery.error && forms.length > 0 && (
-          <div className="table-scroll">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Form</th>
-                  <th>Status</th>
-                  <th>Latest published</th>
-                  <th>Draft</th>
-                  <th>Last updated</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {forms.map((form) => (
-                  <tr key={form.id}>
-                    <td>
-                      <strong>{form.title}</strong>
-                      {form.description && (
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
-                          {form.description}
-                        </div>
-                      )}
-                    </td>
-                    <td><FormStatus form={form} /></td>
-                    <td>
-                      {form.latestPublishedVersionNumber === null
-                        ? '—'
-                        : `Version ${form.latestPublishedVersionNumber}`}
-                    </td>
-                    <td>
-                      {form.draftVersionNumber === null
-                        ? '—'
-                        : `Version ${form.draftVersionNumber} · revision ${form.draftRevision}`}
-                    </td>
-                    <td>{displayDateTime(form.updatedAt)}</td>
-                    <td>
-                      <div className="table-actions" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                        {form.draftVersionNumber !== null && !form.archivedAt && (
-                          <Link to={`/hr/forms/${form.id}/edit`}>Edit Draft</Link>
-                        )}
-                        {form.draftVersionNumber === null && form.latestPublishedVersionNumber !== null && !form.archivedAt && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            disabled={actionFormId === form.id}
-                            onClick={() => void handleCreateDraft(form.id)}
-                          >
-                            {actionFormId === form.id ? 'Creating…' : 'Create New Draft'}
-                          </button>
-                        )}
-                        {(form.draftVersionNumber !== null || form.latestPublishedVersionNumber !== null) && (
-                          <Link to={`/hr/forms/${form.id}/edit?view=preview`}>Preview</Link>
-                        )}
-                        {(form.draftVersionNumber !== null || form.latestPublishedVersionNumber !== null) && (
-                          <Link to={`/hr/forms/${form.id}/edit?view=history`}>Version History</Link>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          )}
+          {!hasDraft && hasPublished && !form.archivedAt && (
+            <button type="button" onClick={onCreateDraft} disabled={isCreatingDraft} className="btn btn-primary">
+              {isCreatingDraft ? 'Creating…' : 'Create New Draft'}
+            </button>
+          )}
+          {canPreviewOrHistory && (
+            <button type="button" onClick={onPreview} className="btn btn-ghost">
+              <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview
+            </button>
+          )}
+          {canPreviewOrHistory && (
+            <button type="button" onClick={onVersionHistory} className="btn btn-ghost">
+              <History style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Version History
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

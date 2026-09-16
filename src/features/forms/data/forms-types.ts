@@ -135,6 +135,53 @@ export function summarizeFormDefinition(
   }
 }
 
+/** Case-insensitive title/description search, kept pure for focused tests. */
+export function filterFormsBySearch(
+  forms: FormDefinitionSummary[],
+  query: string,
+): FormDefinitionSummary[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return forms
+  return forms.filter(
+    (form) =>
+      form.title.toLowerCase().includes(needle) ||
+      (form.description ?? '').toLowerCase().includes(needle),
+  )
+}
+
+export type FormStatusFilter = 'all' | 'draft' | 'published' | 'archived'
+
+/**
+ * "draft" = has an open draft version, "published" = published with no
+ * open draft, "archived" = archived (regardless of draft/published state).
+ * Matches the badge shown on each form card.
+ */
+export function filterFormsByStatus(
+  forms: FormDefinitionSummary[],
+  status: FormStatusFilter,
+): FormDefinitionSummary[] {
+  if (status === 'all') return forms
+  if (status === 'archived') return forms.filter((form) => form.archivedAt !== null)
+  const notArchived = forms.filter((form) => form.archivedAt === null)
+  if (status === 'draft') return notArchived.filter((form) => form.draftVersionNumber !== null)
+  return notArchived.filter((form) => form.draftVersionNumber === null && form.latestPublishedVersionNumber !== null)
+}
+
+const SHORT_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+/**
+ * "16 Sep 2026" — formatted manually (not via Intl) so the month
+ * abbreviation is always the 3-letter form regardless of the runtime's
+ * ICU locale data (some ICU versions render en-GB September as "Sept").
+ */
+export function formatFormDate(iso: string): string {
+  const date = new Date(iso)
+  return `${date.getUTCDate()} ${SHORT_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+}
+
 export function formPersistenceMessage(error: unknown, fallback: string) {
   if (error instanceof FormPersistenceError) {
     if (error.code === 'FORM_DRAFT_CONFLICT') {
