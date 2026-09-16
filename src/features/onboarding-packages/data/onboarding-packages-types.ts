@@ -235,20 +235,23 @@ export function filterOnboardingPackagesBySearch(
   )
 }
 
-export type OnboardingPackageStatusFilter = 'all' | 'draft' | 'published'
+export type OnboardingPackageStatusFilter = 'all' | 'draft' | 'published' | 'archived'
 
 /**
  * "draft" = has an open draft version (regardless of whether an older
  * published version also exists); "published" = published with no open
- * draft. Matches the Draft/Published terminology used in the UI.
+ * draft; "archived" = archived (regardless of draft/published state).
+ * Matches the Draft/Published/Archived terminology used in the UI.
  */
 export function filterOnboardingPackagesByStatus(
   packages: OnboardingPackageSummary[],
   status: OnboardingPackageStatusFilter,
 ): OnboardingPackageSummary[] {
   if (status === 'all') return packages
-  if (status === 'draft') return packages.filter((pkg) => pkg.draftVersionNumber !== null)
-  return packages.filter((pkg) => pkg.draftVersionNumber === null && pkg.latestPublishedVersionNumber !== null)
+  if (status === 'archived') return packages.filter((pkg) => pkg.archivedAt !== null)
+  const notArchived = packages.filter((pkg) => pkg.archivedAt === null)
+  if (status === 'draft') return notArchived.filter((pkg) => pkg.draftVersionNumber !== null)
+  return notArchived.filter((pkg) => pkg.draftVersionNumber === null && pkg.latestPublishedVersionNumber !== null)
 }
 
 const SHORT_MONTHS = [

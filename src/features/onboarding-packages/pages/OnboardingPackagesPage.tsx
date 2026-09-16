@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Archive,
   Package,
   Plus,
   Search,
@@ -13,6 +14,7 @@ import {
 import {
   listOnboardingPackages,
   createOnboardingPackage,
+  archiveOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import {
   filterOnboardingPackagesBySearch,
@@ -29,26 +31,23 @@ export const OnboardingPackagesPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<OnboardingPackageStatusFilter>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
+  const [actionPackageId, setActionPackageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-    listOnboardingPackages()
+  const loadPackages = () => {
+    return listOnboardingPackages()
       .then((data) => {
-        if (isMounted) {
-          setPackages(data)
-          setIsLoading(false)
-        }
+        setPackages(data)
+        setIsLoading(false)
       })
       .catch((err) => {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
-          setIsLoading(false)
-        }
+        setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
+        setIsLoading(false)
       })
-    return () => {
-      isMounted = false
-    }
+  }
+
+  useEffect(() => {
+    void loadPackages()
   }, [])
 
   const handleCreatePackage = async () => {
@@ -63,6 +62,22 @@ export const OnboardingPackagesPage: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create onboarding package.')
       setIsCreating(false)
+    }
+  }
+
+  const handleArchive = async (pkg: OnboardingPackageSummary) => {
+    if (!window.confirm(`Archive "${pkg.title}"? It will be hidden from the active list, but its history is kept.`)) {
+      return
+    }
+    setActionPackageId(pkg.id)
+    setError(null)
+    try {
+      await archiveOnboardingPackage(pkg.id)
+      await loadPackages()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to archive this package.')
+    } finally {
+      setActionPackageId(null)
     }
   }
 
@@ -117,6 +132,7 @@ export const OnboardingPackagesPage: React.FC = () => {
             <option value="all">All Packages</option>
             <option value="draft">Draft</option>
             <option value="published">Published</option>
+            <option value="archived">Archived</option>
           </select>
         </div>
       </div>
@@ -174,6 +190,7 @@ export const OnboardingPackagesPage: React.FC = () => {
                   </div>
 
                   <div className="package-card-badges">
+                    {pkg.archivedAt && <span className="badge badge-neutral">Archived</span>}
                     {hasDraft && (
                       <span className="badge badge-warning">
                         <Clock style={{ width: 12, height: 12 }} /> Draft V{pkg.draftVersionNumber}
@@ -206,6 +223,16 @@ export const OnboardingPackagesPage: React.FC = () => {
                     >
                       Manage Package <ArrowRight style={{ width: 15, height: 15, marginLeft: '0.4rem' }} />
                     </button>
+                    {!pkg.archivedAt && (
+                      <button
+                        type="button"
+                        onClick={() => void handleArchive(pkg)}
+                        disabled={actionPackageId === pkg.id}
+                        className="btn btn-danger"
+                      >
+                        <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

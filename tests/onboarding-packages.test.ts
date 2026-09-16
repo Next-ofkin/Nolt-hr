@@ -367,3 +367,51 @@ test('onboarding package editor: save draft, publish, and create-new-draft actio
   assert.match(source, /publishOnboardingPackageDraft\(/)
   assert.match(source, /createOnboardingPackageDraft\(/)
 })
+
+test('filterOnboardingPackagesByStatus also isolates archived packages', () => {
+  const packages = [
+    sampleSummary({ id: 'active-draft', draftVersionNumber: 1 }),
+    sampleSummary({ id: 'archived-one', archivedAt: '2026-09-10T00:00:00.000Z', latestPublishedVersionNumber: 1 }),
+    sampleSummary({ id: 'archived-two', archivedAt: '2026-09-11T00:00:00.000Z', draftVersionNumber: 2 }),
+  ]
+
+  assert.deepEqual(
+    filterOnboardingPackagesByStatus(packages, 'archived').map((p) => p.id),
+    ['archived-one', 'archived-two'],
+  )
+  // Archived packages are excluded from draft/published filters even if they'd otherwise match.
+  assert.deepEqual(
+    filterOnboardingPackagesByStatus(packages, 'draft').map((p) => p.id),
+    ['active-draft'],
+  )
+})
+
+test('onboarding package editor: preview-form action is wired to fetch the schema and open the preview modal', async () => {
+  const editorSource = await readRepositoryFile('src/features/onboarding-packages/components/PackageEditor.tsx')
+
+  assert.match(editorSource, /handlePreviewFormItem/)
+  assert.match(editorSource, /onPreviewForm=\{.*handlePreviewFormItem/)
+  assert.match(editorSource, /from\('form_definition_versions'\)/)
+
+  const previewModalSource = await readRepositoryFile('src/features/onboarding-packages/components/PackagePreviewModal.tsx')
+  assert.match(previewModalSource, /initialFocus/)
+})
+
+test('onboarding package: archive action is wired to the repository and RPC, with a confirmation prompt', async () => {
+  const repoSource = await readRepositoryFile('src/features/onboarding-packages/data/onboarding-packages-repository.ts')
+  assert.match(repoSource, /export async function archiveOnboardingPackage/)
+  assert.match(repoSource, /\.rpc\('archive_onboarding_package'/)
+
+  const pageSource = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+  assert.match(pageSource, /window\.confirm\(/)
+  assert.match(pageSource, /archiveOnboardingPackage\(/)
+})
+
+test('migration 0020 archives forms and packages via SECURITY DEFINER RPCs, not direct table writes', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0020_archive_forms_and_packages.sql')
+
+  assert.match(migration, /function public\.archive_form_definition[\s\S]*?security definer/i)
+  assert.match(migration, /function public\.archive_onboarding_package[\s\S]*?security definer/i)
+  assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
+  assert.match(migration, /grant execute on function public\.archive_onboarding_package\(uuid\) to authenticated/i)
+})

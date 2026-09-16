@@ -22,6 +22,8 @@ import {
   type PackageItemInput,
   type PackageVersion,
 } from '../data/onboarding-packages-types'
+import { supabase } from '../../../lib/supabase'
+import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 
 import { PackageFormPicker } from './PackageFormPicker'
 import { PackageDocumentModal } from './PackageDocumentModal'
@@ -79,6 +81,10 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   const [isDocModalOpen, setIsDocModalOpen] = useState(false)
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [previewFocus, setPreviewFocus] = useState<{ schema: FormSchema; title: string } | null>(null)
+  const [previewSessionId, setPreviewSessionId] = useState(0)
+  const [isLoadingItemPreview, setIsLoadingItemPreview] = useState<string | null>(null)
+  const [itemPreviewError, setItemPreviewError] = useState<string | null>(null)
 
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -282,6 +288,28 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
   }
 
+  const handlePreviewFormItem = async (formVersionId: string, formTitle?: string) => {
+    setIsLoadingItemPreview(formVersionId)
+    setItemPreviewError(null)
+    try {
+      const { data, error } = await supabase
+        .from('form_definition_versions')
+        .select('definition')
+        .eq('id', formVersionId)
+        .single()
+      if (error) throw error
+      if (!data?.definition) throw new Error('This form version has no content to preview.')
+
+      setPreviewFocus({ schema: data.definition as unknown as FormSchema, title: formTitle || 'Form Preview' })
+      setPreviewSessionId((id) => id + 1)
+      setIsPreviewOpen(true)
+    } catch (err) {
+      setItemPreviewError(err instanceof Error ? err.message : 'Unable to load this form for preview.')
+    } finally {
+      setIsLoadingItemPreview(null)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {errorMessage && (
@@ -313,7 +341,15 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                 {detail.archivedAt && <span className="badge badge-neutral">Archived</span>}
               </div>
 
-              <button type="button" onClick={() => setIsPreviewOpen(true)} className="btn btn-ghost">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewFocus(null)
+                  setPreviewSessionId((id) => id + 1)
+                  setIsPreviewOpen(true)
+                }}
+                className="btn btn-ghost"
+              >
                 <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview Package
               </button>
             </div>
@@ -367,6 +403,14 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
               )}
             </div>
 
+            {itemPreviewError && (
+              <div className="alert alert-error" style={{ marginTop: '1rem' }} role="alert">
+                <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} /> {itemPreviewError}
+                </p>
+              </div>
+            )}
+
             <div style={{ marginTop: '1.1rem' }}>
               <PackageItemsList
                 items={items}
@@ -374,6 +418,8 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
                 onRemove={handleRemoveItem}
+                onPreviewForm={(formVersionId, formTitle) => void handlePreviewFormItem(formVersionId, formTitle)}
+                previewLoadingFormVersionId={isLoadingItemPreview}
               />
             </div>
           </div>
@@ -452,12 +498,17 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       />
 
       <PackagePreviewModal
+        key={previewSessionId}
         isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
+        onClose={() => {
+          setIsPreviewOpen(false)
+          setPreviewFocus(null)
+        }}
         packageTitle={title}
         packageDescription={description}
         versionNumber={activeVersion?.versionNumber || 1}
         items={items}
+        initialFocus={previewFocus}
       />
     </div>
   )

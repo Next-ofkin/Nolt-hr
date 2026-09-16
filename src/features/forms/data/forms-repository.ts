@@ -149,3 +149,11 @@ export async function createDraftFromPublished(formDefinitionId: string): Promis
     createdNew: result.created_new as boolean,
   }
 }
+
+export async function archiveFormDefinition(formDefinitionId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('archive_form_definition', {
+    p_form_definition_id: formDefinitionId,
+  })
+  if (error) throw error
+  unwrapRpc(data)
+}

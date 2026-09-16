@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Eye, FileText, FileCheck, Loader2, ArrowLeft } from 'lucide-react'
+import { Eye, FileText, FileCheck, Loader2, ArrowLeft, AlertCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import { NoltDynamicForm } from '../../shadcn-form-poc/renderer/NoltDynamicForm'
@@ -12,6 +12,13 @@ interface PackagePreviewModalProps {
   packageDescription?: string | null
   versionNumber: number
   items: PackageItemInput[]
+  /**
+   * When set, the modal opens straight into this form's preview instead of
+   * the package summary. Resolved by the caller (not fetched here) so the
+   * initial view can be seeded via lazy state instead of an effect - see
+   * the `key`-remount pattern used where this modal is rendered.
+   */
+  initialFocus?: { schema: FormSchema; title: string } | null
 }
 
 export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
@@ -21,15 +28,18 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
   packageDescription,
   versionNumber,
   items,
+  initialFocus,
 }) => {
-  const [selectedFormSchema, setSelectedFormSchema] = useState<FormSchema | null>(null)
-  const [selectedFormTitle, setSelectedFormTitle] = useState<string>('')
+  const [selectedFormSchema, setSelectedFormSchema] = useState<FormSchema | null>(initialFocus?.schema ?? null)
+  const [selectedFormTitle, setSelectedFormTitle] = useState<string>(initialFocus?.title ?? '')
   const [isLoadingSchema, setIsLoadingSchema] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   if (!isOpen) return null
 
   const handlePreviewForm = async (formVersionId: string, formTitle?: string) => {
     setIsLoadingSchema(true)
+    setPreviewError(null)
     setSelectedFormTitle(formTitle || 'Form Preview')
 
     try {
@@ -43,9 +53,12 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
 
       if (data?.definition) {
         setSelectedFormSchema(data.definition as unknown as FormSchema)
+      } else {
+        setPreviewError('This form version has no content to preview.')
       }
-    } catch {
+    } catch (err) {
       setSelectedFormSchema(null)
+      setPreviewError(err instanceof Error ? err.message : 'Unable to load this form for preview.')
     } finally {
       setIsLoadingSchema(false)
     }
@@ -55,8 +68,16 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-card modal-card-xl no-padding">
         <div className="modal-header">
-          {selectedFormSchema ? (
-            <button type="button" onClick={() => setSelectedFormSchema(null)} className="btn btn-ghost" style={{ padding: '0.4rem 0.75rem' }}>
+          {selectedFormSchema || previewError ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedFormSchema(null)
+                setPreviewError(null)
+              }}
+              className="btn btn-ghost"
+              style={{ padding: '0.4rem 0.75rem' }}
+            >
               <ArrowLeft style={{ width: 14, height: 14, marginRight: '0.35rem' }} /> Back to Package Summary
             </button>
           ) : (
@@ -83,7 +104,15 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
             </div>
           )}
 
-          {!isLoadingSchema && selectedFormSchema && (
+          {!isLoadingSchema && previewError && (
+            <div className="alert alert-error" role="alert">
+              <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} /> {previewError}
+              </p>
+            </div>
+          )}
+
+          {!isLoadingSchema && !previewError && selectedFormSchema && (
             <div>
               <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Form Preview: {selectedFormTitle}</h4>
@@ -95,7 +124,7 @@ export const PackagePreviewModal: React.FC<PackagePreviewModalProps> = ({
             </div>
           )}
 
-          {!isLoadingSchema && !selectedFormSchema && (
+          {!isLoadingSchema && !previewError && !selectedFormSchema && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {packageDescription && (
                 <p className="package-editor-readonly-desc" style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.85rem 1rem' }}>

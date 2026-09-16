@@ -483,6 +483,14 @@ export type Database = {
     }
     Functions: {
       activate_my_employee_account: { Args: never; Returns: Json }
+      archive_form_definition: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
+      archive_onboarding_package: {
+        Args: { p_onboarding_package_id: string }
+        Returns: Json
+      }
       create_form_definition: {
         Args: { p_definition: Json; p_description: string; p_title: string }
         Returns: Json

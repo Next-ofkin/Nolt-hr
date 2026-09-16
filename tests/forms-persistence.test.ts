@@ -350,3 +350,23 @@ test('form editor: the form title is editable while a draft is open, bound to th
   assert.match(source, /setSchema\(\{ \.\.\.schema, title: event\.target\.value \}\)/)
   assert.match(source, /title: schema\.title/)
 })
+
+test('forms library: archive action is wired to the repository and RPC, with a confirmation prompt', async () => {
+  const repoSource = await readRepositoryFile('src/features/forms/data/forms-repository.ts')
+  assert.match(repoSource, /export async function archiveFormDefinition/)
+  assert.match(repoSource, /\.rpc\('archive_form_definition'/)
+
+  const queriesSource = await readRepositoryFile('src/features/forms/data/forms-queries.ts')
+  assert.match(queriesSource, /export function useArchiveFormDefinition/)
+
+  const pageSource = await readRepositoryFile('src/features/forms/pages/FormsLibraryPage.tsx')
+  assert.match(pageSource, /window\.confirm\(/)
+  assert.match(pageSource, /useArchiveFormDefinition\(/)
+})
+
+test('migration 0020 archives forms via a SECURITY DEFINER RPC, not a direct table write', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0020_archive_forms_and_packages.sql')
+
+  assert.match(migration, /function public\.archive_form_definition[\s\S]*?security definer/i)
+  assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
+})

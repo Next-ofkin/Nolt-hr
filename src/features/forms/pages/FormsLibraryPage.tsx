@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { FileText, Plus, Search, Clock, Eye, History, ArrowRight } from 'lucide-react'
+import { Archive, FileText, Plus, Search, Clock, Eye, History, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createBlankFormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import {
+  useArchiveFormDefinition,
   useCreateDraftFromPublished,
   useCreateFormDefinition,
   useFormDefinitions,
@@ -21,6 +22,7 @@ export default function FormsLibraryPage() {
   const formsQuery = useFormDefinitions()
   const createFormMutation = useCreateFormDefinition()
   const createDraftMutation = useCreateDraftFromPublished()
+  const archiveMutation = useArchiveFormDefinition()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FormStatusFilter>('all')
@@ -52,6 +54,21 @@ export default function FormsLibraryPage() {
       navigate(`/hr/forms/${formDefinitionId}/edit`)
     } catch (error) {
       setActionError(formPersistenceMessage(error, 'Unable to create a new draft.'))
+    } finally {
+      setActionFormId(null)
+    }
+  }
+
+  const handleArchive = async (form: FormDefinitionSummary) => {
+    if (!window.confirm(`Archive "${form.title}"? It will be hidden from the active list, but its history is kept.`)) {
+      return
+    }
+    setActionFormId(form.id)
+    setActionError(null)
+    try {
+      await archiveMutation.mutateAsync(form.id)
+    } catch (error) {
+      setActionError(formPersistenceMessage(error, 'Unable to archive this form.'))
     } finally {
       setActionFormId(null)
     }
@@ -162,11 +179,12 @@ export default function FormsLibraryPage() {
             <FormCard
               key={form.id}
               form={form}
-              isCreatingDraft={actionFormId === form.id}
+              isBusy={actionFormId === form.id}
               onEditDraft={() => navigate(`/hr/forms/${form.id}/edit`)}
               onCreateDraft={() => void handleCreateDraft(form.id)}
               onPreview={() => navigate(`/hr/forms/${form.id}/edit?view=preview`)}
               onVersionHistory={() => navigate(`/hr/forms/${form.id}/edit?view=history`)}
+              onArchive={() => void handleArchive(form)}
             />
           ))}
         </div>
@@ -177,18 +195,20 @@ export default function FormsLibraryPage() {
 
 function FormCard({
   form,
-  isCreatingDraft,
+  isBusy,
   onEditDraft,
   onCreateDraft,
   onPreview,
   onVersionHistory,
+  onArchive,
 }: {
   form: FormDefinitionSummary
-  isCreatingDraft: boolean
+  isBusy: boolean
   onEditDraft: () => void
   onCreateDraft: () => void
   onPreview: () => void
   onVersionHistory: () => void
+  onArchive: () => void
 }) {
   const hasDraft = form.draftVersionNumber !== null
   const hasPublished = form.latestPublishedVersionNumber !== null
@@ -226,8 +246,8 @@ function FormCard({
             </button>
           )}
           {!hasDraft && hasPublished && !form.archivedAt && (
-            <button type="button" onClick={onCreateDraft} disabled={isCreatingDraft} className="btn btn-primary">
-              {isCreatingDraft ? 'Creating…' : 'Create New Draft'}
+            <button type="button" onClick={onCreateDraft} disabled={isBusy} className="btn btn-primary">
+              {isBusy ? 'Creating…' : 'Create New Draft'}
             </button>
           )}
           {canPreviewOrHistory && (
@@ -238,6 +258,11 @@ function FormCard({
           {canPreviewOrHistory && (
             <button type="button" onClick={onVersionHistory} className="btn btn-ghost">
               <History style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Version History
+            </button>
+          )}
+          {!form.archivedAt && (
+            <button type="button" onClick={onArchive} disabled={isBusy} className="btn btn-danger">
+              <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
             </button>
           )}
         </div>

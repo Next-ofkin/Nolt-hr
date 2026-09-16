@@ -226,3 +226,11 @@ export async function createOnboardingPackageDraft(
     createdNew: result.created_new as boolean,
   }
 }
+
+export async function archiveOnboardingPackage(onboardingPackageId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('archive_onboarding_package', {
+    p_onboarding_package_id: onboardingPackageId,
+  })
+  if (error) throw error
+  unwrapRpc(data)
+}

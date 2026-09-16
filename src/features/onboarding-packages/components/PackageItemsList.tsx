@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, FileCheck, ArrowUp, ArrowDown, Trash2, Eye } from 'lucide-react'
+import { FileText, FileCheck, ArrowUp, ArrowDown, Trash2, Eye, Loader2 } from 'lucide-react'
 import type { PackageItemInput } from '../data/onboarding-packages-types'
 
 interface PackageItemsListProps {
@@ -9,6 +9,8 @@ interface PackageItemsListProps {
   onMoveDown?: (index: number) => void
   onRemove?: (index: number) => void
   onPreviewForm?: (formVersionId: string, formTitle?: string) => void
+  /** formVersionId currently being fetched for preview, if any. */
+  previewLoadingFormVersionId?: string | null
 }
 
 export const PackageItemsList: React.FC<PackageItemsListProps> = ({
@@ -18,6 +20,7 @@ export const PackageItemsList: React.FC<PackageItemsListProps> = ({
   onMoveDown,
   onRemove,
   onPreviewForm,
+  previewLoadingFormVersionId,
 }) => {
   if (items.length === 0) {
     return (
@@ -70,10 +73,15 @@ export const PackageItemsList: React.FC<PackageItemsListProps> = ({
                 <button
                   type="button"
                   onClick={() => onPreviewForm(item.formVersionId, item.formTitle)}
+                  disabled={previewLoadingFormVersionId === item.formVersionId}
                   className="btn-icon"
                   title="Preview Form"
                 >
-                  <Eye style={{ width: 15, height: 15 }} />
+                  {previewLoadingFormVersionId === item.formVersionId ? (
+                    <Loader2 style={{ width: 15, height: 15 }} className="spin" />
+                  ) : (
+                    <Eye style={{ width: 15, height: 15 }} />
+                  )}
                 </button>
               )}
 

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  archiveFormDefinition,
   createDraftFromPublished,
   createFormDefinition,
   getFormDefinition,
@@ -65,6 +66,17 @@ export function useCreateDraftFromPublished() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createDraftFromPublished,
+    onSuccess: (_, formDefinitionId) => {
+      void queryClient.invalidateQueries({ queryKey: formQueryKeys.library })
+      void queryClient.invalidateQueries({ queryKey: formQueryKeys.detail(formDefinitionId) })
+    },
+  })
+}
+
+export function useArchiveFormDefinition() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: archiveFormDefinition,
     onSuccess: (_, formDefinitionId) => {
       void queryClient.invalidateQueries({ queryKey: formQueryKeys.library })
       void queryClient.invalidateQueries({ queryKey: formQueryKeys.detail(formDefinitionId) })
