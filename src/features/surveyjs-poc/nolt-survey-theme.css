@@ -1,0 +1,97 @@
+/* NOLT SurveyJS CSS Overrides */
+
+.sjs-theme-overrides {
+  --sjs-font-family: var(--font, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  --sjs-primary-backcolor: var(--primary, #2563eb);
+  --sjs-primary-backcolor-dark: var(--primary-hover, #1d4ed8);
+  --sjs-primary-forecolor: #ffffff;
+  --sjs-base-unit: 8px;
+  --sjs-corner-radius: 8px;
+  --sjs-border-light: var(--border, #e2e5ea);
+  --sjs-border-default: var(--border, #e2e5ea);
+  --sjs-general-bg-color: #ffffff;
+  --sjs-body-bgcolor: var(--bg, #f5f6f8);
+  --sjs-font-size: 15px;
+
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/* Container & Box styling for clean SaaS appearance */
+.sjs-theme-overrides .sd-root-modern {
+  background-color: transparent;
+  font-family: var(--font, system-ui, sans-serif);
+  color: var(--text, #334155);
+}
+
+.sjs-theme-overrides .sd-container-modern {
+  max-width: 100%;
+  padding: 0;
+}
+
+.sjs-theme-overrides .sd-body {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e5ea);
+  border-radius: 12px;
+  padding: 2rem 2.25rem;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+@media (max-width: 640px) {
+  .sjs-theme-overrides .sd-body {
+    padding: 1.25rem 1rem;
+  }
+}
+
+/* Header typography */
+.sjs-theme-overrides .sd-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-strong, #0f172a);
+  margin-bottom: 0.35rem;
+}
+
+.sjs-theme-overrides .sd-description {
+  font-size: 0.95rem;
+  color: var(--text-muted, #64748b);
+  white-space: pre-line;
+}
+
+/* Navigation buttons styling */
+.sjs-theme-overrides .sd-navigation__next-btn,
+.sjs-theme-overrides .sd-navigation__complete-btn {
+  background-color: var(--primary, #2563eb) !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 0.65rem 1.4rem !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  border: 1px solid transparent !important;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.sjs-theme-overrides .sd-navigation__next-btn:hover,
+.sjs-theme-overrides .sd-navigation__complete-btn:hover {
+  background-color: var(--primary-hover, #1d4ed8) !important;
+}
+
+.sjs-theme-overrides .sd-navigation__prev-btn {
+  background-color: transparent !important;
+  border: 1px solid var(--border, #e2e5ea) !important;
+  color: var(--text, #334155) !important;
+  border-radius: 8px !important;
+  padding: 0.65rem 1.4rem !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+}
+
+.sjs-theme-overrides .sd-navigation__prev-btn:hover {
+  background-color: var(--bg, #f5f6f8) !important;
+}
+
+/* Dynamic panel button styling */
+.sjs-theme-overrides .sd-paneldynamic__add-btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}

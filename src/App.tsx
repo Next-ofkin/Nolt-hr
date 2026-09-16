@@ -15,6 +15,7 @@ import EditEmployeePage from './pages/EditEmployeePage'
 import EmployeePortalPage from './pages/EmployeePortalPage'
 import FormsV2DemoPage from './pages/FormsV2DemoPage'
 import GoogleFormsPocPage from './pages/GoogleFormsPocPage'
+import SurveyJsPocPage from './pages/SurveyJsPocPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -94,6 +95,14 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <GoogleFormsPocPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/surveyjs-poc',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <SurveyJsPocPage />
           </RequireRole>
         ),
       },
