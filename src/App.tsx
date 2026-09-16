@@ -13,10 +13,6 @@ import CreateEmployeePage from './pages/CreateEmployeePage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import EditEmployeePage from './pages/EditEmployeePage'
 import EmployeePortalPage from './pages/EmployeePortalPage'
-import FormsV2DemoPage from './pages/FormsV2DemoPage'
-import GoogleFormsPocPage from './pages/GoogleFormsPocPage'
-import SurveyJsPocPage from './pages/SurveyJsPocPage'
-import ShadcnFormPocPage from './pages/ShadcnFormPocPage'
 import FormsLibraryPage from './features/forms/pages/FormsLibraryPage'
 import FormEditorPage from './features/forms/pages/FormEditorPage'
 import { OnboardingPackagesPage } from './features/onboarding-packages/pages/OnboardingPackagesPage'
@@ -117,39 +113,6 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <OnboardingPackageEditorPage />
-          </RequireRole>
-        ),
-      },
-
-      {
-        path: '/hr/forms-v2/demo',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <FormsV2DemoPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/google-forms-poc',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <GoogleFormsPocPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/surveyjs-poc',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <SurveyJsPocPage />
-          </RequireRole>
-        ),
-      },
-      {
-        path: '/hr/shadcn-form-poc',
-        element: (
-          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
-            <ShadcnFormPocPage />
           </RequireRole>
         ),
       },

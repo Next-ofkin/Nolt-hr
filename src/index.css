@@ -2176,6 +2176,29 @@ textarea:focus {
   }
 }
 
+/* ---------- Small spacing/alignment utilities ---------- */
+
+.text-center {
+  text-align: center;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- Badges (generic, used by components/ui/badge.tsx) ---------- */
 
 .badge {
