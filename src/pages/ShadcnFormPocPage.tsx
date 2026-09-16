@@ -10,78 +10,38 @@ export const ShadcnFormPocPage: React.FC = () => {
   const [schema, setSchema] = useState<FormSchema>(defaultDemoFormSchema)
 
   return (
-    <div className="page employee-page" style={{ width: '100%', maxWidth: '1280px', margin: '0 auto', paddingInline: 'clamp(16px, 3vw, 24px)' }}>
-      {/* View Switcher Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '0.75rem',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-        }}
-      >
-        <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #64748b)' }}>
-          SHADCN-Native Form Builder Visual POC
+    <div className="page employee-page">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Form builder</p>
+          <h1>{schema.title}</h1>
+          <p className="subtitle">Design onboarding forms and preview how employees will fill them out.</p>
         </div>
 
-        {/* Segmented Control Switcher */}
-        <div
-          style={{
-            display: 'inline-flex',
-            background: '#e2e8f0',
-            padding: '3px',
-            borderRadius: '8px',
-            gap: '3px',
-          }}
-        >
+        <div className="view-switcher" role="tablist" aria-label="Builder view">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'builder'}
             id="tab-builder-btn"
             onClick={() => setActiveTab('builder')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.4rem 0.9rem',
-              borderRadius: '6px',
-              border: 0,
-              background: activeTab === 'builder' ? 'var(--surface, #ffffff)' : 'transparent',
-              color: activeTab === 'builder' ? 'var(--primary, #2563eb)' : 'var(--text-muted, #64748b)',
-              fontWeight: activeTab === 'builder' ? 600 : 500,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              boxShadow: activeTab === 'builder' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            }}
+            className={`view-switcher-btn${activeTab === 'builder' ? ' active' : ''}`}
           >
-            <LayoutGrid style={{ width: '15px', height: '15px' }} /> Builder
+            <LayoutGrid style={{ width: 15, height: 15 }} /> Builder
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'preview'}
             id="tab-preview-btn"
             onClick={() => setActiveTab('preview')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.4rem 0.9rem',
-              borderRadius: '6px',
-              border: 0,
-              background: activeTab === 'preview' ? 'var(--surface, #ffffff)' : 'transparent',
-              color: activeTab === 'preview' ? 'var(--primary, #2563eb)' : 'var(--text-muted, #64748b)',
-              fontWeight: activeTab === 'preview' ? 600 : 500,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              boxShadow: activeTab === 'preview' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            }}
+            className={`view-switcher-btn${activeTab === 'preview' ? ' active' : ''}`}
           >
-            <Eye style={{ width: '15px', height: '15px' }} /> Employee Preview
+            <Eye style={{ width: 15, height: 15 }} /> Employee Preview
           </button>
         </div>
       </div>
 
-      {/* Render Active Tab */}
       {activeTab === 'builder' ? (
         <FormBuilder
           schema={schema}

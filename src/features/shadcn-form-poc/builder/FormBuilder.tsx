@@ -10,7 +10,7 @@ import {
 import { FieldPalette } from './FieldPalette'
 import { BuilderCanvas } from './BuilderCanvas'
 import { FieldInspector } from './FieldInspector'
-import { Save, Eye } from 'lucide-react'
+import { Save, Eye, Check } from 'lucide-react'
 
 interface FormBuilderProps {
   schema: FormSchema
@@ -68,63 +68,40 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   }
 
   const handleSaveDraft = () => {
-    setSaveToast('Draft saved successfully (Local state)')
+    setSaveToast('Draft saved')
     setTimeout(() => setSaveToast(null), 3000)
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
-      {/* Top Builder Control Header */}
-      <div
-        style={{
-          background: 'var(--surface, #ffffff)',
-          border: '1px solid var(--border, #e2e5ea)',
-          borderRadius: '12px',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          flexWrap: 'wrap',
-        }}
-      >
+    <div className="page" style={{ gap: '1.25rem' }}>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-strong, #0f172a)' }}>
-            {schema.title} Builder
-          </h2>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginTop: '0.15rem' }}>
-            Interactive Form Designer • {schema.steps.length} Steps
-          </div>
+          <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{schema.steps.length} step{schema.steps.length === 1 ? '' : 's'}</h2>
+          <p className="subtitle" style={{ margin: '0.15rem 0 0' }}>
+            Add fields from the palette, then click a field to edit its properties.
+          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {saveToast && (
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#16a34a' }}>
-              ✓ {saveToast}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--success)' }}>
+              <Check style={{ width: 15, height: 15 }} /> {saveToast}
             </span>
           )}
           <button type="button" onClick={handleSaveDraft} className="btn btn-ghost">
-            <Save style={{ width: '16px', height: '16px', marginRight: '0.4rem' }} /> Save Draft
+            <Save style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Save Draft
           </button>
           <button type="button" onClick={onSwitchToPreview} className="btn btn-primary">
-            <Eye style={{ width: '16px', height: '16px', marginRight: '0.4rem' }} /> Preview Employee Form
+            <Eye style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Preview
           </button>
         </div>
       </div>
 
-      {/* 3-Column Desktop Grid Layout */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(220px, 240px) 1fr minmax(260px, 280px)',
-          gap: '1.25rem',
-          alignItems: 'start',
-        }}
-      >
-        {/* Left: Palette */}
-        <FieldPalette onAddField={handleAddField} />
+      <div className="builder-workspace">
+        <div className="builder-panel">
+          <FieldPalette onAddField={handleAddField} />
+        </div>
 
-        {/* Middle: Canvas */}
         <BuilderCanvas
           steps={schema.steps}
           activeStepId={activeStepId}
@@ -139,8 +116,9 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
           onDeleteField={handleDeleteField}
         />
 
-        {/* Right: Inspector */}
-        <FieldInspector selectedField={selectedField} onUpdateField={handleUpdateField} />
+        <div className="builder-panel">
+          <FieldInspector selectedField={selectedField} onUpdateField={handleUpdateField} />
+        </div>
       </div>
     </div>
   )

@@ -1,17 +1,18 @@
-/* NOLT SurveyJS CSS Overrides & Responsive System */
+/* NOLT SurveyJS theme
+ *
+ * survey-core v3's default theme reads its palette from CSS custom
+ * properties on the element that carries the "sjs-theme-overrides" class
+ * (survey-core applies that class to its own root element automatically,
+ * alongside "sd-theme-root" - see `defaultCss.rootTheme` in survey.core.js).
+ * Redeclaring the tokens below retints the whole survey without needing a
+ * Tailwind/shadcn design-token setup, which this app doesn't have.
+ */
 
 .sjs-theme-overrides {
-  --sjs-font-family: var(--font, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  --sjs-primary-backcolor: var(--primary, #2563eb);
-  --sjs-primary-backcolor-dark: var(--primary-hover, #1d4ed8);
-  --sjs-primary-forecolor: #ffffff;
-  --sjs-base-unit: 8px;
-  --sjs-corner-radius: 8px;
-  --sjs-border-light: var(--border, #e2e5ea);
-  --sjs-border-default: var(--border, #e2e5ea);
-  --sjs-general-bg-color: #ffffff;
-  --sjs-body-bgcolor: var(--bg, #f5f6f8);
-  --sjs-font-size: 15px;
+  --sjs2-color-project-brand-600: var(--primary, #2563eb);
+  --sjs2-base-unit-radius: 8px;
+  --sjs2-typography-font-family-text: var(--font, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --sjs2-typography-font-family-code: var(--font, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
 
   width: 100%;
   max-width: 1080px;
@@ -21,8 +22,6 @@
 /* Base survey container and typography */
 .sjs-theme-overrides .sd-root-modern {
   background-color: transparent;
-  font-family: var(--font, system-ui, sans-serif);
-  color: var(--text, #334155);
 }
 
 .sjs-theme-overrides .sd-container-modern {
@@ -81,36 +80,42 @@
   margin-bottom: 1.25rem;
 }
 
+/* Required-field asterisk, in this app's danger color */
+.sjs-theme-overrides .sd-question__required-text {
+  color: var(--danger, #dc2626);
+}
+
 /* Input elements: min 44px height & 16px font to prevent iOS auto-zoom */
-.sjs-theme-overrides input[type='text'],
-.sjs-theme-overrides input[type='date'],
-.sjs-theme-overrides input[type='email'],
-.sjs-theme-overrides input[type='tel'],
-.sjs-theme-overrides select,
-.sjs-theme-overrides textarea,
-.sjs-theme-overrides .sd-input,
+.sjs-theme-overrides .sd-formbox__input,
+.sjs-theme-overrides .sd-comment__input,
 .sjs-theme-overrides .sd-dropdown {
   min-height: 44px;
   font-size: 16px !important;
   border-radius: 8px;
 }
 
-/* Fix dropdown arrow size */
-.sjs-theme-overrides .sd-dropdown__icon,
-.sjs-theme-overrides .sd-dropdown_select svg,
-.sjs-theme-overrides .sd-dropdown__select-svg,
-.sjs-theme-overrides .sd-dropdown svg {
-  width: 16px !important;
-  height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
-  min-width: 16px !important;
-  min-height: 16px !important;
+/* Invalid fields use the app's danger color, not the library default */
+.sjs-theme-overrides .sd-formbox--error .sd-formbox__input,
+.sjs-theme-overrides .sd-question--error .sd-dropdown {
+  border-color: var(--danger, #dc2626) !important;
 }
 
-/* Navigation buttons styling */
+.sjs-theme-overrides .sd-error__item {
+  color: var(--danger, #dc2626);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Dropdown chevron icon size */
+.sjs-theme-overrides .sd-dropdown_chevron-button-svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Navigation buttons */
 .sjs-theme-overrides .sd-navigation__next-btn,
-.sjs-theme-overrides .sd-navigation__complete-btn {
+.sjs-theme-overrides .sd-navigation__complete-btn,
+.sjs-theme-overrides .sd-navigation__start-btn {
   background-color: var(--primary, #2563eb) !important;
   color: #ffffff !important;
   border-radius: 8px !important;
@@ -123,7 +128,8 @@
 }
 
 .sjs-theme-overrides .sd-navigation__next-btn:hover,
-.sjs-theme-overrides .sd-navigation__complete-btn:hover {
+.sjs-theme-overrides .sd-navigation__complete-btn:hover,
+.sjs-theme-overrides .sd-navigation__start-btn:hover {
   background-color: var(--primary-hover, #1d4ed8) !important;
 }
 
@@ -142,15 +148,7 @@
   background-color: var(--bg, #f5f6f8) !important;
 }
 
-/* Validation error text styling */
-.sjs-theme-overrides .sd-question__errmsg {
-  color: var(--danger, #dc2626);
-  font-size: 0.85rem;
-  margin-top: 6px;
-  line-height: 1.4;
-}
-
-/* Dynamic panel button styling */
+/* Dynamic panel "add" button */
 .sjs-theme-overrides .sd-paneldynamic__add-btn {
   border-radius: 8px !important;
   font-weight: 600 !important;
