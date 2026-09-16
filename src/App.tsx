@@ -16,6 +16,7 @@ import EmployeePortalPage from './pages/EmployeePortalPage'
 import FormsV2DemoPage from './pages/FormsV2DemoPage'
 import GoogleFormsPocPage from './pages/GoogleFormsPocPage'
 import SurveyJsPocPage from './pages/SurveyJsPocPage'
+import ShadcnFormPocPage from './pages/ShadcnFormPocPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -103,6 +104,14 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <SurveyJsPocPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/shadcn-form-poc',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <ShadcnFormPocPage />
           </RequireRole>
         ),
       },
