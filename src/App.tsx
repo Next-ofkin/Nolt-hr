@@ -17,6 +17,8 @@ import FormsV2DemoPage from './pages/FormsV2DemoPage'
 import GoogleFormsPocPage from './pages/GoogleFormsPocPage'
 import SurveyJsPocPage from './pages/SurveyJsPocPage'
 import ShadcnFormPocPage from './pages/ShadcnFormPocPage'
+import FormsLibraryPage from './features/forms/pages/FormsLibraryPage'
+import FormEditorPage from './features/forms/pages/FormEditorPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
 
 const router = createBrowserRouter([
@@ -80,6 +82,22 @@ const router = createBrowserRouter([
         element: (
           <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
             <EditEmployeePage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/forms',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <FormsLibraryPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/forms/:formId/edit',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <FormEditorPage />
           </RequireRole>
         ),
       },

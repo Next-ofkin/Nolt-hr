@@ -16,16 +16,29 @@ interface FormBuilderProps {
   schema: FormSchema
   onChangeSchema: (newSchema: FormSchema) => void
   onSwitchToPreview: () => void
+  /**
+   * When provided, "Save Draft" calls this instead of the local-only demo
+   * toast. Used by the production form editor to persist to Supabase; left
+   * unset on the /hr/shadcn-form-poc reference page so it keeps behaving
+   * exactly as before.
+   */
+  onSaveDraft?: () => void | Promise<void>
+  /** Extra controls (e.g. Publish, version badge) rendered next to Preview. */
+  headerActions?: React.ReactNode
 }
 
 export const FormBuilder: React.FC<FormBuilderProps> = ({
   schema,
   onChangeSchema,
   onSwitchToPreview,
+  onSaveDraft,
+  headerActions,
 }) => {
   const [activeStepId, setActiveStepId] = useState<string>(schema.steps[0]?.id || '')
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null)
   const [saveToast, setSaveToast] = useState<string | null>(null)
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const activeStep = schema.steps.find((s) => s.id === activeStepId) || schema.steps[0]
   const selectedField = activeStep?.fields.find((f) => f.id === activeFieldId) || null
@@ -67,9 +80,24 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
     onChangeSchema(updated)
   }
 
-  const handleSaveDraft = () => {
-    setSaveToast('Draft saved')
-    setTimeout(() => setSaveToast(null), 3000)
+  const handleSaveDraft = async () => {
+    if (!onSaveDraft) {
+      setSaveToast('Draft saved')
+      setTimeout(() => setSaveToast(null), 3000)
+      return
+    }
+
+    setIsSaving(true)
+    setSaveErrorMessage(null)
+    try {
+      await onSaveDraft()
+      setSaveToast('Draft saved')
+      setTimeout(() => setSaveToast(null), 3000)
+    } catch (err) {
+      setSaveErrorMessage(err instanceof Error ? err.message : 'Failed to save draft')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -88,12 +116,16 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
               <Check style={{ width: 15, height: 15 }} /> {saveToast}
             </span>
           )}
-          <button type="button" onClick={handleSaveDraft} className="btn btn-ghost">
-            <Save style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Save Draft
+          {saveErrorMessage && (
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--danger)' }}>{saveErrorMessage}</span>
+          )}
+          <button type="button" onClick={handleSaveDraft} disabled={isSaving} className="btn btn-ghost">
+            <Save style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> {isSaving ? 'Saving…' : 'Save Draft'}
           </button>
           <button type="button" onClick={onSwitchToPreview} className="btn btn-primary">
             <Eye style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Preview
           </button>
+          {headerActions}
         </div>
       </div>
 

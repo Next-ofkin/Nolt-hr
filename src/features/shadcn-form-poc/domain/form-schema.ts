@@ -57,6 +57,25 @@ export interface FormSchema {
   steps: FormStep[]
 }
 
+/**
+ * A clean starting point for a brand-new production form: one empty
+ * section, no fields, no demo content. Used by the "New Form" workflow so
+ * real forms don't start out pre-filled with the Employee Data demo.
+ */
+export function createBlankFormSchema(): FormSchema {
+  return {
+    title: 'Untitled Form',
+    description: '',
+    steps: [
+      {
+        id: `step_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title: 'Section 1',
+        fields: [],
+      },
+    ],
+  }
+}
+
 export function createDefaultField(type: FieldType, index: number): FormField {
   const id = `field_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
   const baseName = `field_${index + 1}`

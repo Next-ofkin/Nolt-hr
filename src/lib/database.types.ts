@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       departments: {
@@ -196,6 +221,98 @@ export type Database = {
         }
         Relationships: []
       }
+      form_definition_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          definition: Json
+          form_definition_id: string
+          id: string
+          published_at: string | null
+          published_by: string | null
+          revision: number
+          schema_version: number
+          state: string
+          updated_at: string
+          updated_by: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          definition: Json
+          form_definition_id: string
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          revision?: number
+          schema_version?: number
+          state: string
+          updated_at?: string
+          updated_by: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          definition?: Json
+          form_definition_id?: string
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          revision?: number
+          schema_version?: number
+          state?: string
+          updated_at?: string
+          updated_by?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_definition_versions_form_definition_id_fkey"
+            columns: ["form_definition_id"]
+            isOneToOne: false
+            referencedRelation: "form_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_definitions: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -229,6 +346,14 @@ export type Database = {
     }
     Functions: {
       activate_my_employee_account: { Args: never; Returns: Json }
+      create_form_definition: {
+        Args: { p_definition: Json; p_description: string; p_title: string }
+        Returns: Json
+      }
+      create_form_definition_draft: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -241,6 +366,20 @@ export type Database = {
           p_invited_by: string
         }
         Returns: undefined
+      }
+      publish_form_definition_draft: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
+      save_form_definition_draft: {
+        Args: {
+          p_definition: Json
+          p_description: string
+          p_expected_revision: number
+          p_form_definition_id: string
+          p_title: string
+        }
+        Returns: Json
       }
       update_user_role: {
         Args: { p_role: string; p_user_id: string }
@@ -390,6 +529,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       employee_invitation_status: [
@@ -429,3 +571,8 @@ export type EmployeeUpdate = Database["public"]["Tables"]["employees"]["Update"]
 export type EmployeeInvitation = Database["public"]["Tables"]["employee_invitations"]["Row"]
 export type EmployeeInvitationInsert = Database["public"]["Tables"]["employee_invitations"]["Insert"]
 export type EmployeeInvitationUpdate = Database["public"]["Tables"]["employee_invitations"]["Update"]
+
+export type FormDefinitionRow = Database["public"]["Tables"]["form_definitions"]["Row"]
+export type FormDefinitionInsert = Database["public"]["Tables"]["form_definitions"]["Insert"]
+export type FormDefinitionUpdate = Database["public"]["Tables"]["form_definitions"]["Update"]
+export type FormDefinitionVersionRow = Database["public"]["Tables"]["form_definition_versions"]["Row"]
