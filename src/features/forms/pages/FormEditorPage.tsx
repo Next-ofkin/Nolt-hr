@@ -122,7 +122,24 @@ function FormWorkspace({
       <div className="page-heading">
         <div>
           <p className="eyebrow">Form builder</p>
-          <h1>{detail.title}</h1>
+          {draft ? (
+            <>
+              <label htmlFor="form-title-input" className="sr-only">Form title</label>
+              <input
+                id="form-title-input"
+                type="text"
+                className="form-title-input"
+                value={schema.title}
+                placeholder="Untitled Form"
+                onChange={(event) => {
+                  setSchema({ ...schema, title: event.target.value })
+                  setIsDirty(true)
+                }}
+              />
+            </>
+          ) : (
+            <h1>{detail.title}</h1>
+          )}
           <p className="subtitle">
             {versionLabel(headingVersion)}
             {draft ? ` · Revision ${revision}` : ''}

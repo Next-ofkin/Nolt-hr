@@ -340,3 +340,13 @@ test('forms library page renders no unstyled Tailwind utility classes (this app 
     assert.doesNotMatch(source, new RegExp(utility))
   }
 })
+
+test('form editor: the form title is editable while a draft is open, bound to the same schema that gets saved', async () => {
+  const source = await readRepositoryFile('src/features/forms/pages/FormEditorPage.tsx')
+
+  // A real input bound to schema.title, not a static heading, so renaming
+  // actually persists (save sends schema.title as p_title).
+  assert.match(source, /value=\{schema\.title\}/)
+  assert.match(source, /setSchema\(\{ \.\.\.schema, title: event\.target\.value \}\)/)
+  assert.match(source, /title: schema\.title/)
+})

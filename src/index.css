@@ -2154,6 +2154,34 @@ textarea:focus {
   }
 }
 
+.form-title-input {
+  display: block;
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.1rem 0.4rem;
+  margin: 0 0 0.5rem -0.4rem;
+  width: auto;
+  min-width: 220px;
+  max-width: 100%;
+}
+
+.form-title-input:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.form-title-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
