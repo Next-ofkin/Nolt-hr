@@ -15,7 +15,11 @@ test('survey creator is NOT installed', async () => {
   assert.equal(deps['survey-creator'], undefined)
 })
 
-test('SurveyJS definition has expected 6 multi-page sections', () => {
+test('survey definition explicitly configures widthMode responsive', () => {
+  assert.equal(employeeSurveyJson.widthMode, 'responsive')
+})
+
+test('SurveyJS definition has expected 6 multi-page sections with shortTitles', () => {
   assert.equal(employeeSurveyJson.pages.length, 6)
   const pageNames = employeeSurveyJson.pages.map((p) => p.name)
   assert.deepEqual(pageNames, [
@@ -26,14 +30,36 @@ test('SurveyJS definition has expected 6 multi-page sections', () => {
     'health_information',
     'review_declaration',
   ])
+  for (const page of employeeSurveyJson.pages) {
+    assert.ok(page.shortTitle, `Page ${page.name} must have a shortTitle`)
+  }
 })
 
-test('Page 1 Personal Info includes file upload for passport photograph', () => {
+test('No question row contains more than 2 paired columns', () => {
+  for (const page of employeeSurveyJson.pages) {
+    let consecutiveSameRow = 0
+    for (const elem of page.elements) {
+      if (elem.startWithNewLine === false) {
+        consecutiveSameRow += 1
+      } else {
+        consecutiveSameRow = 1
+      }
+      assert.ok(
+        consecutiveSameRow <= 2,
+        `Element ${elem.name} on page ${page.name} creates a row with > 2 columns`,
+      )
+    }
+  }
+})
+
+test('Page 1 Personal Info passport photograph starts on new line and takes full width', () => {
   const page1 = employeeSurveyJson.pages[0]
   const passportQuestion = page1.elements.find((e) => e.name === 'passport_photo')
   assert.ok(passportQuestion)
   assert.equal(passportQuestion.type, 'file')
   assert.equal(passportQuestion.acceptedTypes, 'image/*')
+  assert.equal(passportQuestion.startWithNewLine, true)
+  assert.equal(passportQuestion.minWidth, '100%')
 })
 
 test('Page 3 Education History uses paneldynamic question type', () => {

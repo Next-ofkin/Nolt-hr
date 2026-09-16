@@ -13,6 +13,7 @@ export const NoltSurveyForm: React.FC = () => {
 
   const survey = useMemo(() => {
     const model = new Model(employeeSurveyJson)
+    model.widthMode = 'responsive'
     model.onComplete.add((sender) => {
       setCompletedData(sender.data)
     })

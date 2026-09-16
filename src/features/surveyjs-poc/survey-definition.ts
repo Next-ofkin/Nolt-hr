@@ -2,6 +2,7 @@ export const employeeSurveyJson = {
   title: 'NOLT FINANCE',
   description:
     'Employee Data Form\n\nPlease complete your employee information. You can review your answers before submitting.',
+  widthMode: 'responsive',
   showProgressBar: 'top',
   progressBarType: 'buttons',
   showQuestionNumbers: 'off',
@@ -13,6 +14,7 @@ export const employeeSurveyJson = {
     {
       name: 'personal_info',
       title: 'Personal Information',
+      shortTitle: '1. Personal',
       description: 'Basic identity and personal details',
       elements: [
         {
@@ -20,6 +22,7 @@ export const employeeSurveyJson = {
           name: 'first_name',
           title: 'First Name',
           isRequired: true,
+          minWidth: '260px',
         },
         {
           type: 'text',
@@ -27,12 +30,14 @@ export const employeeSurveyJson = {
           title: 'Last Name',
           isRequired: true,
           startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'text',
           name: 'middle_name',
           title: 'Middle Name',
-          startWithNewLine: false,
+          startWithNewLine: true,
+          minWidth: '260px',
         },
         {
           type: 'text',
@@ -40,25 +45,31 @@ export const employeeSurveyJson = {
           title: 'Date of Birth',
           inputType: 'date',
           isRequired: true,
+          startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'text',
           name: 'place_of_birth',
           title: 'Place of Birth',
-          startWithNewLine: false,
+          startWithNewLine: true,
+          minWidth: '260px',
         },
         {
           type: 'text',
           name: 'nationality',
           title: 'Nationality',
           defaultValue: 'Nigerian',
+          startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'dropdown',
           name: 'marital_status',
           title: 'Marital Status',
           choices: ['Single', 'Married', 'Divorced', 'Widowed'],
-          startWithNewLine: false,
+          startWithNewLine: true,
+          minWidth: '260px',
         },
         {
           type: 'file',
@@ -68,12 +79,15 @@ export const employeeSurveyJson = {
           maxSize: 5242880,
           showPreview: true,
           storeDataAsText: true,
+          startWithNewLine: true,
+          minWidth: '100%',
         },
       ],
     },
     {
       name: 'employment_contact',
       title: 'Employment & Contact',
+      shortTitle: '2. Employment',
       description: 'Job details and contact information',
       elements: [
         {
@@ -82,6 +96,7 @@ export const employeeSurveyJson = {
           title: 'Date Employed',
           inputType: 'date',
           isRequired: true,
+          minWidth: '260px',
         },
         {
           type: 'radiogroup',
@@ -90,6 +105,8 @@ export const employeeSurveyJson = {
           choices: ['Permanent', 'Contract', 'Temporary'],
           isRequired: true,
           colCount: 3,
+          startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'text',
@@ -97,6 +114,8 @@ export const employeeSurveyJson = {
           title: 'Phone Number',
           inputType: 'tel',
           isRequired: true,
+          startWithNewLine: true,
+          minWidth: '260px',
         },
         {
           type: 'text',
@@ -111,6 +130,7 @@ export const employeeSurveyJson = {
             },
           ],
           startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'comment',
@@ -118,29 +138,37 @@ export const employeeSurveyJson = {
           title: 'Residential Address',
           isRequired: true,
           rows: 2,
+          startWithNewLine: true,
+          minWidth: '100%',
         },
         {
           type: 'comment',
           name: 'permanent_home_address',
           title: 'Permanent Home Address',
           rows: 2,
+          startWithNewLine: true,
+          minWidth: '100%',
         },
         {
           type: 'text',
           name: 'state_of_origin',
           title: 'State of Origin',
+          startWithNewLine: true,
+          minWidth: '260px',
         },
         {
           type: 'text',
           name: 'lga',
           title: 'LGA (Local Government Area)',
           startWithNewLine: false,
+          minWidth: '260px',
         },
       ],
     },
     {
       name: 'emergency_education',
       title: 'Emergency & Education',
+      shortTitle: '3. Emergency',
       description: 'Emergency contacts and academic qualifications',
       elements: [
         {
@@ -153,6 +181,7 @@ export const employeeSurveyJson = {
               name: 'emergency_contact_name',
               title: 'Emergency Contact Name',
               isRequired: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -161,13 +190,15 @@ export const employeeSurveyJson = {
               inputType: 'tel',
               isRequired: true,
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'text',
               name: 'emergency_relationship',
               title: 'Relationship',
               isRequired: true,
-              startWithNewLine: false,
+              startWithNewLine: true,
+              minWidth: '260px',
             },
           ],
         },
@@ -185,6 +216,7 @@ export const employeeSurveyJson = {
               name: 'school_institution',
               title: 'School / Institution',
               isRequired: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -192,13 +224,15 @@ export const employeeSurveyJson = {
               title: 'Qualification Obtained',
               isRequired: true,
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'text',
               name: 'completion_date',
               title: 'Completion Date',
               inputType: 'date',
-              startWithNewLine: false,
+              startWithNewLine: true,
+              minWidth: '260px',
             },
           ],
         },
@@ -207,6 +241,7 @@ export const employeeSurveyJson = {
     {
       name: 'financial_nok',
       title: 'Financial & Next of Kin',
+      shortTitle: '4. Financial',
       description: 'Payroll details and Next of Kin records',
       elements: [
         {
@@ -219,6 +254,7 @@ export const employeeSurveyJson = {
               name: 'bank_name',
               title: 'Bank Name',
               isRequired: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -233,22 +269,28 @@ export const employeeSurveyJson = {
                 },
               ],
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'text',
               name: 'pension_administrator',
               title: 'Pension Administrator (PFA)',
+              startWithNewLine: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
               name: 'pension_number',
               title: 'Pension Pin / Number',
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'text',
               name: 'tax_id',
               title: 'Tax ID (TIN)',
+              startWithNewLine: true,
+              minWidth: '260px',
             },
           ],
         },
@@ -262,6 +304,7 @@ export const employeeSurveyJson = {
               name: 'nok_full_name',
               title: 'Full Name',
               isRequired: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -269,6 +312,7 @@ export const employeeSurveyJson = {
               title: 'Relationship',
               isRequired: true,
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -276,6 +320,8 @@ export const employeeSurveyJson = {
               title: 'Phone Number',
               inputType: 'tel',
               isRequired: true,
+              startWithNewLine: true,
+              minWidth: '260px',
             },
             {
               type: 'text',
@@ -283,12 +329,15 @@ export const employeeSurveyJson = {
               title: 'Email Address',
               inputType: 'email',
               startWithNewLine: false,
+              minWidth: '260px',
             },
             {
               type: 'comment',
               name: 'nok_address',
               title: 'Address',
               rows: 2,
+              startWithNewLine: true,
+              minWidth: '100%',
             },
           ],
         },
@@ -297,6 +346,7 @@ export const employeeSurveyJson = {
     {
       name: 'health_information',
       title: 'Health Information',
+      shortTitle: '5. Health',
       description: 'Confidential medical record survey',
       elements: [
         {
@@ -326,6 +376,7 @@ export const employeeSurveyJson = {
           title: 'Are you Asthmatic?',
           choices: ['Yes', 'No'],
           colCount: 2,
+          minWidth: '260px',
         },
         {
           type: 'radiogroup',
@@ -334,6 +385,7 @@ export const employeeSurveyJson = {
           choices: ['Yes', 'No'],
           colCount: 2,
           startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'radiogroup',
@@ -341,6 +393,7 @@ export const employeeSurveyJson = {
           title: 'Are you Epileptic?',
           choices: ['Yes', 'No'],
           colCount: 2,
+          minWidth: '260px',
         },
         {
           type: 'radiogroup',
@@ -349,12 +402,14 @@ export const employeeSurveyJson = {
           choices: ['Yes', 'No'],
           colCount: 2,
           startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'dropdown',
           name: 'blood_group',
           title: 'Blood Group',
           choices: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+          minWidth: '260px',
         },
         {
           type: 'dropdown',
@@ -362,6 +417,7 @@ export const employeeSurveyJson = {
           title: 'Genotype',
           choices: ['AA', 'AS', 'SS', 'AC'],
           startWithNewLine: false,
+          minWidth: '260px',
         },
         {
           type: 'radiogroup',
@@ -369,12 +425,14 @@ export const employeeSurveyJson = {
           title: 'Do you use eye glasses?',
           choices: ['Yes', 'No'],
           colCount: 2,
+          minWidth: '260px',
         },
       ],
     },
     {
       name: 'review_declaration',
       title: 'Review & Declaration',
+      shortTitle: '6. Review',
       description: 'Review your information and sign to complete submission',
       elements: [
         {

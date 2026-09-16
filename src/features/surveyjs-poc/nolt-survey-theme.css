@@ -1,4 +1,4 @@
-/* NOLT SurveyJS CSS Overrides */
+/* NOLT SurveyJS CSS Overrides & Responsive System */
 
 .sjs-theme-overrides {
   --sjs-font-family: var(--font, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
@@ -14,11 +14,11 @@
   --sjs-font-size: 15px;
 
   width: 100%;
-  max-width: 980px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
-/* Container & Box styling for clean SaaS appearance */
+/* Base survey container and typography */
 .sjs-theme-overrides .sd-root-modern {
   background-color: transparent;
   font-family: var(--font, system-ui, sans-serif);
@@ -28,25 +28,34 @@
 .sjs-theme-overrides .sd-container-modern {
   max-width: 100%;
   padding: 0;
+  width: 100%;
 }
 
+/* Card styling & responsive padding */
 .sjs-theme-overrides .sd-body {
   background: var(--surface, #ffffff);
   border: 1px solid var(--border, #e2e5ea);
   border-radius: 12px;
-  padding: 2rem 2.25rem;
+  padding: 32px 40px;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .sjs-theme-overrides .sd-body {
+    padding: 24px;
+  }
 }
 
 @media (max-width: 640px) {
   .sjs-theme-overrides .sd-body {
-    padding: 1.25rem 1rem;
+    padding: 16px 20px;
   }
 }
 
 /* Header typography */
 .sjs-theme-overrides .sd-title {
-  font-size: 1.5rem;
+  font-size: clamp(1.35rem, 2.5vw, 1.65rem);
   font-weight: 700;
   color: var(--text-strong, #0f172a);
   margin-bottom: 0.35rem;
@@ -56,6 +65,47 @@
   font-size: 0.95rem;
   color: var(--text-muted, #64748b);
   white-space: pre-line;
+  line-height: 1.5;
+}
+
+.sjs-theme-overrides .sd-page__title {
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+  font-weight: 700;
+  color: var(--text-strong, #0f172a);
+  margin-bottom: 0.25rem;
+}
+
+.sjs-theme-overrides .sd-page__description {
+  font-size: 0.9rem;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 1.25rem;
+}
+
+/* Input elements: min 44px height & 16px font to prevent iOS auto-zoom */
+.sjs-theme-overrides input[type='text'],
+.sjs-theme-overrides input[type='date'],
+.sjs-theme-overrides input[type='email'],
+.sjs-theme-overrides input[type='tel'],
+.sjs-theme-overrides select,
+.sjs-theme-overrides textarea,
+.sjs-theme-overrides .sd-input,
+.sjs-theme-overrides .sd-dropdown {
+  min-height: 44px;
+  font-size: 16px !important;
+  border-radius: 8px;
+}
+
+/* Fix dropdown arrow size */
+.sjs-theme-overrides .sd-dropdown__icon,
+.sjs-theme-overrides .sd-dropdown_select svg,
+.sjs-theme-overrides .sd-dropdown__select-svg,
+.sjs-theme-overrides .sd-dropdown svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
 }
 
 /* Navigation buttons styling */
@@ -68,6 +118,7 @@
   font-weight: 600 !important;
   font-size: 0.95rem !important;
   border: 1px solid transparent !important;
+  min-height: 44px;
   transition: background-color 0.15s ease-in-out;
 }
 
@@ -84,14 +135,51 @@
   padding: 0.65rem 1.4rem !important;
   font-weight: 600 !important;
   font-size: 0.95rem !important;
+  min-height: 44px;
 }
 
 .sjs-theme-overrides .sd-navigation__prev-btn:hover {
   background-color: var(--bg, #f5f6f8) !important;
 }
 
+/* Validation error text styling */
+.sjs-theme-overrides .sd-question__errmsg {
+  color: var(--danger, #dc2626);
+  font-size: 0.85rem;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 /* Dynamic panel button styling */
 .sjs-theme-overrides .sd-paneldynamic__add-btn {
   border-radius: 8px !important;
   font-weight: 600 !important;
+  min-height: 40px;
+}
+
+/* Passport file upload container styling */
+.sjs-theme-overrides .sd-file {
+  width: 100%;
+}
+
+.sjs-theme-overrides .sd-file__drag-area {
+  padding: 1.25rem 1rem;
+  border-radius: 8px;
+}
+
+/* Force single column on screens <= 640px */
+@media (max-width: 640px) {
+  .sjs-theme-overrides .sd-question,
+  .sjs-theme-overrides .sd-element {
+    min-width: 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  .sjs-theme-overrides .sd-progress-buttons__list {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
 }
