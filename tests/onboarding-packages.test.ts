@@ -9,6 +9,10 @@ import {
   mapPackageItem,
   mapPackageVersion,
   summarizeOnboardingPackage,
+  filterOnboardingPackagesBySearch,
+  filterOnboardingPackagesByStatus,
+  formatPackageDate,
+  type OnboardingPackageSummary,
 } from '../src/features/onboarding-packages/data/onboarding-packages-types.ts'
 import type {
   OnboardingPackageItemRow,
@@ -239,4 +243,99 @@ test('browser code contains no direct package table DML and no service-role key'
   assert.doesNotMatch(browserSource, /\.from\(\s*['"]onboarding_package_items['"]\s*\)\s*\.delete/i)
 
   assert.doesNotMatch(browserSource, /SUPABASE_SERVICE_ROLE_KEY/i)
+})
+
+function sampleSummary(overrides: Partial<OnboardingPackageSummary> = {}): OnboardingPackageSummary {
+  return {
+    id: 'pkg-1',
+    title: 'New Starter Package',
+    description: 'Standard onboarding package for new employees.',
+    createdAt: '2026-09-16T10:00:00.000Z',
+    updatedAt: '2026-09-16T10:00:00.000Z',
+    archivedAt: null,
+    draftVersionNumber: null,
+    draftRevision: null,
+    latestPublishedVersionNumber: null,
+    latestPublishedAt: null,
+    totalFormsCount: 0,
+    totalDocumentsCount: 0,
+    ...overrides,
+  }
+}
+
+test('filterOnboardingPackagesBySearch matches title or description, case-insensitively', () => {
+  const packages = [
+    sampleSummary({ id: 'a', title: 'New Starter Package', description: 'For engineers' }),
+    sampleSummary({ id: 'b', title: 'Contractor Pack', description: 'Short-term hires' }),
+  ]
+
+  assert.deepEqual(filterOnboardingPackagesBySearch(packages, 'starter').map((p) => p.id), ['a'])
+  assert.deepEqual(filterOnboardingPackagesBySearch(packages, 'ENGINEERS').map((p) => p.id), ['a'])
+  assert.deepEqual(filterOnboardingPackagesBySearch(packages, '').map((p) => p.id), ['a', 'b'])
+  assert.deepEqual(filterOnboardingPackagesBySearch(packages, '   ').map((p) => p.id), ['a', 'b'])
+  assert.deepEqual(filterOnboardingPackagesBySearch(packages, 'nonexistent'), [])
+})
+
+test('filterOnboardingPackagesByStatus separates draft (open draft) from published-only packages', () => {
+  const packages = [
+    sampleSummary({ id: 'draft-only', draftVersionNumber: 1 }),
+    sampleSummary({ id: 'published-only', latestPublishedVersionNumber: 1 }),
+    sampleSummary({ id: 'draft-with-published-history', draftVersionNumber: 2, latestPublishedVersionNumber: 1 }),
+    sampleSummary({ id: 'untouched' }),
+  ]
+
+  assert.deepEqual(
+    filterOnboardingPackagesByStatus(packages, 'draft').map((p) => p.id),
+    ['draft-only', 'draft-with-published-history'],
+  )
+  assert.deepEqual(
+    filterOnboardingPackagesByStatus(packages, 'published').map((p) => p.id),
+    ['published-only'],
+  )
+  assert.deepEqual(filterOnboardingPackagesByStatus(packages, 'all'), packages)
+})
+
+test('formatPackageDate renders a readable "16 Sep 2026" style date', () => {
+  assert.equal(formatPackageDate('2026-09-16T10:00:00.000Z'), '16 Sep 2026')
+})
+
+test('onboarding packages list page: New Package action creates a draft and navigates to its editor', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  assert.match(source, /createOnboardingPackage\(/)
+  assert.match(source, /navigate\(`\/hr\/onboarding-packages\/\$\{result\.onboardingPackageId\}\/edit`\)/)
+})
+
+test('onboarding packages list page: card renders title, status badges, form/document counts, and links Manage Package to the right package', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  assert.match(source, /pkg\.title/)
+  assert.match(source, /Draft V\{pkg\.draftVersionNumber\}/)
+  assert.match(source, /Published V\{pkg\.latestPublishedVersionNumber\}/)
+  assert.match(source, /pkg\.totalFormsCount/)
+  assert.match(source, /pkg\.totalDocumentsCount/)
+  assert.match(source, /navigate\(`\/hr\/onboarding-packages\/\$\{pkg\.id\}\/edit`\)/)
+  assert.match(source, /Manage Package/)
+})
+
+test('onboarding packages list page: uses Draft/Published terminology, never the ambiguous "V1 Live"', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  assert.doesNotMatch(source, /Live/)
+})
+
+test('onboarding packages list page: no hardcoded package data, always sourced from the repository', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  assert.match(source, /listOnboardingPackages\(\)/)
+  assert.doesNotMatch(source, /Integrity Test Package/)
+})
+
+test('onboarding packages list page renders no unstyled Tailwind utility classes (this app ships no Tailwind build)', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  // A handful of Tailwind utilities that would silently do nothing without a Tailwind build.
+  for (const utility of ['bg-indigo-600', 'text-slate-900', 'rounded-2xl', 'rounded-xl', 'max-w-7xl', 'grid-cols-1', 'shadow-sm', 'space-x-2', 'space-y-']) {
+    assert.doesNotMatch(source, new RegExp(utility))
+  }
 })

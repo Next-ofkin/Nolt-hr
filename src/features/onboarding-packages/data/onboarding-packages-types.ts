@@ -221,6 +221,52 @@ export function mapPackageVersion(
   }
 }
 
+/** Case-insensitive title/description search, kept pure for focused tests. */
+export function filterOnboardingPackagesBySearch(
+  packages: OnboardingPackageSummary[],
+  query: string,
+): OnboardingPackageSummary[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return packages
+  return packages.filter(
+    (pkg) =>
+      pkg.title.toLowerCase().includes(needle) ||
+      (pkg.description ?? '').toLowerCase().includes(needle),
+  )
+}
+
+export type OnboardingPackageStatusFilter = 'all' | 'draft' | 'published'
+
+/**
+ * "draft" = has an open draft version (regardless of whether an older
+ * published version also exists); "published" = published with no open
+ * draft. Matches the Draft/Published terminology used in the UI.
+ */
+export function filterOnboardingPackagesByStatus(
+  packages: OnboardingPackageSummary[],
+  status: OnboardingPackageStatusFilter,
+): OnboardingPackageSummary[] {
+  if (status === 'all') return packages
+  if (status === 'draft') return packages.filter((pkg) => pkg.draftVersionNumber !== null)
+  return packages.filter((pkg) => pkg.draftVersionNumber === null && pkg.latestPublishedVersionNumber !== null)
+}
+
+const SHORT_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+/**
+ * "16 Sep 2026" — the readable date format used across the packages library.
+ * Formatted manually (not via Intl) so the month abbreviation is always the
+ * 3-letter form regardless of the runtime's ICU locale data (e.g. some ICU
+ * versions render en-GB September as "Sept").
+ */
+export function formatPackageDate(iso: string): string {
+  const date = new Date(iso)
+  return `${date.getUTCDate()} ${SHORT_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+}
+
 export function summarizeOnboardingPackage(
   packageRow: OnboardingPackageRow,
   versionRows: OnboardingPackageVersionRow[],
