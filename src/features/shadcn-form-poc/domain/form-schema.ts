@@ -194,6 +194,30 @@ export function reorderFieldsInStep(
   }
 }
 
+/**
+ * Builds a friendly, contextual "this field is required" message from the
+ * field's own type and label (e.g. "Date of Birth" -> "Please select your
+ * date of birth."), instead of a generic "Response required." string.
+ */
+export function friendlyRequiredMessage(field: Pick<FormField, 'type' | 'label'>): string {
+  const label = field.label.toLowerCase()
+
+  switch (field.type) {
+    case 'date':
+      return `Please select your ${label}.`
+    case 'select':
+    case 'radio':
+    case 'yesno':
+      return `Please choose your ${label}.`
+    case 'checkbox':
+      return `Please confirm "${field.label}" to continue.`
+    case 'file':
+      return `Please upload your ${label}.`
+    default:
+      return `Please enter your ${label}.`
+  }
+}
+
 export function buildZodSchemaForStep(step: FormStep): z.ZodObject<Record<string, z.ZodTypeAny>> {
   const shape: Record<string, z.ZodTypeAny> = {}
 
@@ -205,8 +229,8 @@ export function buildZodSchemaForStep(step: FormStep): z.ZodObject<Record<string
     if (field.type === 'education_repeater') {
       shape[field.name] = z.array(
         z.object({
-          school_institution: z.string().min(1, 'School / Institution is required'),
-          qualification: z.string().min(1, 'Qualification is required'),
+          school_institution: z.string().min(1, 'Please enter the school or institution.'),
+          qualification: z.string().min(1, 'Please enter the qualification.'),
           completion_date: z.string().optional(),
         }),
       )
@@ -219,12 +243,12 @@ export function buildZodSchemaForStep(step: FormStep): z.ZodObject<Record<string
       if (field.required) {
         fieldZod = z
           .string()
-          .min(1, `${field.label} is required`)
-          .email('Please enter a valid email address')
+          .min(1, friendlyRequiredMessage(field))
+          .email('Please enter a valid email address.')
       } else {
         fieldZod = z
           .string()
-          .email('Please enter a valid email address')
+          .email('Please enter a valid email address.')
           .optional()
           .or(z.literal(''))
       }
@@ -232,33 +256,33 @@ export function buildZodSchemaForStep(step: FormStep): z.ZodObject<Record<string
       if (field.required) {
         fieldZod = z
           .string()
-          .min(1, `${field.label} is required`)
-          .regex(/^[0-9]+$/, 'Must be numbers only')
+          .min(1, friendlyRequiredMessage(field))
+          .regex(/^[0-9]+$/, 'Please use numbers only.')
       } else {
         fieldZod = z.string().optional().or(z.literal(''))
       }
     } else if (field.type === 'yesno' || field.type === 'radio' || field.type === 'select') {
       if (field.required) {
-        fieldZod = z.string().min(1, `${field.label} is required`)
+        fieldZod = z.string().min(1, friendlyRequiredMessage(field))
       } else {
         fieldZod = z.string().optional().or(z.literal(''))
       }
     } else if (field.type === 'checkbox') {
       if (field.required) {
-        fieldZod = z.boolean().refine((v) => v === true, { message: `${field.label} is required` })
+        fieldZod = z.boolean().refine((v) => v === true, { message: friendlyRequiredMessage(field) })
       } else {
         fieldZod = z.boolean().optional()
       }
     } else if (field.type === 'file') {
       if (field.required) {
-        fieldZod = z.any().refine((val) => val != null && val !== '', { message: `${field.label} is required` })
+        fieldZod = z.any().refine((val) => val != null && val !== '', { message: friendlyRequiredMessage(field) })
       } else {
         fieldZod = z.any().optional()
       }
     } else {
       // General text, textarea, phone, date
       if (field.required) {
-        fieldZod = z.string().min(1, `${field.label} is required`)
+        fieldZod = z.string().min(1, friendlyRequiredMessage(field))
       } else {
         fieldZod = z.string().optional().or(z.literal(''))
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Controller, useFormContext, useFieldArray, useWatch } from 'react-hook-form'
 import type { Control, FieldValues } from 'react-hook-form'
 import type { FormField } from '../domain/form-schema'
@@ -107,19 +107,69 @@ const CustomSelectControl: React.FC<{ field: FormField; control: Control<FieldVa
   control,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const options = field.options || []
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [isOpen])
 
   return (
     <Controller
       name={field.name}
       control={control}
       render={({ field: controllerField }) => {
-        const selectedOption = (field.options || []).find((o) => o.value === controllerField.value)
+        const selectedOption = options.find((o) => o.value === controllerField.value)
+
+        const openAt = (index: number) => {
+          setHighlightedIndex(Math.max(0, Math.min(index, options.length - 1)))
+          setIsOpen(true)
+        }
+
+        const handleTriggerKeyDown = (event: React.KeyboardEvent) => {
+          if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            const currentIndex = selectedOption ? options.findIndex((o) => o.value === selectedOption.value) : 0
+            openAt(currentIndex)
+          }
+        }
+
+        const handlePopoverKeyDown = (event: React.KeyboardEvent) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setHighlightedIndex((i) => Math.min(i + 1, options.length - 1))
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            setHighlightedIndex((i) => Math.max(i - 1, 0))
+          } else if (event.key === 'Enter') {
+            event.preventDefault()
+            const opt = options[highlightedIndex]
+            if (opt) {
+              controllerField.onChange(opt.value)
+              setIsOpen(false)
+            }
+          } else if (event.key === 'Escape' || event.key === 'Tab') {
+            setIsOpen(false)
+          }
+        }
+
         return (
-          <div className="select-wrap">
+          <div className="select-wrap" ref={wrapRef} onKeyDown={isOpen ? handlePopoverKeyDown : undefined}>
             <button
               type="button"
               id={`custom-select-trigger-${field.id}`}
-              onClick={() => setIsOpen(!isOpen)}
+              aria-haspopup="listbox"
+              aria-expanded={isOpen}
+              onClick={() => (isOpen ? setIsOpen(false) : openAt(selectedOption ? options.findIndex((o) => o.value === selectedOption.value) : 0))}
+              onKeyDown={handleTriggerKeyDown}
               className={`select-trigger${selectedOption ? '' : ' placeholder'}`}
             >
               <span>{selectedOption ? selectedOption.label : field.placeholder || 'Select an option...'}</span>
@@ -127,16 +177,19 @@ const CustomSelectControl: React.FC<{ field: FormField; control: Control<FieldVa
             </button>
 
             {isOpen && (
-              <div className="select-popover">
-                {(field.options || []).map((opt) => (
+              <div className="select-popover" role="listbox">
+                {options.map((opt, index) => (
                   <button
                     key={opt.value}
                     type="button"
+                    role="option"
+                    aria-selected={controllerField.value === opt.value}
+                    onMouseEnter={() => setHighlightedIndex(index)}
                     onClick={() => {
                       controllerField.onChange(opt.value)
                       setIsOpen(false)
                     }}
-                    className={`select-option${controllerField.value === opt.value ? ' selected' : ''}`}
+                    className={`select-option${controllerField.value === opt.value ? ' selected' : ''}${index === highlightedIndex ? ' highlighted' : ''}`}
                   >
                     <span>{opt.label}</span>
                     {controllerField.value === opt.value && <Check style={{ width: 14, height: 14 }} />}
@@ -219,9 +272,9 @@ const FileUploadControl: React.FC<{ field: FormField; control: Control<FieldValu
       control={control}
       render={({ field: controllerField }) => (
         <div className={`file-dropzone${controllerField.value ? ' has-file' : ''}`}>
-          <Upload className="file-dropzone-icon" style={{ width: 28, height: 28 }} />
+          <Upload className="file-dropzone-icon" style={{ width: 22, height: 22 }} />
           <div className="file-dropzone-title">
-            {controllerField.value ? `File selected: ${controllerField.value.name || 'Passport_Photo.png'}` : 'Drag file here or choose a file'}
+            {controllerField.value ? `File selected: ${controllerField.value.name || 'Passport_Photo.png'}` : 'Drag and drop your image here'}
           </div>
           <div className="file-dropzone-hint">PNG, JPG or PDF • Maximum 5 MB</div>
 

@@ -154,7 +154,7 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({ schema, onSwit
               <ArrowLeft style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Previous
             </button>
 
-            <button type="submit" className="btn btn-primary" style={{ minHeight: 44, padding: '0.65rem 1.6rem' }}>
+            <button type="submit" className="btn btn-primary" style={{ minHeight: 48, padding: '0.7rem 1.75rem' }}>
               {activeStepIndex === schema.steps.length - 1 ? (
                 <>
                   <Send style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Submit Form
