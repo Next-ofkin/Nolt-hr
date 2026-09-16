@@ -378,7 +378,8 @@ a {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
@@ -388,8 +389,13 @@ select {
   color: var(--text-strong);
 }
 
+textarea {
+  resize: vertical;
+}
+
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid rgba(37, 99, 235, 0.35);
   outline-offset: 0;
   border-color: var(--primary);
