@@ -19,7 +19,10 @@ import SurveyJsPocPage from './pages/SurveyJsPocPage'
 import ShadcnFormPocPage from './pages/ShadcnFormPocPage'
 import FormsLibraryPage from './features/forms/pages/FormsLibraryPage'
 import FormEditorPage from './features/forms/pages/FormEditorPage'
+import { OnboardingPackagesPage } from './features/onboarding-packages/pages/OnboardingPackagesPage'
+import { OnboardingPackageEditorPage } from './features/onboarding-packages/pages/OnboardingPackageEditorPage'
 import { EMPLOYEE_MANAGER_ROLES } from './lib/employee-domain'
+
 
 const router = createBrowserRouter([
   {
@@ -101,6 +104,23 @@ const router = createBrowserRouter([
           </RequireRole>
         ),
       },
+      {
+        path: '/hr/onboarding-packages',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <OnboardingPackagesPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: '/hr/onboarding-packages/:packageId/edit',
+        element: (
+          <RequireRole roles={EMPLOYEE_MANAGER_ROLES}>
+            <OnboardingPackageEditorPage />
+          </RequireRole>
+        ),
+      },
+
       {
         path: '/hr/forms-v2/demo',
         element: (

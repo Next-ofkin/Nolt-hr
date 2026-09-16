@@ -313,6 +313,143 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_package_items: {
+        Row: {
+          created_at: string
+          document_description: string | null
+          document_title: string | null
+          form_version_id: string | null
+          id: string
+          item_type: string
+          package_version_id: string
+          required: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          document_description?: string | null
+          document_title?: string | null
+          form_version_id?: string | null
+          id?: string
+          item_type: string
+          package_version_id: string
+          required?: boolean
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          document_description?: string | null
+          document_title?: string | null
+          form_version_id?: string | null
+          id?: string
+          item_type?: string
+          package_version_id?: string
+          required?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_package_items_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "form_definition_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_package_items_package_version_id_fkey"
+            columns: ["package_version_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_package_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_package_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          onboarding_package_id: string
+          published_at: string | null
+          published_by: string | null
+          revision: number
+          state: string
+          updated_at: string
+          updated_by: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          onboarding_package_id: string
+          published_at?: string | null
+          published_by?: string | null
+          revision?: number
+          state: string
+          updated_at?: string
+          updated_by: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          onboarding_package_id?: string
+          published_at?: string | null
+          published_by?: string | null
+          revision?: number
+          state?: string
+          updated_at?: string
+          updated_by?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_package_versions_onboarding_package_id_fkey"
+            columns: ["onboarding_package_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_packages: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -354,6 +491,14 @@ export type Database = {
         Args: { p_form_definition_id: string }
         Returns: Json
       }
+      create_onboarding_package: {
+        Args: { p_description: string; p_title: string }
+        Returns: Json
+      }
+      create_onboarding_package_draft: {
+        Args: { p_onboarding_package_id: string }
+        Returns: Json
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -371,12 +516,26 @@ export type Database = {
         Args: { p_form_definition_id: string }
         Returns: Json
       }
+      publish_onboarding_package_draft: {
+        Args: { p_onboarding_package_id: string }
+        Returns: Json
+      }
       save_form_definition_draft: {
         Args: {
           p_definition: Json
           p_description: string
           p_expected_revision: number
           p_form_definition_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      save_onboarding_package_draft: {
+        Args: {
+          p_description: string
+          p_expected_revision: number
+          p_items: Json
+          p_onboarding_package_id: string
           p_title: string
         }
         Returns: Json
@@ -576,3 +735,9 @@ export type FormDefinitionRow = Database["public"]["Tables"]["form_definitions"]
 export type FormDefinitionInsert = Database["public"]["Tables"]["form_definitions"]["Insert"]
 export type FormDefinitionUpdate = Database["public"]["Tables"]["form_definitions"]["Update"]
 export type FormDefinitionVersionRow = Database["public"]["Tables"]["form_definition_versions"]["Row"]
+
+export type OnboardingPackageRow = Database["public"]["Tables"]["onboarding_packages"]["Row"]
+export type OnboardingPackageInsert = Database["public"]["Tables"]["onboarding_packages"]["Insert"]
+export type OnboardingPackageUpdate = Database["public"]["Tables"]["onboarding_packages"]["Update"]
+export type OnboardingPackageVersionRow = Database["public"]["Tables"]["onboarding_package_versions"]["Row"]
+export type OnboardingPackageItemRow = Database["public"]["Tables"]["onboarding_package_items"]["Row"]
