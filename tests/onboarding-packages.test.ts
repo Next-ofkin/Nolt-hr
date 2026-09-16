@@ -415,3 +415,13 @@ test('migration 0020 archives forms and packages via SECURITY DEFINER RPCs, not 
   assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
   assert.match(migration, /grant execute on function public\.archive_onboarding_package\(uuid\) to authenticated/i)
 })
+
+test('package version history collapses old published versions behind a toggle, not a database limit', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/components/PackageVersionHistory.tsx')
+
+  assert.match(source, /splitVersionsForDisplay\(/)
+  assert.match(source, /Show \{hiddenCount\}/)
+  // Every published version is still fetched from the server and passed in whole -
+  // this is a display-only limit, so nothing is dropped before it reaches the component.
+  assert.doesNotMatch(source, /\.slice\(/)
+})

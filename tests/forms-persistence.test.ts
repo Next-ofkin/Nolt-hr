@@ -370,3 +370,13 @@ test('migration 0020 archives forms via a SECURITY DEFINER RPC, not a direct tab
   assert.match(migration, /function public\.archive_form_definition[\s\S]*?security definer/i)
   assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
 })
+
+test('form version history collapses old published versions behind a toggle, not a database limit', async () => {
+  const source = await readRepositoryFile('src/features/forms/components/FormVersionHistory.tsx')
+
+  assert.match(source, /splitVersionsForDisplay\(/)
+  assert.match(source, /\$\{hiddenCount\}/)
+  // Every published version is still fetched from the server and passed in whole -
+  // this is a display-only limit, so nothing is dropped before it reaches the component.
+  assert.doesNotMatch(source, /versions\.slice\(/)
+})

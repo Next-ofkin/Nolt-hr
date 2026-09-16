@@ -1,7 +1,8 @@
-import React from 'react'
-import { History, CheckCircle2, Clock } from 'lucide-react'
+import React, { useState } from 'react'
+import { History, CheckCircle2, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import type { PackageVersion } from '../data/onboarding-packages-types'
 import { formatPackageDate } from '../data/onboarding-packages-types'
+import { splitVersionsForDisplay } from '../../../lib/utils'
 
 interface PackageVersionHistoryProps {
   versions: PackageVersion[]
@@ -14,6 +15,9 @@ export const PackageVersionHistory: React.FC<PackageVersionHistoryProps> = ({
   activeVersionId,
   onSelectVersion,
 }) => {
+  const [showAll, setShowAll] = useState(false)
+  const { visible, hiddenCount } = splitVersionsForDisplay(versions, showAll)
+
   return (
     <div className="card">
       <div className="version-history-title">
@@ -22,7 +26,7 @@ export const PackageVersionHistory: React.FC<PackageVersionHistoryProps> = ({
       </div>
 
       <div className="version-history-list">
-        {versions.map((ver) => {
+        {visible.map((ver) => {
           const isSelected = ver.id === activeVersionId
           const isDraft = ver.state === 'draft'
 
@@ -59,6 +63,21 @@ export const PackageVersionHistory: React.FC<PackageVersionHistoryProps> = ({
           )
         })}
       </div>
+
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ marginTop: '0.75rem', width: '100%', justifyContent: 'center' }}
+          onClick={() => setShowAll(!showAll)}
+        >
+          {showAll ? (
+            <>Show fewer versions <ChevronUp style={{ width: 14, height: 14, marginLeft: '0.35rem' }} /></>
+          ) : (
+            <>Show {hiddenCount} older {hiddenCount === 1 ? 'version' : 'versions'} <ChevronDown style={{ width: 14, height: 14, marginLeft: '0.35rem' }} /></>
+          )}
+        </button>
+      )}
     </div>
   )
 }

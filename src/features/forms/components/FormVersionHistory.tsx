@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { splitVersionsForDisplay } from '../../../lib/utils'
 import type { FormVersion } from '../data/forms-types'
 
 function displayDateTime(value: string | null) {
@@ -20,6 +22,9 @@ export function FormVersionHistory({
   versions: FormVersion[]
   onPreview: (versionId: string) => void
 }) {
+  const [showAll, setShowAll] = useState(false)
+  const { visible, hiddenCount } = splitVersionsForDisplay(versions, showAll)
+
   return (
     <section className="card" aria-labelledby="version-history-heading">
       <h2 id="version-history-heading">Version history</h2>
@@ -38,7 +43,7 @@ export function FormVersionHistory({
             </tr>
           </thead>
           <tbody>
-            {versions.map((version) => (
+            {visible.map((version) => (
               <tr key={version.id}>
                 <td><strong>Version {version.versionNumber}</strong></td>
                 <td><VersionState state={version.state} /></td>
@@ -55,6 +60,12 @@ export function FormVersionHistory({
           </tbody>
         </table>
       </div>
+
+      {hiddenCount > 0 && (
+        <button type="button" className="btn btn-ghost" style={{ marginTop: '0.75rem' }} onClick={() => setShowAll(!showAll)}>
+          {showAll ? 'Show fewer versions' : `Show ${hiddenCount} older ${hiddenCount === 1 ? 'version' : 'versions'}`}
+        </button>
+      )}
     </section>
   )
 }
