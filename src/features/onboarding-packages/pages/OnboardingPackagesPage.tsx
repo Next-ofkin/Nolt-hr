@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Archive,
+  RefreshCw,
   Package,
   Plus,
   Search,
@@ -14,6 +16,8 @@ import {
 import {
   listOnboardingPackages,
   createOnboardingPackage,
+  archiveOnboardingPackage,
+  unarchiveOnboardingPackage,
   deleteOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import {
@@ -80,8 +84,37 @@ export const OnboardingPackagesPage: React.FC = () => {
     }
   }
 
+  const handleArchive = async (pkg: OnboardingPackageSummary) => {
+    if (!window.confirm(`Archive "${pkg.title}"? It will be moved to the Archived list.`)) {
+      return
+    }
+    setActionPackageId(pkg.id)
+    setError(null)
+    try {
+      await archiveOnboardingPackage(pkg.id)
+      await loadPackages()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to archive this package.')
+    } finally {
+      setActionPackageId(null)
+    }
+  }
+
+  const handleRestore = async (pkg: OnboardingPackageSummary) => {
+    setActionPackageId(pkg.id)
+    setError(null)
+    try {
+      await unarchiveOnboardingPackage(pkg.id)
+      await loadPackages()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to restore this package.')
+    } finally {
+      setActionPackageId(null)
+    }
+  }
+
   const handleDelete = async (pkg: OnboardingPackageSummary) => {
-    if (!window.confirm(`Are you sure you want to delete "${pkg.title}"?`)) {
+    if (!window.confirm(`Permanently delete archived package "${pkg.title}"? This cannot be undone.`)) {
       return
     }
     setActionPackageId(pkg.id)
@@ -103,95 +136,81 @@ export const OnboardingPackagesPage: React.FC = () => {
   return (
     <div className="page package-library">
       <div className="page-heading">
-        <div>
-          <p className="eyebrow">Onboarding</p>
-          <h1>Onboarding Packages</h1>
-          <p className="subtitle">Create reusable onboarding packages from published forms and required documents.</p>
+        <div className="page-title-row">
+          <div>
+            <h1 className="title">Onboarding Packages</h1>
+            <p className="subtitle">
+              Create, update, publish, and manage reusable onboarding package definitions.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCreatePackage}
+            disabled={isCreating}
+            className="btn btn-primary"
+          >
+            <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Create Package
+          </button>
         </div>
-
-        <button type="button" onClick={handleCreatePackage} disabled={isCreating} className="btn btn-primary">
-          <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} />
-          {isCreating ? 'Creating…' : 'New Package'}
-        </button>
       </div>
 
       {error && (
-        <div className="alert alert-error" role="alert">
+        <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} /> {error}
+            <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+            <span>{error}</span>
           </p>
         </div>
       )}
 
-      <div className="package-toolbar">
-        <div className="search-input-wrap">
-          <Search style={{ width: 16, height: 16 }} />
-          <label htmlFor="package-search" className="sr-only">Search onboarding packages</label>
-          <input
-            id="package-search"
-            type="search"
-            placeholder="Search onboarding packages..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
+      {/* Filter and Search Bar */}
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem' }}>
+        <div className="package-filter-row">
+          <div className="package-search-box">
+            <Search style={{ width: 16, height: 16, color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search packages by title or description..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none' }}
+            />
+          </div>
 
-        <div>
-          <label htmlFor="package-status-filter" className="sr-only">Filter by status</label>
-          <select
-            id="package-status-filter"
-            className="package-status-filter"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as OnboardingPackageStatusFilter)}
-          >
-            <option value="all">All Packages</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="archived">Archived</option>
-          </select>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as OnboardingPackageStatusFilter)}
+              style={{ padding: '0.45rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="draft">Draft Open</option>
+              <option value="published">Published Only</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {!isLoading && (
-        <p className="package-result-count">
-          Showing {filteredPackages.length} {filteredPackages.length === 1 ? 'package' : 'packages'}
-        </p>
-      )}
-
-      {isLoading && (
-        <div className="package-skeleton-list" aria-label="Loading onboarding packages" aria-busy="true">
-          <div className="package-skeleton-card" />
-          <div className="package-skeleton-card" />
-          <div className="package-skeleton-card" />
+      {isLoading ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <p style={{ color: 'var(--text-muted)' }}>Loading onboarding packages...</p>
         </div>
-      )}
-
-      {!isLoading && filteredPackages.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <Package size={22} aria-hidden="true" />
-          </div>
-          {hasActiveFilters ? (
-            <>
-              <h2>No packages found</h2>
-              <p>Try changing your search or filters.</p>
-            </>
-          ) : (
-            <>
-              <h2>No onboarding packages yet</h2>
-              <p style={{ maxWidth: '46ch', marginInline: 'auto' }}>
-                Create your first reusable onboarding package by combining published forms and required documents.
-              </p>
-              <button type="button" onClick={handleCreatePackage} disabled={isCreating} className="btn btn-primary" style={{ marginTop: '1rem' }}>
-                <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Create First Package
-              </button>
-            </>
+      ) : filteredPackages.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+          <Package style={{ width: 36, height: 36, color: 'var(--text-muted)', margin: '0 auto 0.75rem' }} />
+          <h3 style={{ margin: 0, fontWeight: 600 }}>No onboarding packages found</h3>
+          <p className="subtitle" style={{ margin: '0.35rem 0 1.25rem' }}>
+            {hasActiveFilters ? 'Try adjusting your search or status filter.' : 'Get started by creating your first onboarding package.'}
+          </p>
+          {!hasActiveFilters && (
+            <button type="button" onClick={handleCreatePackage} disabled={isCreating} className="btn btn-primary">
+              <Plus style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Create First Package
+            </button>
           )}
         </div>
-      )}
-
-      {!isLoading && filteredPackages.length > 0 && (
-        <div className="package-list">
+      ) : (
+        <div className="package-grid">
           {filteredPackages.map((pkg) => {
             const hasDraft = pkg.draftVersionNumber !== null
             const hasPublished = pkg.latestPublishedVersionNumber !== null
@@ -231,22 +250,43 @@ export const OnboardingPackagesPage: React.FC = () => {
                 <div className="package-card-footer">
                   <span className="package-card-updated">Updated {formatPackageDate(pkg.updatedAt)}</span>
                   <div className="package-card-actions">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/hr/onboarding-packages/${pkg.id}/edit`)}
-                      className="btn btn-primary"
-                    >
-                      Manage Package <ArrowRight style={{ width: 15, height: 15, marginLeft: '0.4rem' }} />
-                    </button>
-                    {!pkg.archivedAt && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(pkg)}
-                        disabled={actionPackageId === pkg.id}
-                        className="btn btn-danger"
-                      >
-                        <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete
-                      </button>
+                    {!pkg.archivedAt ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/hr/onboarding-packages/${pkg.id}/edit`)}
+                          className="btn btn-primary"
+                        >
+                          Manage Package <ArrowRight style={{ width: 15, height: 15, marginLeft: '0.4rem' }} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleArchive(pkg)}
+                          disabled={actionPackageId === pkg.id}
+                          className="btn btn-ghost"
+                        >
+                          <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleRestore(pkg)}
+                          disabled={actionPackageId === pkg.id}
+                          className="btn btn-ghost"
+                        >
+                          <RefreshCw style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Restore
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(pkg)}
+                          disabled={actionPackageId === pkg.id}
+                          className="btn btn-danger"
+                        >
+                          <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete Permanently
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

@@ -235,6 +235,26 @@ export async function archiveOnboardingPackage(onboardingPackageId: string): Pro
   unwrapRpc(data)
 }
 
+export async function unarchiveOnboardingPackage(onboardingPackageId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('unarchive_onboarding_package', {
+    p_onboarding_package_id: onboardingPackageId,
+  })
+  if (error) throw error
+  unwrapRpc(data)
+}
+
+export async function unpublishOnboardingPackageDraft(onboardingPackageId: string): Promise<PublishPackageDraftResult> {
+  const { data, error } = await supabase.rpc('unpublish_onboarding_package_draft', {
+    p_onboarding_package_id: onboardingPackageId,
+  })
+  if (error) throw error
+  const result = unwrapRpc(data)
+  return {
+    versionId: result.version_id as string,
+    versionNumber: result.version_number as number,
+  }
+}
+
 export async function deleteOnboardingPackage(onboardingPackageId: string): Promise<{ mode: 'hard_delete' | 'archived' }> {
   const { data, error } = await supabase.rpc('delete_onboarding_package', {
     p_onboarding_package_id: onboardingPackageId,

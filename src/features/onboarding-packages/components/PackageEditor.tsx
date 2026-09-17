@@ -11,11 +11,15 @@ import {
   Eye,
   PlusCircle,
   Trash2,
+  RefreshCw,
 } from 'lucide-react'
 import {
   saveOnboardingPackageDraft,
   publishOnboardingPackageDraft,
   createOnboardingPackageDraft,
+  unpublishOnboardingPackageDraft,
+  archiveOnboardingPackage,
+  unarchiveOnboardingPackage,
   deleteOnboardingPackage,
   getOnboardingPackage,
 } from '../data/onboarding-packages-repository'
@@ -279,8 +283,39 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  const handleDeletePackage = async () => {
-    if (!window.confirm(`Are you sure you want to delete "${detail.title}"?`)) {
+  const handleUnpublishPackage = async () => {
+    if (!window.confirm(`Unpublish Version ${activeVersion?.versionNumber}? This will revert it to Draft state so you can edit and re-publish.`)) {
+      return
+    }
+    setIsPublishing(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      await unpublishOnboardingPackageDraft(detail.id)
+      const freshDetail = await getOnboardingPackage(detail.id)
+      if (freshDetail) {
+        setDetail(freshDetail)
+        onPackageUpdated(freshDetail)
+        const draftVersion = freshDetail.versions.find((v: PackageVersion) => v.state === 'draft')
+        if (draftVersion) {
+          setActiveVersion(draftVersion)
+          setTitle(freshDetail.title)
+          setDescription(freshDetail.description || '')
+          setItems(draftVersion.items)
+          setExpectedRevision(draftVersion.revision)
+        }
+      }
+      setSuccessMessage('Package version unpublished back to draft.')
+    } catch (err) {
+      setErrorMessage(onboardingPackagePersistenceMessage(err))
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  const handleArchivePackage = async () => {
+    if (!window.confirm(`Archive "${detail.title}"? It will be moved to the Archived list.`)) {
       return
     }
     setIsArchiving(true)
@@ -288,11 +323,7 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
 
     try {
-      const res = await deleteOnboardingPackage(detail.id)
-      if (res.mode === 'hard_delete') {
-        window.location.href = '/hr/onboarding-packages'
-        return
-      }
+      await archiveOnboardingPackage(detail.id)
       const updatedDetail: OnboardingPackageDetail = {
         ...detail,
         archivedAt: new Date().toISOString(),
@@ -303,6 +334,43 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     } catch (err) {
       setErrorMessage(onboardingPackagePersistenceMessage(err))
     } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const handleRestorePackage = async () => {
+    setIsArchiving(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      await unarchiveOnboardingPackage(detail.id)
+      const freshDetail = await getOnboardingPackage(detail.id)
+      if (freshDetail) {
+        setDetail(freshDetail)
+        onPackageUpdated(freshDetail)
+      }
+      setSuccessMessage('Onboarding package restored to active library.')
+    } catch (err) {
+      setErrorMessage(onboardingPackagePersistenceMessage(err))
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const handleDeletePackage = async () => {
+    if (!window.confirm(`Permanently delete archived package "${detail.title}"? This action CANNOT be undone.`)) {
+      return
+    }
+    setIsArchiving(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      await deleteOnboardingPackage(detail.id)
+      window.location.href = '/hr/onboarding-packages'
+    } catch (err) {
+      setErrorMessage(onboardingPackagePersistenceMessage(err))
       setIsArchiving(false)
     }
   }
@@ -412,15 +480,34 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                 >
                   <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview Package
                 </button>
-                {!detail.archivedAt && (
+                {!detail.archivedAt ? (
                   <button
                     type="button"
-                    onClick={handleDeletePackage}
+                    onClick={handleArchivePackage}
                     disabled={isArchiving}
-                    className="btn btn-danger"
+                    className="btn btn-ghost"
                   >
-                    <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete Package
+                    <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
                   </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleRestorePackage}
+                      disabled={isArchiving}
+                      className="btn btn-ghost"
+                    >
+                      <RefreshCw style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Restore
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeletePackage}
+                      disabled={isArchiving}
+                      className="btn btn-danger"
+                    >
+                      <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete Permanently
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -527,16 +614,26 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                   This package has an open draft — select it from Version History to continue editing.
                 </span>
               ) : (
-                <button type="button" onClick={handleCreateNewDraft} disabled={isCreatingDraft} className="btn btn-primary">
-                  {isCreatingDraft ? (
-                    <>Creating Draft…</>
-                  ) : (
-                    <>
-                      <PlusCircle style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
-                      Create Version {(latestPublishedVersion?.versionNumber ?? activeVersion?.versionNumber ?? 1) + 1} Draft
-                    </>
-                  )}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleUnpublishPackage}
+                    disabled={isPublishing || isCreatingDraft}
+                    className="btn btn-ghost"
+                  >
+                    Unpublish to Draft
+                  </button>
+                  <button type="button" onClick={handleCreateNewDraft} disabled={isCreatingDraft || isPublishing} className="btn btn-primary">
+                    {isCreatingDraft ? (
+                      <>Creating Draft…</>
+                    ) : (
+                      <>
+                        <PlusCircle style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
+                        Create Version {(latestPublishedVersion?.versionNumber ?? activeVersion?.versionNumber ?? 1) + 1} Draft
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
