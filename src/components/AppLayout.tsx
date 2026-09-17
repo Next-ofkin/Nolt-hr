@@ -5,6 +5,7 @@ import { useAuth } from '../lib/useAuth'
 import { useCurrentProfile } from '../lib/queries'
 import { getNavGroups, type NavGroup } from '../lib/navigation'
 import { Sidebar } from './Sidebar'
+import { Toaster } from './ui/toaster'
 
 function resolveSectionLabel(pathname: string, groups: NavGroup[]) {
   const items = groups.flatMap((group) => group.items)
@@ -89,6 +90,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   )
 }

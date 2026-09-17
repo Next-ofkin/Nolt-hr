@@ -23,6 +23,7 @@ import {
   deleteOnboardingPackage,
   getOnboardingPackage,
 } from '../data/onboarding-packages-repository'
+import { toast } from '../../../components/ui/use-toast'
 import {
   onboardingPackagePersistenceMessage,
   type OnboardingPackageDetail,
@@ -50,37 +51,17 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   onPackageUpdated,
 }) => {
   const [detail, setDetail] = useState<OnboardingPackageDetail>(initialDetail)
+  const [activeVersion, setActiveVersion] = useState<PackageVersion | null>(
+    initialDetail.versions.find((v) => v.state === 'draft') ||
+      initialDetail.versions.find((v) => v.state === 'published') ||
+      initialDetail.versions[0] ||
+      null,
+  )
 
-  const activeVersionIndex = detail.versions.findIndex((v) => v.state === 'draft')
-  const initialActiveVersion =
-    activeVersionIndex !== -1 ? detail.versions[activeVersionIndex] : detail.versions[0]
-
-  const [activeVersion, setActiveVersion] = useState<PackageVersion>(initialActiveVersion)
-
-  const [title, setTitle] = useState(detail.title)
-  const [description, setDescription] = useState(detail.description || '')
+  const [title, setTitle] = useState(initialDetail.title)
+  const [description, setDescription] = useState(initialDetail.description || '')
   const [items, setItems] = useState<PackageItemInput[]>(
-    activeVersion?.items.map((item) => {
-      if (item.itemType === 'form') {
-        return {
-          id: item.id,
-          itemType: 'form',
-          sortOrder: item.sortOrder,
-          required: item.required,
-          formVersionId: item.formVersionId,
-          formTitle: item.formTitle,
-          formVersionNumber: item.formVersionNumber,
-        }
-      }
-      return {
-        id: item.id,
-        itemType: 'document',
-        sortOrder: item.sortOrder,
-        required: item.required,
-        documentTitle: item.documentTitle,
-        documentDescription: item.documentDescription,
-      }
-    }) || [],
+    activeVersion ? activeVersion.items : [],
   )
 
   const [expectedRevision, setExpectedRevision] = useState(activeVersion?.revision || 1)
@@ -116,7 +97,9 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
 
     if (items.some((i) => i.itemType === 'form' && i.formVersionId === option.formVersionId)) {
-      setErrorMessage('A package cannot contain the same form version multiple times.')
+      const msg = 'A package cannot contain the same form version multiple times.'
+      setErrorMessage(msg)
+      toast.warning('Duplicate Form', msg)
       return
     }
 
@@ -130,6 +113,7 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
 
     setItems([...items, newItem])
+    toast.info('Form Added', `"${option.title}" v${option.versionNumber} added to package.`)
   }
 
   const handleAddDocument = (doc: { documentTitle: string; documentDescription: string; required: boolean }) => {
@@ -145,6 +129,7 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
 
     setItems([...items, newItem])
+    toast.info('Document Requirement Added', `"${doc.documentTitle}" added to package.`)
   }
 
   const handleMoveUp = (index: number) => {
@@ -187,11 +172,12 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
 
       setExpectedRevision(result.revision)
       setSuccessMessage('Draft saved successfully.')
+      toast.success('Draft Saved', `Package saved at revision ${result.revision}.`)
 
       const updatedVersion = {
         ...activeVersion,
         revision: result.revision,
-      }
+      } as PackageVersion
       setActiveVersion(updatedVersion)
 
       const updatedDetail: OnboardingPackageDetail = {
@@ -203,7 +189,9 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       setDetail(updatedDetail)
       onPackageUpdated(updatedDetail)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Save Failed', msg)
     } finally {
       setIsSaving(false)
     }
@@ -227,13 +215,14 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       const publishRes = await publishOnboardingPackageDraft(detail.id)
 
       setSuccessMessage(`Package Version ${publishRes.versionNumber} published successfully.`)
+      toast.success('Package Published', `Version ${publishRes.versionNumber} is now live and locked.`)
       setIsPublishDialogOpen(false)
 
       const publishedVer: PackageVersion = {
         ...activeVersion,
         state: 'published',
         publishedAt: new Date().toISOString(),
-      }
+      } as PackageVersion
       setActiveVersion(publishedVer)
 
       const updatedDetail: OnboardingPackageDetail = {
@@ -245,7 +234,9 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       setDetail(updatedDetail)
       onPackageUpdated(updatedDetail)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Publish Failed', msg)
       setIsPublishDialogOpen(false)
     } finally {
       setIsPublishing(false)
@@ -275,9 +266,13 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
         }
       }
 
-      setSuccessMessage(result.createdNew ? 'New draft version created.' : 'Switched to existing draft.')
+      const msg = result.createdNew ? 'New draft version created.' : 'Switched to existing draft.'
+      setSuccessMessage(msg)
+      toast.success('Draft Created', msg)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Draft Creation Failed', msg)
     } finally {
       setIsCreatingDraft(false)
     }
@@ -307,8 +302,11 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
         }
       }
       setSuccessMessage('Package version unpublished back to draft.')
+      toast.success('Package Unpublished', `Version ${activeVersion?.versionNumber} reverted to draft.`)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Unpublish Failed', msg)
     } finally {
       setIsPublishing(false)
     }
@@ -331,8 +329,11 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
       setDetail(updatedDetail)
       onPackageUpdated(updatedDetail)
       setSuccessMessage('Onboarding package archived successfully.')
+      toast.success('Package Archived', `"${detail.title}" moved to Archived.`)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Archive Failed', msg)
     } finally {
       setIsArchiving(false)
     }
@@ -351,8 +352,11 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
         onPackageUpdated(freshDetail)
       }
       setSuccessMessage('Onboarding package restored to active library.')
+      toast.success('Package Restored', `"${detail.title}" restored to active library.`)
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Restore Failed', msg)
     } finally {
       setIsArchiving(false)
     }
@@ -368,9 +372,12 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
 
     try {
       await deleteOnboardingPackage(detail.id)
+      toast.success('Package Deleted', `"${detail.title}" permanently deleted.`)
       window.location.href = '/hr/onboarding-packages'
     } catch (err) {
-      setErrorMessage(onboardingPackagePersistenceMessage(err))
+      const msg = onboardingPackagePersistenceMessage(err)
+      setErrorMessage(msg)
+      toast.error('Delete Failed', msg)
       setIsArchiving(false)
     }
   }

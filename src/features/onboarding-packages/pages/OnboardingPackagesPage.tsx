@@ -20,6 +20,7 @@ import {
   unarchiveOnboardingPackage,
   deleteOnboardingPackage,
 } from '../data/onboarding-packages-repository'
+import { toast } from '../../../components/ui/use-toast'
 import {
   filterOnboardingPackagesBySearch,
   filterOnboardingPackagesByStatus,
@@ -77,9 +78,12 @@ export const OnboardingPackagesPage: React.FC = () => {
     setError(null)
     try {
       const result = await createOnboardingPackage({ title: 'Untitled Onboarding Package' })
+      toast.success('Package Draft Created', 'Navigating to package editor...')
       navigate(`/hr/onboarding-packages/${result.onboardingPackageId}/edit`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create new onboarding package.')
+      const msg = err instanceof Error ? err.message : 'Failed to create new onboarding package.'
+      setError(msg)
+      toast.error('Creation Failed', msg)
       setIsCreating(false)
     }
   }
@@ -92,9 +96,12 @@ export const OnboardingPackagesPage: React.FC = () => {
     setError(null)
     try {
       await archiveOnboardingPackage(pkg.id)
+      toast.success('Package Archived', `"${pkg.title}" moved to Archived.`)
       await loadPackages()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to archive this package.')
+      const msg = err instanceof Error ? err.message : 'Unable to archive this package.'
+      setError(msg)
+      toast.error('Archive Failed', msg)
     } finally {
       setActionPackageId(null)
     }
@@ -105,9 +112,12 @@ export const OnboardingPackagesPage: React.FC = () => {
     setError(null)
     try {
       await unarchiveOnboardingPackage(pkg.id)
+      toast.success('Package Restored', `"${pkg.title}" restored to active library.`)
       await loadPackages()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to restore this package.')
+      const msg = err instanceof Error ? err.message : 'Unable to restore this package.'
+      setError(msg)
+      toast.error('Restore Failed', msg)
     } finally {
       setActionPackageId(null)
     }
@@ -121,9 +131,12 @@ export const OnboardingPackagesPage: React.FC = () => {
     setError(null)
     try {
       await deleteOnboardingPackage(pkg.id)
+      toast.success('Package Deleted', `"${pkg.title}" permanently deleted.`)
       await loadPackages()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete this package.')
+      const msg = err instanceof Error ? err.message : 'Unable to delete this package.'
+      setError(msg)
+      toast.error('Delete Failed', msg)
     } finally {
       setActionPackageId(null)
     }
