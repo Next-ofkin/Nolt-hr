@@ -56,10 +56,12 @@ export default function FormsLibraryPage() {
   const handleCreateForm = async () => {
     setActionFormId('new')
     setActionError(null)
+    const definition = createBlankFormSchema()
     try {
       const created = await createFormMutation.mutateAsync({
-        title: 'Untitled Form',
-        schema: createBlankFormSchema(),
+        title: definition.title,
+        description: definition.description,
+        definition,
       })
       toast.success('Form Draft Created', 'Navigating to form builder...')
       navigate(`/hr/forms/${created.formDefinitionId}/edit`)
@@ -72,7 +74,7 @@ export default function FormsLibraryPage() {
     }
   }
 
-  const handleCreateDraftFromPublished = async (formDefinitionId: string) => {
+  const handleCreateDraft = async (formDefinitionId: string) => {
     setActionFormId(formDefinitionId)
     setActionError(null)
     try {

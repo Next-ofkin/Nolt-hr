@@ -84,6 +84,26 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    variant: 'danger' | 'warning' | 'primary'
+    icon: 'trash' | 'archive' | 'warning' | 'restore'
+    isLoading: boolean
+    onConfirm: () => Promise<void>
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: 'Confirm',
+    variant: 'danger',
+    icon: 'warning',
+    isLoading: false,
+    onConfirm: async () => {},
+  })
+
   const isDraft = activeVersion?.state === 'draft'
   const isSuperseded = activeVersion?.state === 'superseded'
   const isReadOnly = !isDraft || !!detail.archivedAt
