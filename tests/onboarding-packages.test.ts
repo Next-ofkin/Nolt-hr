@@ -397,23 +397,23 @@ test('onboarding package editor: preview-form action is wired to fetch the schem
   assert.match(previewModalSource, /initialFocus/)
 })
 
-test('onboarding package: archive action is wired to the repository and RPC, with a confirmation prompt', async () => {
+test('onboarding package: delete action is wired to repository, RPC, and confirmation prompt', async () => {
   const repoSource = await readRepositoryFile('src/features/onboarding-packages/data/onboarding-packages-repository.ts')
-  assert.match(repoSource, /export async function archiveOnboardingPackage/)
-  assert.match(repoSource, /\.rpc\('archive_onboarding_package'/)
+  assert.match(repoSource, /export async function deleteOnboardingPackage/)
+  assert.match(repoSource, /\.rpc\('delete_onboarding_package'/)
 
   const pageSource = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
   assert.match(pageSource, /window\.confirm\(/)
-  assert.match(pageSource, /archiveOnboardingPackage\(/)
+  assert.match(pageSource, /deleteOnboardingPackage\(/)
 })
 
-test('migration 0020 archives forms and packages via SECURITY DEFINER RPCs, not direct table writes', async () => {
-  const migration = await readRepositoryFile('supabase/migrations/0020_archive_forms_and_packages.sql')
+test('migration 0022 provides smart delete for packages and forms via SECURITY DEFINER RPCs', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0022_delete_onboarding_package_rpc.sql')
 
-  assert.match(migration, /function public\.archive_form_definition[\s\S]*?security definer/i)
-  assert.match(migration, /function public\.archive_onboarding_package[\s\S]*?security definer/i)
-  assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
-  assert.match(migration, /grant execute on function public\.archive_onboarding_package\(uuid\) to authenticated/i)
+  assert.match(migration, /function public\.delete_onboarding_package[\s\S]*?security definer/i)
+  assert.match(migration, /function public\.delete_form_definition[\s\S]*?security definer/i)
+  assert.match(migration, /grant execute on function public\.delete_onboarding_package\(uuid\) to authenticated/i)
+  assert.match(migration, /grant execute on function public\.delete_form_definition\(uuid\) to authenticated/i)
 })
 
 test('package version history collapses old published versions behind a toggle, not a database limit', async () => {
@@ -421,7 +421,5 @@ test('package version history collapses old published versions behind a toggle, 
 
   assert.match(source, /splitVersionsForDisplay\(/)
   assert.match(source, /Show \{hiddenCount\}/)
-  // Every published version is still fetched from the server and passed in whole -
-  // this is a display-only limit, so nothing is dropped before it reaches the component.
   assert.doesNotMatch(source, /\.slice\(/)
 })

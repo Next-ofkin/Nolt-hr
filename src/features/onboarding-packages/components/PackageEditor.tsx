@@ -10,12 +10,13 @@ import {
   CheckCircle2,
   Eye,
   PlusCircle,
+  Trash2,
 } from 'lucide-react'
 import {
   saveOnboardingPackageDraft,
   publishOnboardingPackageDraft,
   createOnboardingPackageDraft,
-  archiveOnboardingPackage,
+  deleteOnboardingPackage,
   getOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import {
@@ -278,8 +279,8 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  const handleArchivePackage = async () => {
-    if (!window.confirm(`Are you sure you want to archive "${detail.title}"? Archived packages cannot be edited or published.`)) {
+  const handleDeletePackage = async () => {
+    if (!window.confirm(`Are you sure you want to delete "${detail.title}"?`)) {
       return
     }
     setIsArchiving(true)
@@ -287,7 +288,11 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
 
     try {
-      await archiveOnboardingPackage(detail.id)
+      const res = await deleteOnboardingPackage(detail.id)
+      if (res.mode === 'hard_delete') {
+        window.location.href = '/hr/onboarding-packages'
+        return
+      }
       const updatedDetail: OnboardingPackageDetail = {
         ...detail,
         archivedAt: new Date().toISOString(),
@@ -410,11 +415,11 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                 {!detail.archivedAt && (
                   <button
                     type="button"
-                    onClick={handleArchivePackage}
+                    onClick={handleDeletePackage}
                     disabled={isArchiving}
                     className="btn btn-danger"
                   >
-                    <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive Package
+                    <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete Package
                   </button>
                 )}
               </div>

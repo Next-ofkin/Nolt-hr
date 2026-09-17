@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Archive,
   Package,
   Plus,
   Search,
@@ -10,11 +9,12 @@ import {
   Clock,
   AlertCircle,
   ArrowRight,
+  Trash2,
 } from 'lucide-react'
 import {
   listOnboardingPackages,
   createOnboardingPackage,
-  archiveOnboardingPackage,
+  deleteOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import {
   filterOnboardingPackagesBySearch,
@@ -26,56 +26,71 @@ import {
 
 export const OnboardingPackagesPage: React.FC = () => {
   const navigate = useNavigate()
+
   const [packages, setPackages] = useState<OnboardingPackageSummary[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<OnboardingPackageStatusFilter>('all')
   const [isLoading, setIsLoading] = useState(true)
-  const [isCreating, setIsCreating] = useState(false)
-  const [actionPackageId, setActionPackageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const loadPackages = () => {
-    return listOnboardingPackages()
-      .then((data) => {
-        setPackages(data)
-        setIsLoading(false)
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
-        setIsLoading(false)
-      })
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<OnboardingPackageStatusFilter>('all')
+
+  const [isCreating, setIsCreating] = useState(false)
+  const [actionPackageId, setActionPackageId] = useState<string | null>(null)
+
+  const loadPackages = async () => {
+    try {
+      const data = await listOnboardingPackages()
+      setPackages(data)
+      setIsLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
-    void loadPackages()
+    let isMounted = true
+    listOnboardingPackages()
+      .then((data) => {
+        if (isMounted) {
+          setPackages(data)
+          setIsLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
+          setIsLoading(false)
+        }
+      })
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const handleCreatePackage = async () => {
     setIsCreating(true)
     setError(null)
     try {
-      const result = await createOnboardingPackage({
-        title: 'Untitled Onboarding Package',
-        description: 'New reusable onboarding package',
-      })
+      const result = await createOnboardingPackage({ title: 'Untitled Onboarding Package' })
       navigate(`/hr/onboarding-packages/${result.onboardingPackageId}/edit`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create onboarding package.')
+      setError(err instanceof Error ? err.message : 'Failed to create new onboarding package.')
       setIsCreating(false)
     }
   }
 
-  const handleArchive = async (pkg: OnboardingPackageSummary) => {
-    if (!window.confirm(`Archive "${pkg.title}"? It will be hidden from the active list, but its history is kept.`)) {
+  const handleDelete = async (pkg: OnboardingPackageSummary) => {
+    if (!window.confirm(`Are you sure you want to delete "${pkg.title}"?`)) {
       return
     }
     setActionPackageId(pkg.id)
     setError(null)
     try {
-      await archiveOnboardingPackage(pkg.id)
+      await deleteOnboardingPackage(pkg.id)
       await loadPackages()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to archive this package.')
+      setError(err instanceof Error ? err.message : 'Unable to delete this package.')
     } finally {
       setActionPackageId(null)
     }
@@ -226,11 +241,11 @@ export const OnboardingPackagesPage: React.FC = () => {
                     {!pkg.archivedAt && (
                       <button
                         type="button"
-                        onClick={() => void handleArchive(pkg)}
+                        onClick={() => void handleDelete(pkg)}
                         disabled={actionPackageId === pkg.id}
                         className="btn btn-danger"
                       >
-                        <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
+                        <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete
                       </button>
                     )}
                   </div>

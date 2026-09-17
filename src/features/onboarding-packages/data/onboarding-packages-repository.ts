@@ -234,3 +234,14 @@ export async function archiveOnboardingPackage(onboardingPackageId: string): Pro
   if (error) throw error
   unwrapRpc(data)
 }
+
+export async function deleteOnboardingPackage(onboardingPackageId: string): Promise<{ mode: 'hard_delete' | 'archived' }> {
+  const { data, error } = await supabase.rpc('delete_onboarding_package', {
+    p_onboarding_package_id: onboardingPackageId,
+  })
+  if (error) throw error
+  const result = unwrapRpc(data)
+  return {
+    mode: (result.mode as 'hard_delete' | 'archived') ?? 'archived',
+  }
+}
