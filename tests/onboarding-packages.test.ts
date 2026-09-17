@@ -416,6 +416,59 @@ test('migration 0022 provides smart delete for packages and forms via SECURITY D
   assert.match(migration, /grant execute on function public\.delete_form_definition\(uuid\) to authenticated/i)
 })
 
+test('onboarding packages repository exports unpublish, archive, and unarchive RPC wrappers', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/data/onboarding-packages-repository.ts')
+
+  for (const fn of ['unpublishOnboardingPackageDraft', 'archiveOnboardingPackage', 'unarchiveOnboardingPackage']) {
+    assert.match(source, new RegExp(`export async function ${fn}\\b`))
+  }
+
+  assert.match(source, /\.rpc\('unpublish_onboarding_package_draft'/)
+  assert.match(source, /\.rpc\('archive_onboarding_package'/)
+  assert.match(source, /\.rpc\('unarchive_onboarding_package'/)
+})
+
+test('onboarding package editor: unpublish, archive, and restore actions are wired to the repository with confirmation prompts', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/components/PackageEditor.tsx')
+
+  assert.match(source, /handleUnpublishPackage/)
+  assert.match(source, /unpublishOnboardingPackageDraft\(/)
+  assert.match(source, /handleArchivePackage/)
+  assert.match(source, /archiveOnboardingPackage\(/)
+  assert.match(source, /handleRestorePackage/)
+  assert.match(source, /unarchiveOnboardingPackage\(/)
+  assert.match(source, /window\.confirm\(`Unpublish Version/)
+  assert.match(source, /window\.confirm\(`Archive/)
+  assert.match(source, /window\.confirm\(`Permanently delete archived package/)
+})
+
+test('onboarding packages list page: archive and restore actions are wired to the repository', async () => {
+  const source = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
+
+  assert.match(source, /handleArchive/)
+  assert.match(source, /archiveOnboardingPackage\(/)
+  assert.match(source, /handleRestore/)
+  assert.match(source, /unarchiveOnboardingPackage\(/)
+  assert.match(source, /Restore/)
+})
+
+test('migration 0023 adds unpublish, unarchive, and always-hard-delete RPCs, all SECURITY DEFINER and admin/HR gated', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0023_package_unpublish_unarchive_delete.sql')
+
+  for (const fn of ['unpublish_onboarding_package_draft', 'unarchive_onboarding_package', 'delete_onboarding_package']) {
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?security definer`, 'i'))
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?set search_path = ''`, 'i'))
+    assert.match(migration, new RegExp(`revoke all on function public\\.${fn}\\(uuid\\) from public, anon`, 'i'))
+    assert.match(migration, new RegExp(`grant execute on function public\\.${fn}\\(uuid\\) to authenticated`, 'i'))
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?role not in \\('admin', 'hr'\\)`, 'i'))
+  }
+
+  // delete_onboarding_package now always hard-deletes (archive is a separate, explicit step).
+  assert.match(migration, /delete from public\.onboarding_package_items/)
+  assert.match(migration, /delete from public\.onboarding_package_versions/)
+  assert.match(migration, /delete from public\.onboarding_packages/)
+})
+
 test('package version history collapses old published versions behind a toggle, not a database limit', async () => {
   const source = await readRepositoryFile('src/features/onboarding-packages/components/PackageVersionHistory.tsx')
 
