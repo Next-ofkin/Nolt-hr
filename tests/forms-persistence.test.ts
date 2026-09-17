@@ -360,7 +360,7 @@ test('forms library: archive action is wired to the repository and RPC, with a c
   assert.match(queriesSource, /export function useArchiveFormDefinition/)
 
   const pageSource = await readRepositoryFile('src/features/forms/pages/FormsLibraryPage.tsx')
-  assert.match(pageSource, /window\.confirm\(/)
+  assert.match(pageSource, /ConfirmDialog/)
   assert.match(pageSource, /useArchiveFormDefinition\(/)
 })
 

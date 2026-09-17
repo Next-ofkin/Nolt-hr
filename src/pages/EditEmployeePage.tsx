@@ -1,6 +1,9 @@
+import React, { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EmployeeForm } from '../components/EmployeeForm'
 import { useEmployee, useUpdateEmployee } from '../lib/employee-queries'
+import { ConfirmDialog } from '../components/ui/confirm-dialog'
+import { toast } from '../components/ui/use-toast'
 import {
   archiveEmployeePayload,
   formatEmployeeName,
@@ -15,17 +18,29 @@ export default function EditEmployeePage() {
   const updateEmployee = useUpdateEmployee(id)
   const employee = employeeQuery.data
 
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+
   const onSubmit = async (values: EmployeeFormValues) => {
-    await updateEmployee.mutateAsync(updateEmployeePayload(values))
-    navigate(`/hr/employees/${id}`)
+    try {
+      await updateEmployee.mutateAsync(updateEmployeePayload(values))
+      toast.success('Employee Updated', 'Employee details saved successfully.')
+      navigate(`/hr/employees/${id}`)
+    } catch (err) {
+      toast.error('Update Failed', err instanceof Error ? err.message : 'Unable to update employee.')
+    }
   }
 
-  const onArchive = async () => {
-    if (!employee || !window.confirm(`Archive ${formatEmployeeName(employee)}? The record will be retained.`)) {
-      return
+  const handleConfirmArchive = async () => {
+    if (!employee) return
+    try {
+      await updateEmployee.mutateAsync(archiveEmployeePayload())
+      toast.success('Employee Archived', `${formatEmployeeName(employee)} has been archived.`)
+      navigate(`/hr/employees/${id}`)
+    } catch (err) {
+      toast.error('Archive Failed', err instanceof Error ? err.message : 'Unable to archive employee.')
+    } finally {
+      setIsConfirmOpen(false)
     }
-    await updateEmployee.mutateAsync(archiveEmployeePayload())
-    navigate(`/hr/employees/${id}`)
   }
 
   if (employeeQuery.isLoading) {
@@ -68,12 +83,24 @@ export default function EditEmployeePage() {
             className="btn btn-danger"
             type="button"
             disabled={updateEmployee.isPending}
-            onClick={() => void onArchive()}
+            onClick={() => setIsConfirmOpen(true)}
           >
             Archive Employee
           </button>
         </section>
       )}
+
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title={`Archive ${formatEmployeeName(employee)}?`}
+        description="The employee record will be removed from active lists and retained in archived status."
+        confirmText="Archive Employee"
+        variant="warning"
+        icon="archive"
+        isLoading={updateEmployee.isPending}
+        onConfirm={() => void handleConfirmArchive()}
+        onClose={() => setIsConfirmOpen(false)}
+      />
     </div>
   )
 }

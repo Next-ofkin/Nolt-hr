@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Archive, FileText, Plus, Search, Clock, Eye, History, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createBlankFormSchema } from '../../shadcn-form-poc/domain/form-schema'
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog'
+import { toast } from '../../../components/ui/use-toast'
 import {
   useArchiveFormDefinition,
   useCreateDraftFromPublished,
@@ -29,49 +31,89 @@ export default function FormsLibraryPage() {
   const [actionFormId, setActionFormId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const forms = formsQuery.data ?? []
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    variant: 'danger' | 'warning' | 'primary'
+    icon: 'trash' | 'archive' | 'warning' | 'restore'
+    isLoading: boolean
+    onConfirm: () => Promise<void>
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: 'Confirm',
+    variant: 'danger',
+    icon: 'warning',
+    isLoading: false,
+    onConfirm: async () => {},
+  })
+
+  const forms = formsQuery.data || []
 
   const handleCreateForm = async () => {
+    setActionFormId('new')
     setActionError(null)
-    const definition = createBlankFormSchema()
     try {
       const created = await createFormMutation.mutateAsync({
-        title: definition.title,
-        description: definition.description,
-        definition,
+        title: 'Untitled Form',
+        schema: createBlankFormSchema(),
       })
+      toast.success('Form Draft Created', 'Navigating to form builder...')
       navigate(`/hr/forms/${created.formDefinitionId}/edit`)
     } catch (error) {
-      setActionError(formPersistenceMessage(error, 'Unable to create a new form.'))
+      const msg = formPersistenceMessage(error, 'Unable to create a new form.')
+      setActionError(msg)
+      toast.error('Creation Failed', msg)
+    } finally {
+      setActionFormId(null)
     }
   }
 
-  const handleCreateDraft = async (formDefinitionId: string) => {
+  const handleCreateDraftFromPublished = async (formDefinitionId: string) => {
     setActionFormId(formDefinitionId)
     setActionError(null)
     try {
       await createDraftMutation.mutateAsync(formDefinitionId)
+      toast.success('Draft Created', 'Navigating to form editor...')
       navigate(`/hr/forms/${formDefinitionId}/edit`)
     } catch (error) {
-      setActionError(formPersistenceMessage(error, 'Unable to create a new draft.'))
+      const msg = formPersistenceMessage(error, 'Unable to create a new draft.')
+      setActionError(msg)
+      toast.error('Draft Creation Failed', msg)
     } finally {
       setActionFormId(null)
     }
   }
 
-  const handleArchive = async (form: FormDefinitionSummary) => {
-    if (!window.confirm(`Archive "${form.title}"? It will be hidden from the active list, but its history is kept.`)) {
-      return
-    }
-    setActionFormId(form.id)
-    setActionError(null)
-    try {
-      await archiveMutation.mutateAsync(form.id)
-    } catch (error) {
-      setActionError(formPersistenceMessage(error, 'Unable to archive this form.'))
-    } finally {
-      setActionFormId(null)
-    }
+  const handleArchive = (form: FormDefinitionSummary) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Archive "${form.title}"?`,
+      description: 'It will be hidden from the active forms list, but its published version history will be retained.',
+      confirmText: 'Archive Form',
+      variant: 'warning',
+      icon: 'archive',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setActionFormId(form.id)
+        setActionError(null)
+        try {
+          await archiveMutation.mutateAsync(form.id)
+          toast.success('Form Archived', `"${form.title}" archived successfully.`)
+        } catch (error) {
+          const msg = formPersistenceMessage(error, 'Unable to archive this form.')
+          setActionError(msg)
+          toast.error('Archive Failed', msg)
+        } finally {
+          setActionFormId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
   }
 
   const searchFiltered = filterFormsBySearch(forms, search)
@@ -189,6 +231,18 @@ export default function FormsLibraryPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        icon={confirmDialog.icon}
+        isLoading={confirmDialog.isLoading}
+        onConfirm={() => void confirmDialog.onConfirm()}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

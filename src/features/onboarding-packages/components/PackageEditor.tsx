@@ -24,6 +24,7 @@ import {
   getOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import { toast } from '../../../components/ui/use-toast'
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog'
 import {
   onboardingPackagePersistenceMessage,
   type OnboardingPackageDetail,
@@ -278,65 +279,86 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  const handleUnpublishPackage = async () => {
-    if (!window.confirm(`Unpublish Version ${activeVersion?.versionNumber}? This will revert it to Draft state so you can edit and re-publish.`)) {
-      return
-    }
-    setIsPublishing(true)
-    setErrorMessage(null)
-    setSuccessMessage(null)
+  const handleUnpublishPackage = () => {
+    const versionNum = activeVersion?.versionNumber
+    setConfirmDialog({
+      isOpen: true,
+      title: `Unpublish Version ${versionNum}?`,
+      description: 'This will revert the published package version back to Draft state so you can edit and re-publish.',
+      confirmText: 'Unpublish to Draft',
+      variant: 'warning',
+      icon: 'warning',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setIsPublishing(true)
+        setErrorMessage(null)
+        setSuccessMessage(null)
 
-    try {
-      await unpublishOnboardingPackageDraft(detail.id)
-      const freshDetail = await getOnboardingPackage(detail.id)
-      if (freshDetail) {
-        setDetail(freshDetail)
-        onPackageUpdated(freshDetail)
-        const draftVersion = freshDetail.versions.find((v: PackageVersion) => v.state === 'draft')
-        if (draftVersion) {
-          setActiveVersion(draftVersion)
-          setTitle(freshDetail.title)
-          setDescription(freshDetail.description || '')
-          setItems(draftVersion.items)
-          setExpectedRevision(draftVersion.revision)
+        try {
+          await unpublishOnboardingPackageDraft(detail.id)
+          const freshDetail = await getOnboardingPackage(detail.id)
+          if (freshDetail) {
+            setDetail(freshDetail)
+            onPackageUpdated(freshDetail)
+            const draftVersion = freshDetail.versions.find((v: PackageVersion) => v.state === 'draft')
+            if (draftVersion) {
+              setActiveVersion(draftVersion)
+              setTitle(freshDetail.title)
+              setDescription(freshDetail.description || '')
+              setItems(draftVersion.items)
+              setExpectedRevision(draftVersion.revision)
+            }
+          }
+          setSuccessMessage('Package version unpublished back to draft.')
+          toast.success('Package Unpublished', `Version ${versionNum} reverted to draft.`)
+        } catch (err) {
+          const msg = onboardingPackagePersistenceMessage(err)
+          setErrorMessage(msg)
+          toast.error('Unpublish Failed', msg)
+        } finally {
+          setIsPublishing(false)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
         }
-      }
-      setSuccessMessage('Package version unpublished back to draft.')
-      toast.success('Package Unpublished', `Version ${activeVersion?.versionNumber} reverted to draft.`)
-    } catch (err) {
-      const msg = onboardingPackagePersistenceMessage(err)
-      setErrorMessage(msg)
-      toast.error('Unpublish Failed', msg)
-    } finally {
-      setIsPublishing(false)
-    }
+      },
+    })
   }
 
-  const handleArchivePackage = async () => {
-    if (!window.confirm(`Archive "${detail.title}"? It will be moved to the Archived list.`)) {
-      return
-    }
-    setIsArchiving(true)
-    setErrorMessage(null)
-    setSuccessMessage(null)
+  const handleArchivePackage = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Archive "${detail.title}"?`,
+      description: 'It will be moved to the Archived list and hidden from active package selection.',
+      confirmText: 'Archive Package',
+      variant: 'warning',
+      icon: 'archive',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setIsArchiving(true)
+        setErrorMessage(null)
+        setSuccessMessage(null)
 
-    try {
-      await archiveOnboardingPackage(detail.id)
-      const updatedDetail: OnboardingPackageDetail = {
-        ...detail,
-        archivedAt: new Date().toISOString(),
-      }
-      setDetail(updatedDetail)
-      onPackageUpdated(updatedDetail)
-      setSuccessMessage('Onboarding package archived successfully.')
-      toast.success('Package Archived', `"${detail.title}" moved to Archived.`)
-    } catch (err) {
-      const msg = onboardingPackagePersistenceMessage(err)
-      setErrorMessage(msg)
-      toast.error('Archive Failed', msg)
-    } finally {
-      setIsArchiving(false)
-    }
+        try {
+          await archiveOnboardingPackage(detail.id)
+          const updatedDetail: OnboardingPackageDetail = {
+            ...detail,
+            archivedAt: new Date().toISOString(),
+          }
+          setDetail(updatedDetail)
+          onPackageUpdated(updatedDetail)
+          setSuccessMessage('Onboarding package archived successfully.')
+          toast.success('Package Archived', `"${detail.title}" moved to Archived.`)
+        } catch (err) {
+          const msg = onboardingPackagePersistenceMessage(err)
+          setErrorMessage(msg)
+          toast.error('Archive Failed', msg)
+        } finally {
+          setIsArchiving(false)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
   }
 
   const handleRestorePackage = async () => {
@@ -362,24 +384,34 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     }
   }
 
-  const handleDeletePackage = async () => {
-    if (!window.confirm(`Permanently delete archived package "${detail.title}"? This action CANNOT be undone.`)) {
-      return
-    }
-    setIsArchiving(true)
-    setErrorMessage(null)
-    setSuccessMessage(null)
+  const handleDeletePackage = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Permanently delete "${detail.title}"?`,
+      description: 'This action cannot be undone. The archived package and all associated metadata will be permanently deleted.',
+      confirmText: 'Delete Permanently',
+      variant: 'danger',
+      icon: 'trash',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setIsArchiving(true)
+        setErrorMessage(null)
+        setSuccessMessage(null)
 
-    try {
-      await deleteOnboardingPackage(detail.id)
-      toast.success('Package Deleted', `"${detail.title}" permanently deleted.`)
-      window.location.href = '/hr/onboarding-packages'
-    } catch (err) {
-      const msg = onboardingPackagePersistenceMessage(err)
-      setErrorMessage(msg)
-      toast.error('Delete Failed', msg)
-      setIsArchiving(false)
-    }
+        try {
+          await deleteOnboardingPackage(detail.id)
+          toast.success('Package Deleted', `"${detail.title}" permanently deleted.`)
+          window.location.href = '/hr/onboarding-packages'
+        } catch (err) {
+          const msg = onboardingPackagePersistenceMessage(err)
+          setErrorMessage(msg)
+          toast.error('Delete Failed', msg)
+          setIsArchiving(false)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
   }
 
   const handleSelectVersion = (version: PackageVersion) => {
@@ -690,6 +722,18 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
         versionNumber={activeVersion?.versionNumber || 1}
         items={items}
         initialFocus={previewFocus}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        icon={confirmDialog.icon}
+        isLoading={confirmDialog.isLoading}
+        onConfirm={() => void confirmDialog.onConfirm()}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   )

@@ -21,6 +21,7 @@ import {
   deleteOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import { toast } from '../../../components/ui/use-toast'
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog'
 import {
   filterOnboardingPackagesBySearch,
   filterOnboardingPackagesByStatus,
@@ -42,13 +43,37 @@ export const OnboardingPackagesPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false)
   const [actionPackageId, setActionPackageId] = useState<string | null>(null)
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    variant: 'danger' | 'warning' | 'primary'
+    icon: 'trash' | 'archive' | 'warning' | 'restore'
+    isLoading: boolean
+    onConfirm: () => Promise<void>
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: 'Confirm',
+    variant: 'danger',
+    icon: 'warning',
+    isLoading: false,
+    onConfirm: async () => {},
+  })
+
   const loadPackages = async () => {
+    setIsLoading(true)
+    setError(null)
     try {
       const data = await listOnboardingPackages()
       setPackages(data)
-      setIsLoading(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
+      const msg = err instanceof Error ? err.message : 'Failed to load onboarding packages.'
+      setError(msg)
+      toast.error('Loading Error', msg)
+    } finally {
       setIsLoading(false)
     }
   }
@@ -64,7 +89,9 @@ export const OnboardingPackagesPage: React.FC = () => {
       })
       .catch((err) => {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load onboarding packages.')
+          const msg = err instanceof Error ? err.message : 'Failed to load onboarding packages.'
+          setError(msg)
+          toast.error('Loading Error', msg)
           setIsLoading(false)
         }
       })
@@ -88,23 +115,33 @@ export const OnboardingPackagesPage: React.FC = () => {
     }
   }
 
-  const handleArchive = async (pkg: OnboardingPackageSummary) => {
-    if (!window.confirm(`Archive "${pkg.title}"? It will be moved to the Archived list.`)) {
-      return
-    }
-    setActionPackageId(pkg.id)
-    setError(null)
-    try {
-      await archiveOnboardingPackage(pkg.id)
-      toast.success('Package Archived', `"${pkg.title}" moved to Archived.`)
-      await loadPackages()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to archive this package.'
-      setError(msg)
-      toast.error('Archive Failed', msg)
-    } finally {
-      setActionPackageId(null)
-    }
+  const handleArchive = (pkg: OnboardingPackageSummary) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Archive "${pkg.title}"?`,
+      description: 'It will be moved to the Archived list and hidden from active package selection.',
+      confirmText: 'Archive Package',
+      variant: 'warning',
+      icon: 'archive',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setActionPackageId(pkg.id)
+        setError(null)
+        try {
+          await archiveOnboardingPackage(pkg.id)
+          toast.success('Package Archived', `"${pkg.title}" moved to Archived.`)
+          await loadPackages()
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unable to archive this package.'
+          setError(msg)
+          toast.error('Archive Failed', msg)
+        } finally {
+          setActionPackageId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
   }
 
   const handleRestore = async (pkg: OnboardingPackageSummary) => {
@@ -123,23 +160,33 @@ export const OnboardingPackagesPage: React.FC = () => {
     }
   }
 
-  const handleDelete = async (pkg: OnboardingPackageSummary) => {
-    if (!window.confirm(`Permanently delete archived package "${pkg.title}"? This cannot be undone.`)) {
-      return
-    }
-    setActionPackageId(pkg.id)
-    setError(null)
-    try {
-      await deleteOnboardingPackage(pkg.id)
-      toast.success('Package Deleted', `"${pkg.title}" permanently deleted.`)
-      await loadPackages()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to delete this package.'
-      setError(msg)
-      toast.error('Delete Failed', msg)
-    } finally {
-      setActionPackageId(null)
-    }
+  const handleDelete = (pkg: OnboardingPackageSummary) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Permanently delete "${pkg.title}"?`,
+      description: 'This action cannot be undone. The archived package and all associated metadata will be permanently deleted.',
+      confirmText: 'Delete Permanently',
+      variant: 'danger',
+      icon: 'trash',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setActionPackageId(pkg.id)
+        setError(null)
+        try {
+          await deleteOnboardingPackage(pkg.id)
+          toast.success('Package Deleted', `"${pkg.title}" permanently deleted.`)
+          await loadPackages()
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unable to delete this package.'
+          setError(msg)
+          toast.error('Delete Failed', msg)
+        } finally {
+          setActionPackageId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
   }
 
   const searchFiltered = filterOnboardingPackagesBySearch(packages, search)
@@ -308,6 +355,18 @@ export const OnboardingPackagesPage: React.FC = () => {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        icon={confirmDialog.icon}
+        isLoading={confirmDialog.isLoading}
+        onConfirm={() => void confirmDialog.onConfirm()}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

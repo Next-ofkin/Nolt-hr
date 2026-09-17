@@ -403,7 +403,7 @@ test('onboarding package: delete action is wired to repository, RPC, and confirm
   assert.match(repoSource, /\.rpc\('delete_onboarding_package'/)
 
   const pageSource = await readRepositoryFile('src/features/onboarding-packages/pages/OnboardingPackagesPage.tsx')
-  assert.match(pageSource, /window\.confirm\(/)
+  assert.match(pageSource, /ConfirmDialog/)
   assert.match(pageSource, /deleteOnboardingPackage\(/)
 })
 
@@ -436,10 +436,10 @@ test('onboarding package editor: unpublish, archive, and restore actions are wir
   assert.match(source, /handleArchivePackage/)
   assert.match(source, /archiveOnboardingPackage\(/)
   assert.match(source, /handleRestorePackage/)
-  assert.match(source, /unarchiveOnboardingPackage\(/)
-  assert.match(source, /window\.confirm\(`Unpublish Version/)
-  assert.match(source, /window\.confirm\(`Archive/)
-  assert.match(source, /window\.confirm\(`Permanently delete archived package/)
+  assert.match(source, /ConfirmDialog/)
+  assert.match(source, /Unpublish Version \${versionNum}\?/)
+  assert.match(source, /Archive "\${detail\.title}"\?/)
+  assert.match(source, /Permanently delete "\${detail\.title}"\?/)
 })
 
 test('onboarding packages list page: archive and restore actions are wired to the repository', async () => {
