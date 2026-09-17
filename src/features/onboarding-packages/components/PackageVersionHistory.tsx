@@ -1,8 +1,32 @@
 import React, { useState } from 'react'
-import { History, CheckCircle2, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import { History, CheckCircle2, Clock, Archive, ChevronDown, ChevronUp } from 'lucide-react'
 import type { PackageVersion } from '../data/onboarding-packages-types'
 import { formatPackageDate } from '../data/onboarding-packages-types'
 import { splitVersionsForDisplay } from '../../../lib/utils'
+
+function versionIcon(state: PackageVersion['state']) {
+  if (state === 'draft') return <Clock style={{ width: 14, height: 14 }} />
+  if (state === 'superseded') return <Archive style={{ width: 14, height: 14 }} />
+  return <CheckCircle2 style={{ width: 14, height: 14 }} />
+}
+
+function versionIconClass(state: PackageVersion['state']) {
+  if (state === 'draft') return 'version-history-icon-draft'
+  if (state === 'superseded') return 'version-history-icon-superseded'
+  return 'version-history-icon-published'
+}
+
+function versionBadgeClass(state: PackageVersion['state']) {
+  if (state === 'draft') return 'badge-warning'
+  if (state === 'superseded') return 'badge-neutral'
+  return 'badge-success'
+}
+
+function versionBadgeLabel(state: PackageVersion['state'], revision: number) {
+  if (state === 'draft') return `Draft (Rev ${revision})`
+  if (state === 'superseded') return 'Superseded'
+  return 'Published'
+}
 
 interface PackageVersionHistoryProps {
   versions: PackageVersion[]
@@ -37,15 +61,15 @@ export const PackageVersionHistory: React.FC<PackageVersionHistoryProps> = ({
               onClick={() => onSelectVersion(ver)}
               className={`version-history-item${isSelected ? ' active' : ''}`}
             >
-              <span className={`version-history-icon ${isDraft ? 'version-history-icon-draft' : 'version-history-icon-published'}`}>
-                {isDraft ? <Clock style={{ width: 14, height: 14 }} /> : <CheckCircle2 style={{ width: 14, height: 14 }} />}
+              <span className={`version-history-icon ${versionIconClass(ver.state)}`}>
+                {versionIcon(ver.state)}
               </span>
 
               <span className="version-history-info">
                 <span className="version-history-info-top">
                   <span className="version-history-label">Version {ver.versionNumber}</span>
-                  <span className={`badge ${isDraft ? 'badge-warning' : 'badge-success'}`}>
-                    {isDraft ? `Draft (Rev ${ver.revision})` : 'Published'}
+                  <span className={`badge ${versionBadgeClass(ver.state)}`}>
+                    {versionBadgeLabel(ver.state, ver.revision)}
                   </span>
                 </span>
                 <span className="version-history-meta">

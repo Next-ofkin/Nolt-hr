@@ -19,9 +19,15 @@ import {
 
 type EditorView = 'builder' | 'preview' | 'history'
 
+function versionStateLabel(state: FormVersion['state']) {
+  if (state === 'published') return 'Published'
+  if (state === 'superseded') return 'Superseded'
+  return 'Draft'
+}
+
 function versionLabel(version: FormVersion | undefined) {
   if (!version) return 'No version available'
-  return `Version ${version.versionNumber} ${version.state === 'published' ? 'Published' : 'Draft'}`
+  return `Version ${version.versionNumber} ${versionStateLabel(version.state)}`
 }
 
 function FormWorkspace({
@@ -230,7 +236,11 @@ function FormWorkspace({
             <div className="card" style={{ paddingBlock: '0.85rem' }}>
               <strong>{versionLabel(selectedVersion)}</strong>
               <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                {selectedVersion.state === 'published' ? 'Immutable published version' : 'Current draft preview'}
+                {selectedVersion.state === 'published'
+                  ? 'Immutable published version'
+                  : selectedVersion.state === 'superseded'
+                    ? 'Superseded version (no longer current)'
+                    : 'Current draft preview'}
               </span>
             </div>
             {previewSchema.steps.length > 0 ? (

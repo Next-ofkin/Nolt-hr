@@ -3086,6 +3086,11 @@ textarea:focus {
   color: #166534;
 }
 
+.version-history-icon-superseded {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .version-history-info {
   min-width: 0;
   flex: 1;

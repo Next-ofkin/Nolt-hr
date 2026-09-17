@@ -105,11 +105,13 @@ export interface PackageDocumentItem {
 
 export type PackageItem = PackageFormItem | PackageDocumentItem
 
+export type PackageVersionState = 'draft' | 'published' | 'superseded'
+
 export interface PackageVersion {
   id: string
   onboardingPackageId: string
   versionNumber: number
-  state: 'draft' | 'published'
+  state: PackageVersionState
   revision: number
   createdBy: string
   updatedBy: string
@@ -209,7 +211,7 @@ export function mapPackageVersion(
     id: row.id,
     onboardingPackageId: row.onboarding_package_id,
     versionNumber: row.version_number,
-    state: row.state as 'draft' | 'published',
+    state: row.state as PackageVersionState,
     revision: row.revision,
     createdBy: row.created_by,
     updatedBy: row.updated_by,

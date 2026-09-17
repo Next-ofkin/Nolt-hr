@@ -1,7 +1,7 @@
 import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import type { FormDefinitionVersionRow } from '../../../lib/database.types'
 
-export type FormVersionState = 'draft' | 'published'
+export type FormVersionState = 'draft' | 'published' | 'superseded'
 
 export interface FormVersion {
   id: string

@@ -7,12 +7,13 @@ function displayDateTime(value: string | null) {
 }
 
 function VersionState({ state }: Pick<FormVersion, 'state'>) {
-  const statusClass = state === 'published' ? 'employee-status-completed' : 'employee-status-draft'
-  return (
-    <span className={`employee-status ${statusClass}`}>
-      {state === 'published' ? 'Published' : 'Draft'}
-    </span>
-  )
+  if (state === 'published') {
+    return <span className="employee-status employee-status-completed">Published</span>
+  }
+  if (state === 'superseded') {
+    return <span className="employee-status employee-status-archived">Superseded</span>
+  }
+  return <span className="employee-status employee-status-draft">Draft</span>
 }
 
 export function FormVersionHistory({
@@ -28,7 +29,7 @@ export function FormVersionHistory({
   return (
     <section className="card" aria-labelledby="version-history-heading">
       <h2 id="version-history-heading">Version history</h2>
-      <p className="subtitle">Published versions are immutable. Rollback and deletion are not available.</p>
+      <p className="subtitle">Publishing a new version supersedes the old one. Published and superseded versions are immutable and cannot be deleted.</p>
 
       <div className="table-scroll">
         <table className="table">

@@ -4,6 +4,7 @@ import {
   Sparkles,
   Lock,
   Clock,
+  Archive,
   Plus,
   AlertCircle,
   CheckCircle2,
@@ -14,6 +15,8 @@ import {
   saveOnboardingPackageDraft,
   publishOnboardingPackageDraft,
   createOnboardingPackageDraft,
+  archiveOnboardingPackage,
+  getOnboardingPackage,
 } from '../data/onboarding-packages-repository'
 import {
   onboardingPackagePersistenceMessage,
@@ -89,12 +92,19 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isCreatingDraft, setIsCreatingDraft] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const isDraft = activeVersion?.state === 'draft'
+  const isSuperseded = activeVersion?.state === 'superseded'
   const isReadOnly = !isDraft || !!detail.archivedAt
+  // Computed from the full version list, not the version currently being
+  // viewed - so browsing an old superseded version from Version History
+  // never shows the wrong "next version" number or a stale draft prompt.
+  const hasOpenDraft = detail.versions.some((v) => v.state === 'draft')
+  const latestPublishedVersion = detail.versions.find((v) => v.state === 'published')
 
   const handleAddFormVersion = (option: { formVersionId: string; title: string; versionNumber: number }) => {
     setErrorMessage(null)
@@ -243,18 +253,52 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
     setSuccessMessage(null)
 
     try {
-      const draftRes = await createOnboardingPackageDraft(detail.id)
-      setSuccessMessage(
-        draftRes.createdNew
-          ? `Branched Version ${draftRes.versionNumber} Draft.`
-          : `Switched to open Version ${draftRes.versionNumber} Draft.`,
-      )
+      const result = await createOnboardingPackageDraft(detail.id)
+      const freshDetail = await getOnboardingPackage(detail.id)
 
-      window.location.reload()
+      if (freshDetail) {
+        setDetail(freshDetail)
+        onPackageUpdated(freshDetail)
+
+        const newDraftVersion = freshDetail.versions.find((v: PackageVersion) => v.id === result.versionId)
+        if (newDraftVersion) {
+          setActiveVersion(newDraftVersion)
+          setTitle(freshDetail.title)
+          setDescription(freshDetail.description || '')
+          setItems(newDraftVersion.items)
+          setExpectedRevision(newDraftVersion.revision)
+        }
+      }
+
+      setSuccessMessage(result.createdNew ? 'New draft version created.' : 'Switched to existing draft.')
     } catch (err) {
       setErrorMessage(onboardingPackagePersistenceMessage(err))
     } finally {
       setIsCreatingDraft(false)
+    }
+  }
+
+  const handleArchivePackage = async () => {
+    if (!window.confirm(`Are you sure you want to archive "${detail.title}"? Archived packages cannot be edited or published.`)) {
+      return
+    }
+    setIsArchiving(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    try {
+      await archiveOnboardingPackage(detail.id)
+      const updatedDetail: OnboardingPackageDetail = {
+        ...detail,
+        archivedAt: new Date().toISOString(),
+      }
+      setDetail(updatedDetail)
+      onPackageUpdated(updatedDetail)
+      setSuccessMessage('Onboarding package archived successfully.')
+    } catch (err) {
+      setErrorMessage(onboardingPackagePersistenceMessage(err))
+    } finally {
+      setIsArchiving(false)
     }
   }
 
@@ -334,24 +378,46 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
           <div className="card">
             <div className="package-editor-card-top">
               <div className="package-editor-badges">
-                <span className={`badge ${isDraft ? 'badge-warning' : 'badge-success'}`}>
-                  {isDraft ? <Clock style={{ width: 12, height: 12 }} /> : <Lock style={{ width: 12, height: 12 }} />}
-                  {isDraft ? `Version ${activeVersion?.versionNumber} Draft (Rev ${expectedRevision})` : `Version ${activeVersion?.versionNumber} Published`}
+                <span className={`badge ${isDraft ? 'badge-warning' : isSuperseded ? 'badge-neutral' : 'badge-success'}`}>
+                  {isDraft ? (
+                    <Clock style={{ width: 12, height: 12 }} />
+                  ) : isSuperseded ? (
+                    <Archive style={{ width: 12, height: 12 }} />
+                  ) : (
+                    <Lock style={{ width: 12, height: 12 }} />
+                  )}
+                  {isDraft
+                    ? `Version ${activeVersion?.versionNumber} Draft (Rev ${expectedRevision})`
+                    : isSuperseded
+                      ? `Version ${activeVersion?.versionNumber} Superseded`
+                      : `Version ${activeVersion?.versionNumber} Published`}
                 </span>
                 {detail.archivedAt && <span className="badge badge-neutral">Archived</span>}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewFocus(null)
-                  setPreviewSessionId((id) => id + 1)
-                  setIsPreviewOpen(true)
-                }}
-                className="btn btn-ghost"
-              >
-                <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview Package
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewFocus(null)
+                    setPreviewSessionId((id) => id + 1)
+                    setIsPreviewOpen(true)
+                  }}
+                  className="btn btn-ghost"
+                >
+                  <Eye style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Preview Package
+                </button>
+                {!detail.archivedAt && (
+                  <button
+                    type="button"
+                    onClick={handleArchivePackage}
+                    disabled={isArchiving}
+                    className="btn btn-danger"
+                  >
+                    <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive Package
+                  </button>
+                )}
+              </div>
             </div>
 
             <div style={{ marginTop: '1.1rem' }}>
@@ -428,7 +494,9 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
             <span className="package-editor-footer-note">
               {isDraft
                 ? `Unsaved changes will be stored as revision ${expectedRevision + 1}.`
-                : 'Published versions cannot be modified. Branch a new draft to edit.'}
+                : isSuperseded
+                  ? 'This version has been superseded and cannot be modified.'
+                  : 'Published versions cannot be modified. Branch a new draft to edit.'}
             </span>
 
             <div className="package-editor-footer-actions">
@@ -449,6 +517,10 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                     Publish Version {activeVersion?.versionNumber}
                   </button>
                 </>
+              ) : hasOpenDraft ? (
+                <span className="package-editor-footer-note">
+                  This package has an open draft — select it from Version History to continue editing.
+                </span>
               ) : (
                 <button type="button" onClick={handleCreateNewDraft} disabled={isCreatingDraft} className="btn btn-primary">
                   {isCreatingDraft ? (
@@ -456,7 +528,7 @@ export const PackageEditor: React.FC<PackageEditorProps> = ({
                   ) : (
                     <>
                       <PlusCircle style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
-                      Create Version {(activeVersion?.versionNumber || 1) + 1} Draft
+                      Create Version {(latestPublishedVersion?.versionNumber ?? activeVersion?.versionNumber ?? 1) + 1} Draft
                     </>
                   )}
                 </button>
