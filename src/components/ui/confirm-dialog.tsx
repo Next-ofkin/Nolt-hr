@@ -156,8 +156,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             disabled={isLoading}
             style={{
               background: 'transparent',
-              border: '1px solid var(--border, rgba(255, 255, 255, 0.15))',
-              color: 'var(--text-main, #f8fafc)',
+              border: '1px solid var(--border, #e2e5ea)',
+              color: 'var(--text-strong, #0f172a)',
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               fontWeight: 500,
