@@ -157,3 +157,19 @@ export async function archiveFormDefinition(formDefinitionId: string): Promise<v
   if (error) throw error
   unwrapRpc(data)
 }
+
+export async function unarchiveFormDefinition(formDefinitionId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('unarchive_form_definition', {
+    p_form_definition_id: formDefinitionId,
+  })
+  if (error) throw error
+  unwrapRpc(data)
+}
+
+export async function deleteFormDefinition(formDefinitionId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('delete_form_definition', {
+    p_form_definition_id: formDefinitionId,
+  })
+  if (error) throw error
+  unwrapRpc(data)
+}

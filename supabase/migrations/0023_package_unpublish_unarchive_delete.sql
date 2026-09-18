@@ -10,6 +10,61 @@
 begin;
 
 -- ------------------------------------------------------------
+-- 0. Allow one more version-immutability transition: published -> draft.
+--
+-- 0021 taught this trigger to allow published -> superseded (automatic, when
+-- a newer draft is published). "Unpublish to Draft" below needs a second,
+-- equally explicit transition: published -> draft, clearing published_at /
+-- published_by. Every other field must stay identical, and every other
+-- published/superseded mutation remains rejected exactly as before.
+-- ------------------------------------------------------------
+create or replace function public.enforce_onboarding_package_version_immutability()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if TG_OP = 'UPDATE' then
+    if OLD.state = 'published' and NEW.state = 'superseded'
+       and NEW.version_number = OLD.version_number
+       and NEW.onboarding_package_id = OLD.onboarding_package_id
+       and NEW.created_by = OLD.created_by
+       and NEW.created_at = OLD.created_at
+       and NEW.published_at = OLD.published_at
+       and NEW.published_by = OLD.published_by
+       and NEW.revision = OLD.revision
+    then
+      return NEW;
+    end if;
+    if OLD.state = 'published' and NEW.state = 'draft'
+       and NEW.version_number = OLD.version_number
+       and NEW.onboarding_package_id = OLD.onboarding_package_id
+       and NEW.created_by = OLD.created_by
+       and NEW.created_at = OLD.created_at
+       and NEW.published_at is null
+       and NEW.published_by is null
+       and NEW.revision = OLD.revision
+    then
+      return NEW;
+    end if;
+    if OLD.state in ('published', 'superseded') then
+      raise exception 'Published onboarding package versions are immutable and cannot be modified.'
+        using errcode = 'P0001';
+    end if;
+    return NEW;
+  elsif TG_OP = 'DELETE' then
+    if OLD.state in ('published', 'superseded') then
+      raise exception 'Published onboarding package versions cannot be deleted.'
+        using errcode = 'P0001';
+    end if;
+    return OLD;
+  end if;
+  return NEW;
+end;
+$$;
+
+-- ------------------------------------------------------------
 -- 1. RPC: unpublish_onboarding_package_draft
 -- ------------------------------------------------------------
 create or replace function public.unpublish_onboarding_package_draft(
@@ -155,20 +210,24 @@ begin
     return jsonb_build_object('ok', false, 'error_code', 'PACKAGE_NOT_FOUND', 'error', 'Onboarding package not found.');
   end if;
 
-  -- Revert version state to 'draft' so immutability triggers don't block deletion
-  update public.onboarding_package_versions
-  set state = 'draft'
-  where onboarding_package_id = p_onboarding_package_id;
+  -- Published/superseded versions (and their items) are protected by immutability
+  -- triggers. A hard delete is an explicit admin override of that protection, so
+  -- the triggers are disabled for the duration of this statement only. Because DDL
+  -- is transactional in Postgres, if anything below raises, the ALTER TABLE calls
+  -- roll back with everything else and the triggers are never left disabled.
+  alter table public.onboarding_package_items disable trigger check_onboarding_package_item_immutability;
+  alter table public.onboarding_package_versions disable trigger check_onboarding_package_version_immutability;
 
-  -- Delete child items
   delete from public.onboarding_package_items
   where package_version_id in (
     select id from public.onboarding_package_versions where onboarding_package_id = p_onboarding_package_id
   );
 
-  -- Delete versions
   delete from public.onboarding_package_versions
   where onboarding_package_id = p_onboarding_package_id;
+
+  alter table public.onboarding_package_versions enable trigger check_onboarding_package_version_immutability;
+  alter table public.onboarding_package_items enable trigger check_onboarding_package_item_immutability;
 
   -- Delete package header
   delete from public.onboarding_packages

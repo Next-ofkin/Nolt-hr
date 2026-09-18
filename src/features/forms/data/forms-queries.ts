@@ -3,10 +3,12 @@ import {
   archiveFormDefinition,
   createDraftFromPublished,
   createFormDefinition,
+  deleteFormDefinition,
   getFormDefinition,
   listFormDefinitions,
   publishFormDraft,
   saveFormDraft,
+  unarchiveFormDefinition,
 } from './forms-repository'
 
 export const formQueryKeys = {
@@ -80,6 +82,27 @@ export function useArchiveFormDefinition() {
     onSuccess: (_, formDefinitionId) => {
       void queryClient.invalidateQueries({ queryKey: formQueryKeys.library })
       void queryClient.invalidateQueries({ queryKey: formQueryKeys.detail(formDefinitionId) })
+    },
+  })
+}
+
+export function useUnarchiveFormDefinition() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: unarchiveFormDefinition,
+    onSuccess: (_, formDefinitionId) => {
+      void queryClient.invalidateQueries({ queryKey: formQueryKeys.library })
+      void queryClient.invalidateQueries({ queryKey: formQueryKeys.detail(formDefinitionId) })
+    },
+  })
+}
+
+export function useDeleteFormDefinition() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteFormDefinition,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: formQueryKeys.library })
     },
   })
 }

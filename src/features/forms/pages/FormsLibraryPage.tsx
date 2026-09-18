@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, FileText, Plus, Search, Clock, Eye, History, ArrowRight } from 'lucide-react'
+import { Archive, FileText, Plus, Search, Clock, Eye, History, ArrowRight, RefreshCw, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createBlankFormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog'
@@ -8,7 +8,9 @@ import {
   useArchiveFormDefinition,
   useCreateDraftFromPublished,
   useCreateFormDefinition,
+  useDeleteFormDefinition,
   useFormDefinitions,
+  useUnarchiveFormDefinition,
 } from '../data/forms-queries'
 import {
   filterFormsBySearch,
@@ -25,6 +27,8 @@ export default function FormsLibraryPage() {
   const createFormMutation = useCreateFormDefinition()
   const createDraftMutation = useCreateDraftFromPublished()
   const archiveMutation = useArchiveFormDefinition()
+  const unarchiveMutation = useUnarchiveFormDefinition()
+  const deleteMutation = useDeleteFormDefinition()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FormStatusFilter>('all')
@@ -110,6 +114,62 @@ export default function FormsLibraryPage() {
           const msg = formPersistenceMessage(error, 'Unable to archive this form.')
           setActionError(msg)
           toast.error('Archive Failed', msg)
+        } finally {
+          setActionFormId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
+  }
+
+  const handleRestore = (form: FormDefinitionSummary) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Restore "${form.title}"?`,
+      description: 'It will move back to the active forms list.',
+      confirmText: 'Restore Form',
+      variant: 'primary',
+      icon: 'restore',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setActionFormId(form.id)
+        setActionError(null)
+        try {
+          await unarchiveMutation.mutateAsync(form.id)
+          toast.success('Form Restored', `"${form.title}" is active again.`)
+        } catch (error) {
+          const msg = formPersistenceMessage(error, 'Unable to restore this form.')
+          setActionError(msg)
+          toast.error('Restore Failed', msg)
+        } finally {
+          setActionFormId(null)
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
+        }
+      },
+    })
+  }
+
+  const handleDelete = (form: FormDefinitionSummary) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Permanently delete "${form.title}"?`,
+      description: 'This action cannot be undone. The archived form and all of its versions will be permanently deleted.',
+      confirmText: 'Delete Permanently',
+      variant: 'danger',
+      icon: 'trash',
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }))
+        setActionFormId(form.id)
+        setActionError(null)
+        try {
+          await deleteMutation.mutateAsync(form.id)
+          toast.success('Form Deleted', `"${form.title}" was permanently deleted.`)
+        } catch (error) {
+          const msg = formPersistenceMessage(error, 'Unable to delete this form.')
+          setActionError(msg)
+          toast.error('Delete Failed', msg)
         } finally {
           setActionFormId(null)
           setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }))
@@ -229,6 +289,8 @@ export default function FormsLibraryPage() {
               onPreview={() => navigate(`/hr/forms/${form.id}/edit?view=preview`)}
               onVersionHistory={() => navigate(`/hr/forms/${form.id}/edit?view=history`)}
               onArchive={() => void handleArchive(form)}
+              onRestore={() => void handleRestore(form)}
+              onDelete={() => void handleDelete(form)}
             />
           ))}
         </div>
@@ -257,6 +319,8 @@ function FormCard({
   onPreview,
   onVersionHistory,
   onArchive,
+  onRestore,
+  onDelete,
 }: {
   form: FormDefinitionSummary
   isBusy: boolean
@@ -265,6 +329,8 @@ function FormCard({
   onPreview: () => void
   onVersionHistory: () => void
   onArchive: () => void
+  onRestore: () => void
+  onDelete: () => void
 }) {
   const hasDraft = form.draftVersionNumber !== null
   const hasPublished = form.latestPublishedVersionNumber !== null
@@ -316,10 +382,19 @@ function FormCard({
               <History style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Version History
             </button>
           )}
-          {!form.archivedAt && (
+          {!form.archivedAt ? (
             <button type="button" onClick={onArchive} disabled={isBusy} className="btn btn-danger">
               <Archive style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Archive
             </button>
+          ) : (
+            <>
+              <button type="button" onClick={onRestore} disabled={isBusy} className="btn btn-ghost">
+                <RefreshCw style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Restore
+              </button>
+              <button type="button" onClick={onDelete} disabled={isBusy} className="btn btn-danger">
+                <Trash2 style={{ width: 15, height: 15, marginRight: '0.4rem' }} /> Delete Permanently
+              </button>
+            </>
           )}
         </div>
       </div>

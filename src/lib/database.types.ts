@@ -495,6 +495,10 @@ export type Database = {
         Args: { p_form_definition_id: string }
         Returns: Json
       }
+      unarchive_form_definition: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
       delete_onboarding_package: {
         Args: { p_onboarding_package_id: string }
         Returns: Json

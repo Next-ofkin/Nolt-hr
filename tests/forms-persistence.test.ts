@@ -371,6 +371,67 @@ test('migration 0020 archives forms via a SECURITY DEFINER RPC, not a direct tab
   assert.match(migration, /grant execute on function public\.archive_form_definition\(uuid\) to authenticated/i)
 })
 
+test('forms library: restore and delete-permanently actions are wired to the repository and RPC, with confirmation prompts', async () => {
+  const repoSource = await readRepositoryFile('src/features/forms/data/forms-repository.ts')
+  assert.match(repoSource, /export async function unarchiveFormDefinition/)
+  assert.match(repoSource, /\.rpc\('unarchive_form_definition'/)
+  assert.match(repoSource, /export async function deleteFormDefinition/)
+  assert.match(repoSource, /\.rpc\('delete_form_definition'/)
+
+  const queriesSource = await readRepositoryFile('src/features/forms/data/forms-queries.ts')
+  assert.match(queriesSource, /export function useUnarchiveFormDefinition/)
+  assert.match(queriesSource, /export function useDeleteFormDefinition/)
+
+  const pageSource = await readRepositoryFile('src/features/forms/pages/FormsLibraryPage.tsx')
+  assert.match(pageSource, /useUnarchiveFormDefinition\(/)
+  assert.match(pageSource, /useDeleteFormDefinition\(/)
+  assert.match(pageSource, /Permanently delete/)
+  assert.match(pageSource, /Restore/)
+})
+
+test('migration 0024 adds unarchive_form_definition and an always-hard-delete delete_form_definition, both SECURITY DEFINER and admin/HR gated', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0024_form_unarchive_and_hard_delete.sql')
+
+  for (const fn of ['unarchive_form_definition', 'delete_form_definition']) {
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?security definer`, 'i'))
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?set search_path = ''`, 'i'))
+    assert.match(migration, new RegExp(`revoke all on function public\\.${fn}\\(uuid\\) from public, anon`, 'i'))
+    assert.match(migration, new RegExp(`grant execute on function public\\.${fn}\\(uuid\\) to authenticated`, 'i'))
+    assert.match(migration, new RegExp(`function public\\.${fn}[\\s\\S]*?role not in \\('admin', 'hr'\\)`, 'i'))
+  }
+
+  // Deleting a form that has published/superseded versions must not be blocked by the
+  // version-immutability trigger - the trigger is disabled for the delete and re-enabled
+  // right after, rather than trying to rewrite protected rows' state (which the trigger
+  // would itself reject).
+  assert.match(migration, /alter table public\.form_definition_versions disable trigger check_form_definition_version_immutability/i)
+  assert.match(migration, /alter table public\.form_definition_versions enable trigger check_form_definition_version_immutability/i)
+})
+
+test('migration 0023 disables (not rewrites) the immutability triggers before hard-deleting a published package', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0023_package_unpublish_unarchive_delete.sql')
+
+  // The delete path itself must not try to rewrite a published/superseded row's state
+  // (that would just hit the trigger it's supposed to be bypassing) - it disables the
+  // triggers around the raw deletes instead. Unpublish's own "set state = 'draft'" is a
+  // separate, legitimate transition that the trigger below is taught to allow outright.
+  const deleteFn = migration.slice(migration.indexOf('function public.delete_onboarding_package'))
+  assert.doesNotMatch(deleteFn, /set state = 'draft'/i)
+  assert.match(migration, /alter table public\.onboarding_package_versions disable trigger check_onboarding_package_version_immutability/i)
+  assert.match(migration, /alter table public\.onboarding_package_items disable trigger check_onboarding_package_item_immutability/i)
+  assert.match(migration, /alter table public\.onboarding_package_versions enable trigger check_onboarding_package_version_immutability/i)
+  assert.match(migration, /alter table public\.onboarding_package_items enable trigger check_onboarding_package_item_immutability/i)
+})
+
+test('migration 0023 teaches the immutability trigger to allow published -> draft (Unpublish to Draft)', async () => {
+  const migration = await readRepositoryFile('supabase/migrations/0023_package_unpublish_unarchive_delete.sql')
+
+  assert.match(migration, /create or replace function public\.enforce_onboarding_package_version_immutability/i)
+  assert.match(migration, /OLD\.state = 'published' and NEW\.state = 'draft'/)
+  assert.match(migration, /NEW\.published_at is null/)
+  assert.match(migration, /NEW\.published_by is null/)
+})
+
 test('form version history collapses old published versions behind a toggle, not a database limit', async () => {
   const source = await readRepositoryFile('src/features/forms/components/FormVersionHistory.tsx')
 
