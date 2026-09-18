@@ -3,12 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import { EmployeeStatusBadge } from '../components/EmployeeStatusBadge'
 import { useEmployee, useLatestEmployeeInvitation, useSendEmployeeInvitation } from '../lib/employee-queries'
 import { formatEmployeeName, getEmployeeAccountState } from '../lib/employee-domain'
+import { EmployeeOnboardingSection } from '../features/employee-onboarding/components/EmployeeOnboardingSection'
 
 const detailSections = ['Overview', 'Onboarding', 'Forms', 'Documents', 'Activity'] as const
 type DetailSection = (typeof detailSections)[number]
 
-const emptyStates: Record<Exclude<DetailSection, 'Overview'>, string> = {
-  Onboarding: 'No onboarding package has been assigned yet.',
+const emptyStates: Record<Exclude<DetailSection, 'Overview' | 'Onboarding'>, string> = {
   Forms: 'No employee forms have been assigned yet.',
   Documents: 'No employee documents are available yet.',
   Activity: 'No lifecycle activity has been recorded yet.',
@@ -207,6 +207,12 @@ export default function EmployeeDetailPage() {
             </dl>
           </section>
         </div>
+      ) : section === 'Onboarding' ? (
+        <EmployeeOnboardingSection
+          employeeId={employee.id}
+          employeeName={formatEmployeeName(employee)}
+          isEmployeeArchived={employee.status === 'ARCHIVED'}
+        />
       ) : (
         <section className="card empty-state section-empty-state">
           <h2>{section}</h2>

@@ -119,6 +119,160 @@ export type Database = {
           },
         ]
       }
+      employee_onboarding_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          employee_id: string
+          id: string
+          package_description_snapshot: string | null
+          package_title_snapshot: string
+          package_version_id: string
+          package_version_number: number
+          started_at: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id: string
+          id?: string
+          package_description_snapshot?: string | null
+          package_title_snapshot: string
+          package_version_id: string
+          package_version_number: number
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id?: string
+          id?: string
+          package_description_snapshot?: string | null
+          package_title_snapshot?: string
+          package_version_id?: string
+          package_version_number?: number
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_onboarding_assignments_package_version_id_fkey"
+            columns: ["package_version_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_package_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_items: {
+        Row: {
+          assignment_id: string
+          completed_at: string | null
+          created_at: string
+          document_description: string | null
+          document_title: string | null
+          form_title_snapshot: string | null
+          form_version_id: string | null
+          form_version_number: number | null
+          id: string
+          item_type: string
+          required: boolean
+          sort_order: number
+          source_package_item_id: string
+          started_at: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string | null
+          created_at?: string
+          document_description?: string | null
+          document_title?: string | null
+          form_title_snapshot?: string | null
+          form_version_id?: string | null
+          form_version_number?: number | null
+          id?: string
+          item_type: string
+          required: boolean
+          sort_order: number
+          source_package_item_id: string
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string | null
+          created_at?: string
+          document_description?: string | null
+          document_title?: string | null
+          form_title_snapshot?: string | null
+          form_version_id?: string | null
+          form_version_number?: number | null
+          id?: string
+          item_type?: string
+          required?: boolean
+          sort_order?: number
+          source_package_item_id?: string
+          started_at?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_items_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "employee_onboarding_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_onboarding_items_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "form_definition_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_onboarding_items_source_package_item_id_fkey"
+            columns: ["source_package_item_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_package_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           account_activated_at: string | null
@@ -491,24 +645,16 @@ export type Database = {
         Args: { p_onboarding_package_id: string }
         Returns: Json
       }
-      delete_form_definition: {
-        Args: { p_form_definition_id: string }
+      assign_onboarding_package: {
+        Args: {
+          p_due_date: string
+          p_employee_id: string
+          p_package_version_id: string
+        }
         Returns: Json
       }
-      unarchive_form_definition: {
-        Args: { p_form_definition_id: string }
-        Returns: Json
-      }
-      delete_onboarding_package: {
-        Args: { p_onboarding_package_id: string }
-        Returns: Json
-      }
-      unarchive_onboarding_package: {
-        Args: { p_onboarding_package_id: string }
-        Returns: Json
-      }
-      unpublish_onboarding_package_draft: {
-        Args: { p_onboarding_package_id: string }
+      cancel_onboarding_assignment: {
+        Args: { p_assignment_id: string; p_reason: string }
         Returns: Json
       }
       create_form_definition: {
@@ -530,6 +676,14 @@ export type Database = {
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      delete_form_definition: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
+      delete_onboarding_package: {
+        Args: { p_onboarding_package_id: string }
+        Returns: Json
       }
       finalize_employee_invitation: {
         Args: {
@@ -566,6 +720,19 @@ export type Database = {
           p_onboarding_package_id: string
           p_title: string
         }
+        Returns: Json
+      }
+      start_my_onboarding: { Args: { p_assignment_id: string }; Returns: Json }
+      unarchive_form_definition: {
+        Args: { p_form_definition_id: string }
+        Returns: Json
+      }
+      unarchive_onboarding_package: {
+        Args: { p_onboarding_package_id: string }
+        Returns: Json
+      }
+      unpublish_onboarding_package_draft: {
+        Args: { p_onboarding_package_id: string }
         Returns: Json
       }
       update_user_role: {
@@ -769,3 +936,6 @@ export type OnboardingPackageInsert = Database["public"]["Tables"]["onboarding_p
 export type OnboardingPackageUpdate = Database["public"]["Tables"]["onboarding_packages"]["Update"]
 export type OnboardingPackageVersionRow = Database["public"]["Tables"]["onboarding_package_versions"]["Row"]
 export type OnboardingPackageItemRow = Database["public"]["Tables"]["onboarding_package_items"]["Row"]
+
+export type EmployeeOnboardingAssignmentRow = Database["public"]["Tables"]["employee_onboarding_assignments"]["Row"]
+export type EmployeeOnboardingItemRow = Database["public"]["Tables"]["employee_onboarding_items"]["Row"]

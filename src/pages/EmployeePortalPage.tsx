@@ -1,6 +1,11 @@
 import { useEffect } from 'react'
+import { Package } from 'lucide-react'
 import { EmployeeStatusBadge } from '../components/EmployeeStatusBadge'
 import { useActivateEmployeeAccount, useMyEmployee } from '../lib/employee-queries'
+import { useMyOnboardingAssignments, useStartMyOnboarding } from '../features/employee-onboarding/data/employee-onboarding-queries'
+import { MyOnboardingCard } from '../features/employee-onboarding/components/MyOnboardingCard'
+import { toast } from '../components/ui/use-toast'
+import { employeeOnboardingPersistenceMessage } from '../features/employee-onboarding/data/employee-onboarding-types'
 
 function displayDate(value: string | null | undefined) {
   if (!value) return '—'
@@ -10,6 +15,8 @@ function displayDate(value: string | null | undefined) {
 export default function EmployeePortalPage() {
   const { data: employee, isLoading, error } = useMyEmployee()
   const { mutate: activateAccount } = useActivateEmployeeAccount()
+  const { data: assignments, isLoading: isLoadingOnboarding } = useMyOnboardingAssignments(Boolean(employee))
+  const { mutate: startOnboarding, isPending: isStarting, variables: startingAssignmentId } = useStartMyOnboarding()
 
   useEffect(() => {
     // Invoke activation RPC on mount for authenticated user
@@ -71,16 +78,39 @@ export default function EmployeePortalPage() {
             </dd>
           </dl>
         </section>
+      </div>
 
-        <section className="card">
-          <h2>Your Onboarding</h2>
-          <p className="mt-2" style={{ fontWeight: 600, color: 'var(--text-strong)' }}>
-            No onboarding package has been assigned yet.
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.35rem' }}>
-            Your onboarding requirements will appear here once Human Resources assigns a package.
-          </p>
-        </section>
+      <div className="onboarding-section">
+        <h2 style={{ marginBottom: '1rem' }}>My Onboarding</h2>
+
+        {isLoadingOnboarding ? (
+          <section className="card">
+            <p className="subtitle">Loading your onboarding…</p>
+          </section>
+        ) : !assignments || assignments.length === 0 ? (
+          <section className="card empty-state section-empty-state">
+            <Package style={{ width: 30, height: 30, color: 'var(--text-muted)', margin: '0 auto 0.6rem' }} />
+            <h3 style={{ margin: 0, fontWeight: 600 }}>No onboarding tasks have been assigned yet.</h3>
+            <p style={{ margin: '0.35rem 0 0', color: 'var(--text-muted)' }}>
+              Your onboarding requirements will appear here once Human Resources assigns a package.
+            </p>
+          </section>
+        ) : (
+          <div className="onboarding-assignment-list">
+            {assignments.map((assignment) => (
+              <MyOnboardingCard
+                key={assignment.id}
+                assignment={assignment}
+                isStarting={isStarting && startingAssignmentId === assignment.id}
+                onStart={(target) =>
+                  startOnboarding(target.id, {
+                    onError: (err) => toast.error('Unable to Start Onboarding', employeeOnboardingPersistenceMessage(err)),
+                  })
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
