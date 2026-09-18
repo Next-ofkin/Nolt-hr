@@ -4,11 +4,12 @@ import { EmployeeStatusBadge } from '../components/EmployeeStatusBadge'
 import { useEmployee, useLatestEmployeeInvitation, useSendEmployeeInvitation } from '../lib/employee-queries'
 import { formatEmployeeName, getEmployeeAccountState } from '../lib/employee-domain'
 import { EmployeeOnboardingSection } from '../features/employee-onboarding/components/EmployeeOnboardingSection'
+import { EmployeePortalAccessCard } from '../features/employees/components/EmployeePortalAccessCard'
 
-const detailSections = ['Overview', 'Onboarding', 'Forms', 'Documents', 'Activity'] as const
+const detailSections = ['Overview', 'Onboarding', 'Access', 'Forms', 'Documents', 'Activity'] as const
 type DetailSection = (typeof detailSections)[number]
 
-const emptyStates: Record<Exclude<DetailSection, 'Overview' | 'Onboarding'>, string> = {
+const emptyStates: Record<Exclude<DetailSection, 'Overview' | 'Onboarding' | 'Access'>, string> = {
   Forms: 'No employee forms have been assigned yet.',
   Documents: 'No employee documents are available yet.',
   Activity: 'No lifecycle activity has been recorded yet.',
@@ -131,77 +132,8 @@ export default function EmployeeDetailPage() {
           </section>
 
           <section className="card">
-            <h2>ACCOUNT ACCESS</h2>
-
-            {accountState === 'NOT_INVITED' && (
-              <div className="account-access-state">
-                <span className="badge badge-neutral">Not yet invited</span>
-                <p className="state-description">This employee does not have access to the Employee Portal.</p>
-                {canInvite && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm mt-3"
-                    onClick={() => {
-                      setInviteError(null)
-                      setIsModalOpen(true)
-                    }}
-                  >
-                    Send Invitation
-                  </button>
-                )}
-              </div>
-            )}
-
-            {accountState === 'PENDING' && (
-              <div className="account-access-state">
-                <span className="badge badge-warning">Invitation sent</span>
-                <p className="state-description">Waiting for the employee to accept their invitation.</p>
-                <dl className="detail-list mt-3">
-                  <dt>Sent Date</dt>
-                  <dd>{displayDate(latestInvitation?.sent_at || employee.invited_at)}</dd>
-                </dl>
-              </div>
-            )}
-
-            {accountState === 'ACTIVE' && (
-              <div className="account-access-state">
-                <span className="badge badge-success">Account active</span>
-                <p className="state-description">The employee has activated their NOLT HR account.</p>
-                <dl className="detail-list mt-3">
-                  <dt>Activated Date</dt>
-                  <dd>{displayDate(employee.account_activated_at || latestInvitation?.accepted_at)}</dd>
-                </dl>
-              </div>
-            )}
-
-            {accountState === 'FAILED' && (
-              <div className="account-access-state">
-                <span className="badge badge-danger">Invitation failed</span>
-                <p className="state-description">
-                  The invitation could not be completed.
-                  {latestInvitation?.failure_code && ` (${latestInvitation.failure_code})`}
-                </p>
-                {canInvite && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm mt-3"
-                    onClick={() => {
-                      setInviteError(null)
-                      setIsModalOpen(true)
-                    }}
-                  >
-                    Retry Invitation
-                  </button>
-                )}
-              </div>
-            )}
-
-            <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border)' }} />
-
             <h2>Record information</h2>
             <dl className="detail-list">
-              <dt>Auth Account</dt>
-              <dd>{employee.auth_user_id ? 'Linked' : 'Unlinked'}</dd>
               <dt>Created Date</dt><dd>{displayDate(employee.created_at)}</dd>
               <dt>Updated Date</dt><dd>{displayDate(employee.updated_at)}</dd>
             </dl>
@@ -213,6 +145,8 @@ export default function EmployeeDetailPage() {
           employeeName={formatEmployeeName(employee)}
           isEmployeeArchived={employee.status === 'ARCHIVED'}
         />
+      ) : section === 'Access' ? (
+        <EmployeePortalAccessCard employee={employee} latestInvitation={latestInvitation} />
       ) : (
         <section className="card empty-state section-empty-state">
           <h2>{section}</h2>

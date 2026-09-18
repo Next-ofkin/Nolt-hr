@@ -702,6 +702,10 @@ export type Database = {
         Args: { p_onboarding_package_id: string }
         Returns: Json
       }
+      revoke_employee_invitation: {
+        Args: { p_employee_id: string; p_invitation_id: string }
+        Returns: undefined
+      }
       save_form_definition_draft: {
         Args: {
           p_definition: Json

@@ -70,16 +70,120 @@ Deno.serve(async (req) => {
 
   // -------------------------------------------------------------
   // MODE A: Employee Record Authoritative Invitation ({ employee_id })
+  //
+  // `action` selects the operation on that employee's portal access:
+  //   'invite' (default, backward compatible with the original body
+  //             shape of just { employee_id }) — send a first invitation.
+  //   'revoke' — invalidate a still-pending (unaccepted) invitation.
+  //   'resend' — revoke the pending invitation (if any) and send a
+  //             fresh one, so there is never more than one live invite.
   // -------------------------------------------------------------
   if (body.employee_id && typeof body.employee_id === 'string') {
     const employeeId = body.employee_id.trim()
+    const action = typeof body.action === 'string' ? body.action : 'invite'
 
-    // 1. Load employee from database
-    const { data: employee, error: empError } = await supabase
-      .from('employees')
-      .select('id, first_name, middle_name, last_name, work_email, status, auth_user_id')
-      .eq('id', employeeId)
-      .single()
+    if (!['invite', 'resend', 'revoke'].includes(action)) {
+      return json({ error: 'Invalid action' }, 400)
+    }
+
+    type EmployeeRow = {
+      id: string
+      first_name: string
+      middle_name: string | null
+      last_name: string
+      work_email: string
+      status: string
+      auth_user_id: string | null
+      account_activated_at: string | null
+    }
+
+    async function loadEmployee(): Promise<{ employee: EmployeeRow | null; error: unknown }> {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, first_name, middle_name, last_name, work_email, status, auth_user_id, account_activated_at')
+        .eq('id', employeeId)
+        .single()
+      return { employee: data as EmployeeRow | null, error }
+    }
+
+    // Invalidates a still-pending invite by deleting its unconfirmed auth
+    // user (this also NULLs employees.auth_user_id via the FK's `on
+    // delete set null`), then records the revocation and resets the
+    // employee to DRAFT via the RPC so it can be invited again.
+    async function revokePendingInvitation(
+      employee: EmployeeRow,
+    ): Promise<{ error: string; status: number } | null> {
+      if (!employee.auth_user_id) {
+        return { error: 'This employee has no pending invitation to revoke.', status: 400 }
+      }
+      if (employee.account_activated_at) {
+        return { error: 'This invitation has already been accepted and cannot be revoked.', status: 400 }
+      }
+
+      const { data: pendingInvitation } = await supabase
+        .from('employee_invitations')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('status', 'PENDING')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!pendingInvitation) {
+        return { error: 'No pending invitation was found for this employee.', status: 400 }
+      }
+
+      const deleteRes = await supabase.auth.admin.deleteUser(employee.auth_user_id)
+      if (deleteRes.error) {
+        return { error: 'Failed to revoke the invitation. Please try again.', status: 500 }
+      }
+
+      const { error: rpcError } = await supabase.rpc('revoke_employee_invitation', {
+        p_employee_id: employee.id,
+        p_invitation_id: pendingInvitation.id,
+      })
+      if (rpcError) {
+        return { error: 'The invitation link was revoked, but its record could not be updated.', status: 500 }
+      }
+
+      return null
+    }
+
+    if (action === 'revoke') {
+      const { employee, error: empError } = await loadEmployee()
+      if (empError || !employee) {
+        return json({ error: 'Employee record not found' }, 440)
+      }
+      const revokeError = await revokePendingInvitation(employee)
+      if (revokeError) {
+        return json({ error: revokeError.error }, revokeError.status)
+      }
+      return json({ ok: true, revoked: true })
+    }
+
+    if (action === 'resend') {
+      const { employee, error: empError } = await loadEmployee()
+      if (empError || !employee) {
+        return json({ error: 'Employee record not found' }, 440)
+      }
+      if (employee.account_activated_at) {
+        return json({ error: 'This invitation has already been accepted and cannot be resent.' }, 400)
+      }
+      // Only revoke if there is actually something pending (a previously
+      // FAILED attempt left no auth user behind, so there is nothing to
+      // revoke — just fall through and send fresh, exactly like a retry).
+      if (employee.auth_user_id) {
+        const revokeError = await revokePendingInvitation(employee)
+        if (revokeError) {
+          return json({ error: revokeError.error }, revokeError.status)
+        }
+      }
+      // Falls through to the shared "send a fresh invitation" logic below,
+      // now that the employee is back in DRAFT (or already was).
+    }
+
+    // action === 'invite', or 'resend' having just cleared the way above.
+    const { employee, error: empError } = await loadEmployee()
 
     if (empError || !employee) {
       return json({ error: 'Employee record not found' }, 440)

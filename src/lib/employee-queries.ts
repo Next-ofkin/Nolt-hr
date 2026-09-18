@@ -161,26 +161,44 @@ export function useUpdateEmployee(employeeId: string | undefined) {
   })
 }
 
-export function useSendEmployeeInvitation() {
+type InvitationAction = 'invite' | 'resend' | 'revoke'
+
+async function invokeInvitationAction(employeeId: string, action: InvitationAction) {
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>('invite-user', {
+    body: { employee_id: employeeId, action },
+  })
+  if (error) {
+    throw new Error(error.message || 'Failed to update this employee’s portal access.')
+  }
+  if (data?.error) {
+    throw new Error(data.error)
+  }
+  return data
+}
+
+function useInvitationActionMutation(action: InvitationAction) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (employeeId: string) => {
-      const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>('invite-user', {
-        body: { employee_id: employeeId },
-      })
-      if (error) {
-        throw new Error(error.message || 'Failed to send employee invitation.')
-      }
-      if (data?.error) {
-        throw new Error(data.error)
-      }
-      return data
-    },
+    mutationFn: (employeeId: string) => invokeInvitationAction(employeeId, action),
     onSuccess: (_, employeeId) => {
       void queryClient.invalidateQueries({ queryKey: ['employees'] })
       void queryClient.invalidateQueries({ queryKey: ['employee_invitations', 'latest', employeeId] })
     },
   })
+}
+
+export function useSendEmployeeInvitation() {
+  return useInvitationActionMutation('invite')
+}
+
+/** Revokes any pending invitation for the employee, then sends a fresh one. */
+export function useResendEmployeeInvitation() {
+  return useInvitationActionMutation('resend')
+}
+
+/** Invalidates a still-pending (unaccepted) invitation. Never touches an already-accepted account. */
+export function useRevokeEmployeeInvitation() {
+  return useInvitationActionMutation('revoke')
 }
 
 export function useActivateEmployeeAccount() {
