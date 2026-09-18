@@ -53,27 +53,41 @@ export function EmployeeOnboardingStep({
       <h2 className="dynamic-form-step-title">Onboarding</h2>
       <p className="dynamic-form-step-desc">Assign this employee's onboarding checklist now, or leave it for later.</p>
 
-      <div className="wizard-choice-group">
-        <label className={`wizard-choice-card${onboardingMode === 'assign_now' ? ' selected' : ''}`}>
-          <input
-            type="radio"
-            name="onboarding_mode"
-            checked={onboardingMode === 'assign_now'}
-            onChange={() => onChangeOnboardingMode('assign_now')}
-          />
+      <div className="wizard-choice-group" role="radiogroup" aria-label="Onboarding assignment timing">
+        <label
+          role="radio"
+          tabIndex={0}
+          aria-checked={onboardingMode === 'assign_now'}
+          onClick={() => onChangeOnboardingMode('assign_now')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onChangeOnboardingMode('assign_now')
+            }
+          }}
+          className={`wizard-choice-card${onboardingMode === 'assign_now' ? ' selected' : ''}`}
+        >
+          <span className="wizard-choice-dot" />
           <div>
             <span className="wizard-choice-title">Assign an onboarding package now</span>
             <p className="wizard-choice-desc">Choose a published package to start this employee's onboarding checklist.</p>
           </div>
         </label>
 
-        <label className={`wizard-choice-card${onboardingMode === 'assign_later' ? ' selected' : ''}`}>
-          <input
-            type="radio"
-            name="onboarding_mode"
-            checked={onboardingMode === 'assign_later'}
-            onChange={() => onChangeOnboardingMode('assign_later')}
-          />
+        <label
+          role="radio"
+          tabIndex={0}
+          aria-checked={onboardingMode === 'assign_later'}
+          onClick={() => onChangeOnboardingMode('assign_later')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onChangeOnboardingMode('assign_later')
+            }
+          }}
+          className={`wizard-choice-card${onboardingMode === 'assign_later' ? ' selected' : ''}`}
+        >
+          <span className="wizard-choice-dot" />
           <div>
             <span className="wizard-choice-title">Assign onboarding later</span>
             <p className="wizard-choice-desc">You can assign a package from the employee's Onboarding tab at any time.</p>

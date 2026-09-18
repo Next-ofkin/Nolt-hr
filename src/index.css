@@ -3314,14 +3314,37 @@ textarea:focus {
   border-color: #cbd5e1;
 }
 
+.wizard-choice-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  border-color: var(--primary);
+}
+
 .wizard-choice-card.selected {
   border-color: var(--primary);
   background: var(--bg);
 }
 
-.wizard-choice-card input[type='radio'] {
-  margin-top: 0.2rem;
+/*
+ * No native <input type="radio"> here on purpose: the app-wide
+ * `input, select, textarea { width: 100%; ... }` rule (see top of this
+ * file) hijacks radio/checkbox inputs into full-width bordered boxes,
+ * which is exactly the bug .radio-card/.checkbox-row already work around
+ * elsewhere. This dot mirrors .radio-card-dot's approach instead.
+ */
+.wizard-choice-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #94a3b8;
+  background: var(--surface);
   flex-shrink: 0;
+  margin-top: 0.1rem;
+  transition: all 0.15s ease;
+}
+
+.wizard-choice-card.selected .wizard-choice-dot {
+  border: 5px solid var(--primary);
 }
 
 .wizard-choice-title {

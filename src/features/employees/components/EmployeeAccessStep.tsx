@@ -13,27 +13,41 @@ export function EmployeeAccessStep({ accessMode, email, onChangeAccessMode, onCh
       <h2 className="dynamic-form-step-title">Portal Access</h2>
       <p className="dynamic-form-step-desc">How would you like to give this employee access?</p>
 
-      <div className="wizard-choice-group">
-        <label className={`wizard-choice-card${accessMode === 'invite_now' ? ' selected' : ''}`}>
-          <input
-            type="radio"
-            name="access_mode"
-            checked={accessMode === 'invite_now'}
-            onChange={() => onChangeAccessMode('invite_now')}
-          />
+      <div className="wizard-choice-group" role="radiogroup" aria-label="Portal access timing">
+        <label
+          role="radio"
+          tabIndex={0}
+          aria-checked={accessMode === 'invite_now'}
+          onClick={() => onChangeAccessMode('invite_now')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onChangeAccessMode('invite_now')
+            }
+          }}
+          className={`wizard-choice-card${accessMode === 'invite_now' ? ' selected' : ''}`}
+        >
+          <span className="wizard-choice-dot" />
           <div>
             <span className="wizard-choice-title">Send invitation now</span>
             <p className="wizard-choice-desc">The employee receives a secure link to activate their portal access right away.</p>
           </div>
         </label>
 
-        <label className={`wizard-choice-card${accessMode === 'invite_later' ? ' selected' : ''}`}>
-          <input
-            type="radio"
-            name="access_mode"
-            checked={accessMode === 'invite_later'}
-            onChange={() => onChangeAccessMode('invite_later')}
-          />
+        <label
+          role="radio"
+          tabIndex={0}
+          aria-checked={accessMode === 'invite_later'}
+          onClick={() => onChangeAccessMode('invite_later')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onChangeAccessMode('invite_later')
+            }
+          }}
+          className={`wizard-choice-card${accessMode === 'invite_later' ? ' selected' : ''}`}
+        >
+          <span className="wizard-choice-dot" />
           <div>
             <span className="wizard-choice-title">Send invitation later</span>
             <p className="wizard-choice-desc">
