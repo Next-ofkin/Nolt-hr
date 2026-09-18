@@ -14,6 +14,11 @@ export type EmployeeOnboardingErrorCode =
   | 'ASSIGNMENT_NOT_FOUND'
   | 'ASSIGNMENT_CANCELLED'
   | 'ASSIGNMENT_COMPLETED'
+  | 'ITEM_NOT_FOUND'
+  | 'NOT_A_FORM_ITEM'
+  | 'ASSIGNMENT_NOT_ACTIVE'
+  | 'ALREADY_SUBMITTED'
+  | 'INVALID_RESPONSE'
   | (string & {})
 
 export class EmployeeOnboardingPersistenceError extends Error {
@@ -39,6 +44,12 @@ export function employeeOnboardingPersistenceMessage(
     }
     if (error.code === 'EMPLOYEE_ARCHIVED') {
       return 'This employee is archived and cannot receive a new onboarding assignment.'
+    }
+    if (error.code === 'ALREADY_SUBMITTED') {
+      return 'This form has already been submitted.'
+    }
+    if (error.code === 'ASSIGNMENT_NOT_ACTIVE') {
+      return 'Start your onboarding before submitting this form.'
     }
     if (error.message) return error.message
   }
@@ -72,6 +83,8 @@ export interface EmployeeOnboardingFormItem {
   formVersionNumber: number
   startedAt: string | null
   completedAt: string | null
+  responseData: Record<string, unknown> | null
+  submittedAt: string | null
 }
 
 export interface EmployeeOnboardingDocumentItem {
@@ -130,6 +143,12 @@ export interface CancelOnboardingAssignmentResult {
   alreadyCancelled: boolean
 }
 
+export interface SubmitOnboardingFormResponseResult {
+  itemId: string
+  state: OnboardingItemState
+  submittedAt: string
+}
+
 export function mapEmployeeOnboardingItem(row: EmployeeOnboardingItemRow): EmployeeOnboardingItem {
   if (row.item_type === 'form') {
     return {
@@ -145,6 +164,8 @@ export function mapEmployeeOnboardingItem(row: EmployeeOnboardingItemRow): Emplo
       formVersionNumber: row.form_version_number ?? 1,
       startedAt: row.started_at,
       completedAt: row.completed_at,
+      responseData: (row.response_data as Record<string, unknown> | null) ?? null,
+      submittedAt: row.submitted_at,
     }
   }
   return {
@@ -210,6 +231,13 @@ export function calculateOnboardingProgress(items: EmployeeOnboardingItem[]): On
 /** Assignments still requiring employee/HR attention, most relevant first. */
 export function isActiveAssignment(assignment: EmployeeOnboardingAssignment): boolean {
   return assignment.state === 'assigned' || assignment.state === 'in_progress'
+}
+
+/** Only these states may still be opened and filled in — once submitted, editing is a future (HR-review) phase. */
+const FILLABLE_ITEM_STATES: ReadonlySet<OnboardingItemState> = new Set(['not_started', 'in_progress'])
+
+export function canFillFormItem(item: EmployeeOnboardingItem): item is EmployeeOnboardingFormItem {
+  return item.itemType === 'form' && FILLABLE_ITEM_STATES.has(item.state)
 }
 
 const SHORT_MONTHS = [

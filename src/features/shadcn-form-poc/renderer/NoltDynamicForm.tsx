@@ -9,13 +9,37 @@ import { Check, ArrowLeft, ArrowRight, Send } from 'lucide-react'
 interface NoltDynamicFormProps {
   schema: FormSchema
   onSwitchToBuilder?: () => void
+  /**
+   * Seed data for the form. Defaults to the shadcn-form-poc demo's own
+   * education-history seed so the builder/package preview usages of this
+   * component keep behaving exactly as before — a real caller (e.g. an
+   * assigned onboarding form) should pass `{}` explicitly.
+   */
+  initialData?: Record<string, unknown>
+  /**
+   * When provided, the form hands the final merged payload to the caller
+   * instead of showing its own built-in "completed" screen — the caller
+   * owns persistence and whatever happens next (success/error/retry).
+   * Without it, behavior is unchanged from the original POC/preview use.
+   */
+  onComplete?: (data: Record<string, unknown>) => void
+  /** Disables the submit button while a caller-owned onComplete is in flight. */
+  isSubmitting?: boolean
 }
 
-export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({ schema, onSwitchToBuilder }) => {
+const DEMO_SEED_DATA: Record<string, unknown> = {
+  education_history: [{ school_institution: '', qualification: '', completion_date: '' }],
+}
+
+export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({
+  schema,
+  onSwitchToBuilder,
+  initialData,
+  onComplete,
+  isSubmitting = false,
+}) => {
   const [activeStepIndex, setActiveStepIndex] = useState(0)
-  const [accumulatedData, setAccumulatedData] = useState<Record<string, unknown>>({
-    education_history: [{ school_institution: '', qualification: '', completion_date: '' }],
-  })
+  const [accumulatedData, setAccumulatedData] = useState<Record<string, unknown>>(initialData ?? DEMO_SEED_DATA)
   const [completedPayload, setCompletedPayload] = useState<Record<string, unknown> | null>(null)
 
   const activeStep = schema.steps[activeStepIndex] || schema.steps[0]
@@ -37,6 +61,11 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({ schema, onSwit
     if (activeStepIndex < schema.steps.length - 1) {
       setActiveStepIndex(activeStepIndex + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (onComplete) {
+      // Caller owns what happens next (including retry on failure), so
+      // this component deliberately stays on the last step instead of
+      // flipping to its own completed screen.
+      onComplete(merged)
     } else {
       setCompletedPayload(merged)
     }
@@ -154,10 +183,16 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({ schema, onSwit
               <ArrowLeft style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Previous
             </button>
 
-            <button type="submit" className="btn btn-primary" style={{ minHeight: 48, padding: '0.7rem 1.75rem' }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting}
+              style={{ minHeight: 48, padding: '0.7rem 1.75rem' }}
+            >
               {activeStepIndex === schema.steps.length - 1 ? (
                 <>
-                  <Send style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Submit Form
+                  <Send style={{ width: 16, height: 16, marginRight: '0.4rem' }} />
+                  {isSubmitting ? 'Submitting…' : 'Submit Form'}
                 </>
               ) : (
                 <>

@@ -207,10 +207,12 @@ export type Database = {
           id: string
           item_type: string
           required: boolean
+          response_data: Json | null
           sort_order: number
           source_package_item_id: string
           started_at: string | null
           state: string
+          submitted_at: string | null
           updated_at: string
         }
         Insert: {
@@ -225,10 +227,12 @@ export type Database = {
           id?: string
           item_type: string
           required: boolean
+          response_data?: Json | null
           sort_order: number
           source_package_item_id: string
           started_at?: string | null
           state?: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -243,10 +247,12 @@ export type Database = {
           id?: string
           item_type?: string
           required?: boolean
+          response_data?: Json | null
           sort_order?: number
           source_package_item_id?: string
           started_at?: string | null
           state?: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -727,6 +733,10 @@ export type Database = {
         Returns: Json
       }
       start_my_onboarding: { Args: { p_assignment_id: string }; Returns: Json }
+      submit_onboarding_form_response: {
+        Args: { p_item_id: string; p_response_data: Json }
+        Returns: Json
+      }
       unarchive_form_definition: {
         Args: { p_form_definition_id: string }
         Returns: Json

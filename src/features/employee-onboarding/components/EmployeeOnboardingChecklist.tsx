@@ -1,6 +1,11 @@
 import React from 'react'
-import { CheckCircle2, Circle, CircleDot } from 'lucide-react'
-import type { EmployeeOnboardingItem, OnboardingItemState } from '../data/employee-onboarding-types'
+import { CheckCircle2, Circle, CircleDot, FileEdit } from 'lucide-react'
+import {
+  canFillFormItem,
+  type EmployeeOnboardingFormItem,
+  type EmployeeOnboardingItem,
+  type OnboardingItemState,
+} from '../data/employee-onboarding-types'
 
 const STATE_LABELS: Record<OnboardingItemState, string> = {
   not_started: 'Not started',
@@ -22,8 +27,14 @@ function ItemStatusIcon({ state }: { state: OnboardingItemState }) {
   return <CircleDot style={{ width: 18, height: 18, color: '#d97706', flexShrink: 0 }} />
 }
 
-function ChecklistRow({ item }: { item: EmployeeOnboardingItem }) {
+interface ChecklistRowProps {
+  item: EmployeeOnboardingItem
+  onFillForm?: (item: EmployeeOnboardingFormItem) => void
+}
+
+function ChecklistRow({ item, onFillForm }: ChecklistRowProps) {
   const title = item.itemType === 'form' ? `${item.formTitle} — Version ${item.formVersionNumber}` : item.documentTitle
+  const canFill = onFillForm && canFillFormItem(item)
 
   return (
     <div className="onboarding-checklist-row">
@@ -38,15 +49,23 @@ function ChecklistRow({ item }: { item: EmployeeOnboardingItem }) {
           <p className="package-item-desc">{item.documentDescription}</p>
         )}
       </div>
+      {canFill && (
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => onFillForm(item as EmployeeOnboardingFormItem)}>
+          <FileEdit style={{ width: 14, height: 14, marginRight: '0.35rem' }} />
+          {item.state === 'in_progress' ? 'Continue' : 'Fill Form'}
+        </button>
+      )}
     </div>
   )
 }
 
 interface EmployeeOnboardingChecklistProps {
   items: EmployeeOnboardingItem[]
+  /** Only the employee's own portal view passes this — HR's read-only view leaves it undefined. */
+  onFillForm?: (item: EmployeeOnboardingFormItem) => void
 }
 
-export const EmployeeOnboardingChecklist: React.FC<EmployeeOnboardingChecklistProps> = ({ items }) => {
+export const EmployeeOnboardingChecklist: React.FC<EmployeeOnboardingChecklistProps> = ({ items, onFillForm }) => {
   const forms = items.filter((item): item is Extract<EmployeeOnboardingItem, { itemType: 'form' }> => item.itemType === 'form')
   const documents = items.filter((item): item is Extract<EmployeeOnboardingItem, { itemType: 'document' }> => item.itemType === 'document')
 
@@ -56,7 +75,7 @@ export const EmployeeOnboardingChecklist: React.FC<EmployeeOnboardingChecklistPr
         <div className="onboarding-checklist-section">
           <h4 className="onboarding-checklist-section-title">Forms</h4>
           {forms.map((item) => (
-            <ChecklistRow key={item.id} item={item} />
+            <ChecklistRow key={item.id} item={item} onFillForm={onFillForm} />
           ))}
         </div>
       )}

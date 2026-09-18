@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabase'
 import type { Json } from '../../../lib/database.types'
+import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import {
   EmployeeOnboardingPersistenceError,
   mapEmployeeOnboardingAssignment,
@@ -8,6 +9,7 @@ import {
   type EmployeeOnboardingAssignment,
   type EmployeeOnboardingErrorCode,
   type StartMyOnboardingResult,
+  type SubmitOnboardingFormResponseResult,
 } from './employee-onboarding-types'
 
 type RpcOk = { ok: true } & Record<string, unknown>
@@ -218,5 +220,40 @@ export async function cancelOnboardingAssignment(input: {
   return {
     assignmentId: result.assignment_id as string,
     alreadyCancelled: Boolean(result.already_cancelled),
+  }
+}
+
+/**
+ * Reads the exact published form schema pinned to one of the caller's own
+ * checklist items. Relies on the assignment-aware RLS policy added in
+ * 0027 — an employee can only read the specific form_definition_versions
+ * row tied to something actually assigned to them, never the table at
+ * large.
+ */
+export async function getAssignedFormSchema(formVersionId: string): Promise<FormSchema> {
+  const { data, error } = await supabase
+    .from('form_definition_versions')
+    .select('definition')
+    .eq('id', formVersionId)
+    .single()
+  if (error) throw error
+  return data.definition as unknown as FormSchema
+}
+
+export async function submitOnboardingFormResponse(input: {
+  itemId: string
+  responseData: Record<string, unknown>
+}): Promise<SubmitOnboardingFormResponseResult> {
+  const { data, error } = await supabase.rpc('submit_onboarding_form_response', {
+    p_item_id: input.itemId,
+    p_response_data: input.responseData as unknown as Json,
+  })
+  if (error) throw error
+
+  const result = unwrapRpc(data)
+  return {
+    itemId: result.item_id as string,
+    state: result.state as SubmitOnboardingFormResponseResult['state'],
+    submittedAt: result.submitted_at as string,
   }
 }

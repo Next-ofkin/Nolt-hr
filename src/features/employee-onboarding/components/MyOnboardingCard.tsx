@@ -1,13 +1,15 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { AlertCircle, Calendar, PlayCircle } from 'lucide-react'
 import {
   calculateOnboardingProgress,
   formatOnboardingDate,
   type AssignmentState,
   type EmployeeOnboardingAssignment,
+  type EmployeeOnboardingFormItem,
 } from '../data/employee-onboarding-types'
 import { OnboardingProgressBar } from './OnboardingProgress'
 import { EmployeeOnboardingChecklist } from './EmployeeOnboardingChecklist'
+import { FormResponseModal } from './FormResponseModal'
 
 const STATE_BADGE: Record<AssignmentState, { label: string; className: string }> = {
   assigned: { label: 'Assigned', className: 'badge-neutral' },
@@ -23,6 +25,7 @@ interface MyOnboardingCardProps {
 }
 
 export const MyOnboardingCard: React.FC<MyOnboardingCardProps> = ({ assignment, onStart, isStarting = false }) => {
+  const [activeFormItem, setActiveFormItem] = useState<EmployeeOnboardingFormItem | null>(null)
   const progress = calculateOnboardingProgress(assignment.items)
   const badge = STATE_BADGE[assignment.state]
 
@@ -63,7 +66,11 @@ export const MyOnboardingCard: React.FC<MyOnboardingCardProps> = ({ assignment, 
           {isStarting ? 'Starting…' : 'Start Onboarding'}
         </button>
       ) : (
-        <EmployeeOnboardingChecklist items={assignment.items} />
+        <EmployeeOnboardingChecklist items={assignment.items} onFillForm={setActiveFormItem} />
+      )}
+
+      {activeFormItem && (
+        <FormResponseModal item={activeFormItem} onClose={() => setActiveFormItem(null)} />
       )}
     </section>
   )
