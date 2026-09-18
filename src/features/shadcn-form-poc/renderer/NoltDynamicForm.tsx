@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import type { FormSchema } from '../domain/form-schema'
 import { buildZodSchemaForStep } from '../domain/form-schema'
 import { DynamicField } from './DynamicField'
-import { Check, ArrowLeft, ArrowRight, Send } from 'lucide-react'
+import { Check, ArrowLeft, ArrowRight, Save, Send } from 'lucide-react'
 
 interface NoltDynamicFormProps {
   schema: FormSchema
@@ -25,6 +25,13 @@ interface NoltDynamicFormProps {
   onComplete?: (data: Record<string, unknown>) => void
   /** Disables the submit button while a caller-owned onComplete is in flight. */
   isSubmitting?: boolean
+  /**
+   * When provided, shows a "Save & Continue Later" action on every step
+   * that hands the raw (unvalidated) current values to the caller — a
+   * draft may be incomplete, so this deliberately bypasses the
+   * Continue/Submit validation resolver. Never triggers onComplete.
+   */
+  onSaveDraft?: (currentStepData: Record<string, unknown>) => Promise<void> | void
 }
 
 const DEMO_SEED_DATA: Record<string, unknown> = {
@@ -37,10 +44,12 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({
   initialData,
   onComplete,
   isSubmitting = false,
+  onSaveDraft,
 }) => {
   const [activeStepIndex, setActiveStepIndex] = useState(0)
   const [accumulatedData, setAccumulatedData] = useState<Record<string, unknown>>(initialData ?? DEMO_SEED_DATA)
   const [completedPayload, setCompletedPayload] = useState<Record<string, unknown> | null>(null)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   const activeStep = schema.steps[activeStepIndex] || schema.steps[0]
 
@@ -52,7 +61,21 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({
     mode: 'onTouched',
   })
 
-  const { handleSubmit } = methods
+  const { handleSubmit, getValues } = methods
+
+  const handleSaveDraft = async () => {
+    if (!onSaveDraft || isSavingDraft) return
+    // Raw current values, deliberately not run through the step's zod
+    // resolver — a draft is allowed to be incomplete.
+    const merged = { ...accumulatedData, ...getValues() }
+    setAccumulatedData(merged)
+    setIsSavingDraft(true)
+    try {
+      await onSaveDraft(merged)
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
 
   const handleStepSubmit = (stepData: Record<string, unknown>) => {
     const merged = { ...accumulatedData, ...stepData }
@@ -176,17 +199,30 @@ export const NoltDynamicForm: React.FC<NoltDynamicFormProps> = ({
             <button
               type="button"
               onClick={handlePrevStep}
-              disabled={activeStepIndex === 0}
+              disabled={activeStepIndex === 0 || isSavingDraft}
               className="btn btn-ghost"
               style={{ minHeight: 44, padding: '0.65rem 1.4rem' }}
             >
               <ArrowLeft style={{ width: 16, height: 16, marginRight: '0.4rem' }} /> Previous
             </button>
 
+            {onSaveDraft && (
+              <button
+                type="button"
+                onClick={() => void handleSaveDraft()}
+                disabled={isSavingDraft || isSubmitting}
+                className="btn btn-ghost"
+                style={{ minHeight: 44, padding: '0.65rem 1.4rem' }}
+              >
+                <Save style={{ width: 15, height: 15, marginRight: '0.4rem' }} />
+                {isSavingDraft ? 'Saving…' : 'Save & Continue Later'}
+              </button>
+            )}
+
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingDraft}
               style={{ minHeight: 48, padding: '0.7rem 1.75rem' }}
             >
               {activeStepIndex === schema.steps.length - 1 ? (

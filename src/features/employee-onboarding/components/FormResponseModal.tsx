@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, FileText, Loader2 } from 'lucide-react'
 import { getAssignedFormSchema } from '../data/employee-onboarding-repository'
-import { useSubmitOnboardingFormResponse } from '../data/employee-onboarding-queries'
+import { useSaveOnboardingFormDraft, useSubmitOnboardingFormResponse } from '../data/employee-onboarding-queries'
 import { employeeOnboardingPersistenceMessage, type EmployeeOnboardingFormItem } from '../data/employee-onboarding-types'
 import type { FormSchema } from '../../shadcn-form-poc/domain/form-schema'
 import { NoltDynamicForm } from '../../shadcn-form-poc/renderer/NoltDynamicForm'
+import { toast } from '../../../components/ui/use-toast'
 
 interface FormResponseModalProps {
   item: EmployeeOnboardingFormItem
@@ -17,6 +18,7 @@ export function FormResponseModal({ item, onClose }: FormResponseModalProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const submitResponse = useSubmitOnboardingFormResponse()
+  const saveDraft = useSaveOnboardingFormDraft()
 
   useEffect(() => {
     let isMounted = true
@@ -41,6 +43,19 @@ export function FormResponseModal({ item, onClose }: FormResponseModalProps) {
         onError: (err) => setSubmitError(employeeOnboardingPersistenceMessage(err, 'Unable to submit this form.')),
       },
     )
+  }
+
+  const handleSaveDraft = async (data: Record<string, unknown>) => {
+    setSubmitError(null)
+    try {
+      await saveDraft.mutateAsync({ itemId: item.id, responseData: data })
+      toast.success('Progress Saved', 'You can continue this form later.')
+      onClose()
+    } catch (err) {
+      // Keep the modal open with the employee's current input intact —
+      // NoltDynamicForm stays mounted regardless, only this banner shows.
+      setSubmitError(employeeOnboardingPersistenceMessage(err, 'Unable to save your progress.'))
+    }
   }
 
   return (
@@ -96,9 +111,10 @@ export function FormResponseModal({ item, onClose }: FormResponseModalProps) {
               )}
               <NoltDynamicForm
                 schema={schema}
-                initialData={{}}
+                initialData={item.responseData ?? {}}
                 isSubmitting={submitResponse.isPending}
                 onComplete={handleComplete}
+                onSaveDraft={handleSaveDraft}
               />
             </>
           )}

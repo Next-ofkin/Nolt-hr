@@ -8,6 +8,7 @@ import {
   type CancelOnboardingAssignmentResult,
   type EmployeeOnboardingAssignment,
   type EmployeeOnboardingErrorCode,
+  type SaveOnboardingFormDraftResult,
   type StartMyOnboardingResult,
   type SubmitOnboardingFormResponseResult,
 } from './employee-onboarding-types'
@@ -255,5 +256,23 @@ export async function submitOnboardingFormResponse(input: {
     itemId: result.item_id as string,
     state: result.state as SubmitOnboardingFormResponseResult['state'],
     submittedAt: result.submitted_at as string,
+  }
+}
+
+/** Saves incomplete progress for an assigned form item; never sets submitted_at. */
+export async function saveOnboardingFormDraft(input: {
+  itemId: string
+  responseData: Record<string, unknown>
+}): Promise<SaveOnboardingFormDraftResult> {
+  const { data, error } = await supabase.rpc('save_onboarding_form_draft', {
+    p_item_id: input.itemId,
+    p_response_data: input.responseData as unknown as Json,
+  })
+  if (error) throw error
+
+  const result = unwrapRpc(data)
+  return {
+    itemId: result.item_id as string,
+    state: result.state as SaveOnboardingFormDraftResult['state'],
   }
 }

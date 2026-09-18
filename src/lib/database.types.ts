@@ -722,6 +722,10 @@ export type Database = {
         }
         Returns: Json
       }
+      save_onboarding_form_draft: {
+        Args: { p_item_id: string; p_response_data: Json }
+        Returns: Json
+      }
       save_onboarding_package_draft: {
         Args: {
           p_description: string

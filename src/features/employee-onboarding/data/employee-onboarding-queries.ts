@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getMyOnboardingAssignments,
+  saveOnboardingFormDraft,
   startMyOnboarding,
   submitOnboardingFormResponse,
 } from './employee-onboarding-repository'
@@ -27,6 +28,16 @@ export function useSubmitOnboardingFormResponse() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: { itemId: string; responseData: Record<string, unknown> }) => submitOnboardingFormResponse(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['employee_onboarding_assignments', 'mine'] })
+    },
+  })
+}
+
+export function useSaveOnboardingFormDraft() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { itemId: string; responseData: Record<string, unknown> }) => saveOnboardingFormDraft(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['employee_onboarding_assignments', 'mine'] })
     },

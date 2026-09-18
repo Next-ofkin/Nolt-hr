@@ -149,6 +149,11 @@ export interface SubmitOnboardingFormResponseResult {
   submittedAt: string
 }
 
+export interface SaveOnboardingFormDraftResult {
+  itemId: string
+  state: OnboardingItemState
+}
+
 export function mapEmployeeOnboardingItem(row: EmployeeOnboardingItemRow): EmployeeOnboardingItem {
   if (row.item_type === 'form') {
     return {
