@@ -1,0 +1,33 @@
+import "reflect-metadata";
+import {
+  Controller,
+  Get,
+  Inject,
+  Module,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { Database } from "./database.js";
+import { AuthController, HrGuard, SessionGuard } from "./auth.js";
+import { FormsController, FormsService } from "./forms.js";
+@Controller("health")
+@ApiTags("Health")
+class HealthController {
+  constructor(@Inject(Database) private readonly db: Database) {}
+  @Get("live") live() {
+    return { status: "ok", service: "nolt-api" };
+  }
+  @Get("ready") async ready() {
+    try {
+      await this.db.$queryRaw`SELECT 1`;
+      return { status: "ready" };
+    } catch {
+      throw new ServiceUnavailableException("Database is unavailable.");
+    }
+  }
+}
+@Module({
+  controllers: [HealthController, AuthController, FormsController],
+  providers: [Database, SessionGuard, HrGuard, FormsService],
+})
+export class AppModule {}

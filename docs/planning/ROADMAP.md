@@ -1,14 +1,14 @@
 # NOLT HR Employee Lifecycle Portal — delivery roadmap
 
-Prepared 13 October 2026. **Status: proposed; awaiting owner approval.**
+Prepared 13 October 2026. **Status: local implementation approved 13 October 2026; see ../TRACKER.md.**
 
 Source: [original PRD](../source/NOLT_HR_Employee_Lifecycle_Portal_Full_PRD%20%283%29.pdf), v1.0, 9 September 2026, all 29 pages. Page numbers below refer to PDF pages. The PRD itself is a stakeholder-review draft. The underlying policy manual, legal agreements, AXA workbook and original forms were not separately supplied or verified; their exact text and field layouts must be obtained before their modules are finalised.
 
-This roadmap authorises no application implementation, cloud provisioning or production deployment. Approval will start local implementation of the agreed scope. Unresolved business decisions remain tracked separately.
+The owner approved local application implementation on 13 October 2026. Cloud provisioning and production deployment remain unapproved. Follow [the implementation tracker](../TRACKER.md) for verified progress. Unresolved business decisions remain tracked separately.
 
 ## Confirmed owner amendments
 
-Use **shadcn/ui**. HR creates and publishes forms, upload/signature requirements and recipient assignments through a responsive builder in the core release. Employees send requests to guarantors; guarantors alone complete/sign their own responses. All portals and the builder adapt across screen sizes. Read [FORM_BUILDER.md](FORM_BUILDER.md) for the binding detail and acceptance scenarios. These owner requirements supersede the earlier seeded-template/editor deferral; overall roadmap approval remains pending.
+Use **shadcn/ui**. HR creates and publishes forms, upload/signature requirements and recipient assignments through a responsive builder in the core release. Employees send requests to guarantors; guarantors alone complete/sign their own responses. All portals and the builder adapt across screen sizes. Read [FORM_BUILDER.md](FORM_BUILDER.md) for the binding detail and acceptance scenarios. These owner requirements supersede the earlier seeded-template/editor deferral; local implementation is now approved.
 
 ## 1. Delivery outcome and scope
 

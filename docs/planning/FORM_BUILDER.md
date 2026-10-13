@@ -1,6 +1,6 @@
 # HR form builder, signatures and respondent delivery
 
-**Confirmed owner requirements, 13 October 2026.** These clarify and extend the original PRD. They take precedence over earlier suggestions to deliver only fixed forms or defer the form editor until Phase 2B. Overall implementation approval is still pending.
+**Confirmed owner requirements, 13 October 2026.** These clarify and extend the original PRD. They take precedence over earlier suggestions to deliver only fixed forms or defer the form editor until Phase 2B. Local implementation is approved; unresolved business decisions remain tracked.
 
 ## UI and responsive behaviour
 
@@ -31,7 +31,13 @@ HR can add a required or optional signature field and select whether the signer 
 
 The signer reviews the relevant form/agreement version, confirms signing intent, draws or uploads their own signature and submits. No actor can insert another person's signature on their behalf. Server validates the authorised signer, required signature, attachment scan status and current content revision. Changing the signed content invalidates the pending signature and requires signing again before final submission.
 
-Evidence references the exact published form/agreement version, immutable response snapshot and content digest, signature object/checksum, signer identity or verified external request, signing method, consent version and server timestamp. Store signature files privately with file validation/scanning and authorised access. Drawn signatures use a safe generated image format. Retain evidence and render a completed copy without replacing earlier signed versions.
+Evidence references the exact published form/agreement version, immutable response snapshot and content digest, private signature file reference/checksum, signer identity or verified external request, signing method, consent version and server timestamp. Store drawn signatures, uploaded signature images and signed-document PDFs in private object storage. PostgreSQL stores the stable object key/file version and evidence metadata, not Base64 images or expiring URLs. Retain evidence and render a completed copy without replacing earlier signed versions.
+
+### Signature image storage - confirmed owner choice
+
+The owner accepted private file storage plus database signing evidence, superseding the earlier Base64 database proposal. Validate image bytes, dimensions and size, safely decode/re-encode and resize/compress before signing confirmation, then compute the checksum over the exact final bytes. Bind that immutable file version to the signer and response/content version. Never resize or replace already-confirmed evidence in place. Reject invalid/oversized payloads and unsafe image types such as SVG; validate/scan before acceptance.
+
+Keep storage private by default and permit retrieval only after actor/record authorisation. Generate short-lived links on demand; no permanent public URLs. General lists, dashboards, logs, audit and email payloads must not contain image data or access links. Apply the same restrictions to employee and external signers. Signature capture/storage remains pending implementation and verification; no existing signature records require migration.
 
 Collecting a drawn/uploaded signature is a functional capability; the approved legal process determines when it is sufficient and whether a third-party e-sign provider is required. The builder cannot label every image upload as legally verified signing.
 

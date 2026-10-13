@@ -11,3 +11,9 @@ node_modules/
 .next/
 dist/
 coverage/
+
+# Local runtime state and generated files
+.local/
+*.tsbuildinfo
+test-results/
+playwright-report/

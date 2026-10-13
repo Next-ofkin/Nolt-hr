@@ -1,6 +1,6 @@
 # PRD coverage and acceptance register
 
-Status: planning coverage only. No application feature is implemented or verified. Source is the 29-page supplied PRD; PDF page references make each planned item reviewable.
+Status: requirement-to-milestone baseline. Local implementation has started; verified completion and evidence are maintained in [the tracker](../TRACKER.md). Rows below describe required acceptance, not a claim that every feature is complete. Source is the 29-page supplied PRD; PDF page references make each planned item reviewable.
 
 ## Core requirements
 

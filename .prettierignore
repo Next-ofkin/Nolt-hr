@@ -1,0 +1,8 @@
+node_modules/
+**/dist/
+**/.next/
+.local/
+tools/
+package-lock.json
+packages/api-client/src/schema.d.ts
+docs/api/openapi.json

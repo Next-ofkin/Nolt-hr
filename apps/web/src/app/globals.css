@@ -1,0 +1,75 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: Arial, Helvetica, sans-serif;
+}
+:root {
+  --background: #f7f8fa;
+  --foreground: #172c2b;
+  --card: #fff;
+  --card-foreground: #172c2b;
+  --popover: #fff;
+  --popover-foreground: #172c2b;
+  --primary: #006b5e;
+  --primary-foreground: #fff;
+  --secondary: #eef3f1;
+  --secondary-foreground: #26423b;
+  --muted: #f0f2f5;
+  --muted-foreground: #626d77;
+  --accent: #e5f3ef;
+  --accent-foreground: #005448;
+  --destructive: #b42318;
+  --border: #e0e5e8;
+  --input: #d5dddf;
+  --ring: #008878;
+  --radius: 0.65rem;
+}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  select {
+    cursor: pointer;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+.native-select {
+  @apply h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring;
+}
+.field-preview {
+  @apply space-y-2;
+}
