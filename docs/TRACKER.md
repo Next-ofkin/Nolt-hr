@@ -98,8 +98,11 @@ Verified first slice on 13 October 2026:
 - `npm run test:e2e`: 2 Chromium checks pass, covering create/save/preview/publish/reopen/new version and no horizontal overflow at 320/375/768/1024/1440/1920 widths.
 - `npm run build`: API and frontend production compilation pass. This is not production release approval.
 - Desktop/mobile screenshots reviewed locally under ignored `.local/qa/`.
-- CI workflow added; remote CI has not been run in this turn.
+- Pre-merge rerun: type checks, both builds, 4 domain/API/database checks and 2 Chromium tests all passed against compiled applications.
+- GitHub Actions attempted [PR #2 run](https://github.com/Next-ofkin/Nolt-hr/actions/runs/38401471685), but reported `startup_failure` with zero jobs/check runs and no test logs. The workflow passes local actionlint validation; remote execution remains unverified and requires follow-up.
 
 Current limits: localhost-only synthetic identity; no managed OIDC/MFA, employee assignments, response collection, actual signatures/uploads, notification worker/email or external request delivery. Signature/attachment controls configure requirements and show labelled previews only. Audit/outbox exists for form mutations, not yet every lifecycle module. Full zoom, touch signing, all-browser and release checks remain open.
+
+Before the next merge, investigate the GitHub Actions startup failure and obtain a successful remote run. This does not invalidate the completed local slice, but remote CI is not marked passed.
 
 Run instructions: [local setup](development/LOCAL_SETUP.md). Initial schema: [data model](development/DATA_MODEL.md).

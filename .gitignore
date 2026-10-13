@@ -1,5 +1,6 @@
 # Local document extraction / skill validation dependencies
 tools/python/
+tools/actionlint/
 __pycache__/
 *.pyc
 
