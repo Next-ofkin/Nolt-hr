@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique
+  name String
+  role String
+  active Boolean @default(true)
+  sessions Session[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  csrfHash String
+  userId String @db.Uuid
+  user User @relation(fields:[userId], references:[id], onDelete:Restrict)
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([userId])
+  @@index([expiresAt])
+}
+model Form {
+  id String @id @default(uuid()) @db.Uuid
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  versions FormVersion[]
+  @@index([createdAt])
+}
+model FormVersion {
+  id String @id @default(uuid()) @db.Uuid
+  formId String @db.Uuid
+  form Form @relation(fields:[formId],references:[id],onDelete:Restrict)
+  version Int
+  revision Int @default(1)
+  status String @default("DRAFT")
+  title String
+  description String @default("")
+  recipient String
+  fields Json @default("[]")
+  publishedAt DateTime? @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  @@unique([formId,version])
+  @@index([status,updatedAt])
+}
+model AuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String @db.Uuid
+  action String
+  targetId String @db.Uuid
+  metadata Json @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([targetId,createdAt])
+}
+model OutboxEvent {
+  id String @id @default(uuid()) @db.Uuid
+  type String
+  targetId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  processedAt DateTime? @db.Timestamptz(3)
+  @@index([processedAt,createdAt])
+}

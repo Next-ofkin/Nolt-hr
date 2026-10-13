@@ -2,7 +2,34 @@
 
 A secure portal for NOLT Finance to manage employee pre-onboarding, HR reviews, policy acknowledgements, agreements, benefits, induction, company assets and offboarding.
 
-**Current status:** planning complete; roadmap approval pending. Application code has not been scaffolded. shadcn/ui and the HR-owned form builder requirements are confirmed; remaining stack choices and overall implementation await approval.
+**Current status:** local implementation approved and started. The first working slice is HR form authoring: create/save/reopen, field configuration, respondent preview, immutable publication and new versions. PostgreSQL stores the records; managed identity and later lifecycle modules are still in progress.
+
+**Track progress:** [implementation checklist](docs/TRACKER.md), also visible at `/tracker` in the local app. Completed boxes require verification evidence.
+
+## Run locally
+
+See [local setup and verification](docs/development/LOCAL_SETUP.md). Node.js 24 is required.
+
+```powershell
+npm ci
+Copy-Item .env.example .env
+npm run contracts:build
+npm run db:generate
+npm run db:local
+```
+
+Leave PostgreSQL running in that terminal. In a second terminal:
+
+```powershell
+npm run db:migrate
+npm run db:permissions
+npm run db:seed
+npm run dev
+```
+
+Open **http://127.0.0.1:3000** and choose **Continue as local HR**. Use synthetic data only. Do not overwrite an existing `.env` on repeat setup. API docs: **http://127.0.0.1:4000/api/docs**.
+
+Signature/attachment fields currently configure what will be requested; actual signing, file collection and third-party sending remain on the tracker.
 
 ## Languages, frameworks and tools
 
@@ -23,18 +50,18 @@ A secure portal for NOLT Finance to manage employee pre-onboarding, HR reviews, 
 | Automated verification | **Unit/integration tests + Playwright** | Domain rules, API permissions and complete browser journeys |
 | Local document utilities | **Python + pypdf + PyYAML** | PRD extraction and skill validation only; Python is not the proposed application backend |
 
-Email, hosting, identity, scanning and storage providers remain to be selected. Framework/runtime versions will be checked and locked when implementation begins. There are no install, development-server or build commands yet because the application has not been created.
+Email, hosting, identity, scanning and storage providers remain to be selected. Installed versions are locked in `package-lock.json`; the build currently uses Next.js 16.4, React 19.3, NestJS 12.1 and Prisma 7.10. The table describes the complete target stack; worker and managed integrations are not implemented yet.
 
 ## Confirmed product requirements
 
 - **HR creates and configures forms and requirements:** questions, sections, conditional rules, uploads, signatures, recipients and assignments through a visual builder. This is core scope.
-- **Signatures:** HR can request a drawn signature, signature-image attachment or signed-document attachment. Evidence is tied to the signer and exact form version.
+- **Signatures:** HR can request a drawn signature, signature-image attachment or signed-document attachment. Signature images and signed PDFs will be stored privately; PostgreSQL retains the stable file reference, signer, exact form/response version, timestamp and checksum. Access uses authorised short-lived links, never public URLs.
 - **Guarantor delivery:** the employee sends a secure request; the guarantor completes and signs their own form directly. Employees cannot complete it on their behalf.
 - **Responsive throughout:** employee, HR, builder and guarantor screens work on mobile, tablet, desktop and wide screens with touch and keyboard support.
 
 See [form builder and signing requirements](docs/planning/FORM_BUILDER.md).
 
-## Application connection
+## Target application connection
 
 ```text
 Employee / HR / external respondent
@@ -50,35 +77,33 @@ Employee / HR / external respondent
   Outbox + worker --> Email / scanning / exports
 ```
 
-The API verifies identity and permissions, validates submissions, controls lifecycle transitions, and writes audit evidence. The frontend communicates through the API contract. Files remain private and access is granted through authorised, short-lived links. A managed OIDC provider supports the API/session authentication boundary.
+The implemented slice connects the Next.js frontend to NestJS, PostgreSQL, audit and outbox records. Managed OIDC, private file storage, response submission and background delivery in the diagram are planned next; see the tracker.
 
 ## Current folder structure
 
 ```text
 Nolt-hr/
-├── README.md                         Project overview and proposed stack
-├── AGENTS.md                         Instructions for coding agents
-├── .gitignore                        Local utility dependencies excluded
-├── docs/
-│   ├── source/
-│   │   ├── NOLT_HR_Employee_Lifecycle_Portal_Full_PRD (3).pdf
-│   │   └── prd-extracted.txt          Page-labelled PRD text
-│   └── planning/
-│       ├── ROADMAP.md                 Architecture, milestones and estimates
-│       ├── API_AND_CONNECTIONS.md     API inventory and integration flows
-│       ├── TRACEABILITY.md            PRD coverage and acceptance checks
-│       └── DECISIONS.md               Approval and unresolved choices
-├── skills/
-│   └── nolt-hr-delivery/
-│       └── SKILL.md                   Reusable project delivery skill
-├── tools/
-│   └── python/                       Local PDF/validation dependencies
-├── .agents/                          Existing protected skills
-├── .codex/                           Existing protected tool settings
-└── .git/                             Existing Git history
+  apps/web/                          Next.js frontend and shadcn/ui
+  apps/api/                          NestJS API and local session guards
+  packages/form-schemas/             Shared versioned form validation
+  packages/api-client/               Generated OpenAPI types and fetch client
+  database/                          Prisma schema, SQL migrations and seed
+  scripts/                           Local database and readiness tooling
+  tests/                             Domain, real-DB API and browser checks
+  .github/workflows/                 CI check configuration
+  docs/TRACKER.md                    Implementation checklist
+  docs/development/                  Local setup and initial data model
+  docs/api/                          Executable initial OpenAPI contract
+  docs/planning/                     Roadmap, connections and requirements
+  docs/source/                       Preserved PRD PDF and extracted text
+  skills/nolt-hr-delivery/            Reusable project delivery skill
+  tools/python/                      Ignored document utility dependencies
+  README.md                          Project overview and setup entrypoint
+  AGENTS.md                          Instructions for coding agents
+  .agents/, .codex/, .git/            Preserved skills, settings and history
 ```
 
-The supplied PDF is preserved under `docs/source/`. Existing protected configuration/history folders are retained. Application directories will be created after roadmap approval: `apps/web`, `apps/api`, `apps/worker`, shared `packages`, `database` and `tests/e2e`. The detailed proposed structure is in the roadmap.
+The supplied PDF is preserved under `docs/source/`. Existing protected configuration/history folders are retained. Implemented application code is under `apps/web` and `apps/api`; shared contracts/client are under `packages`, migrations under `database`, checks under `tests`, and local tooling under `scripts`. The worker and remaining modules follow the tracker. See the [initial data model](docs/development/DATA_MODEL.md).
 
 ## Planning documents
 
@@ -96,7 +121,7 @@ The supplied PDF is preserved under `docs/source/`. Existing protected configura
 | Foundation | Confirm decisions, designs, permissions, data model and API contracts |
 | Phase 1 | Authentication, invitations, checklist, biodata/declarations, files, HR form builder, signature fields, drafts, review/correction, progress and audit |
 | Phase 2A | Guarantors/references, policies, confidentiality/indemnity and beneficiaries |
-| Phase 2B | HMO/AXA exports, induction, assets and reports; builder already delivered in Phase 1 |
+| Phase 2B | HMO/AXA exports, induction, assets and reports; core builder belongs to Phase 1 |
 | Phase 3 | Handover, asset returns, departmental clearance, exit interview and closure |
 
-The roadmap flags the PRD's conflicting placement of induction in its MVP description. Proposed delivery follows the PRD release table and places full induction in Phase 2B. Confirm this and the proposed stack with roadmap approval before implementation starts.
+The roadmap flags the PRD's conflicting placement of induction in its MVP description. Proposed delivery follows the PRD release table and places full induction in Phase 2B. Local implementation is now approved. Unresolved HR/legal/provider decisions remain in the decision log and do not imply production approval.

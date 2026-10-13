@@ -1,5 +1,6 @@
 # Local document extraction / skill validation dependencies
 tools/python/
+tools/actionlint/
 __pycache__/
 *.pyc
 
@@ -11,3 +12,9 @@ node_modules/
 .next/
 dist/
 coverage/
+
+# Local runtime state and generated files
+.local/
+*.tsbuildinfo
+test-results/
+playwright-report/

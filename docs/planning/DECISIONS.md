@@ -1,10 +1,10 @@
 # Decision log
 
-Prepared 13 October 2026. D17?D20 are **confirmed owner requirements**; other decisions remain proposed or unresolved. Record owner, date and rationale when resolving them; preserve superseded decisions.
+Prepared 13 October 2026. Local implementation and the architecture baseline are approved; D17-D20 are confirmed owner requirements. Provider, HR and legal decisions remain unresolved where noted. Record owner, date and rationale when resolving them; preserve superseded decisions.
 
 | ID | Decision | Proposal / unresolved input | Owner / deadline |
 |---|---|---|---|
-| D01 | Architecture | Next.js + NestJS modular monolith + PostgreSQL + private object storage + worker | Project owner, roadmap approval |
+| D01 | Architecture | Confirmed implementation baseline: Next.js + shadcn/ui + NestJS + PostgreSQL; storage/worker follow roadmap | Owner approved local build, 13 October 2026 |
 | D02 | Release scope | PRD phase table; full induction Phase 2B despite p27 MVP wording | HR/product owner, roadmap approval |
 | D03 | Templates/readiness | Employment-type templates, requirement stage/mandatory/optional rules | HR, M0/M2 |
 | D04 | Guarantor family | Conflicting source rule; configurable; governing rule not selected | HR/legal, before 2A launch |
@@ -20,19 +20,22 @@ Prepared 13 October 2026. D17?D20 are **confirmed owner requirements**; other de
 | D14 | AXA export | Confirm workbook version, approved rows, HR export operator | HR/benefits, M6 |
 | D15 | Exit | Clearance departments, exceptions, account deactivation timing and access to handover | HR/IT, M7 |
 | D16 | Operations | Staff/file volumes, performance, RPO/RTO, backup retention, incident/support owners | Owner/IT, foundation/release |
-
 | D17 | UI components | **Confirmed:** shadcn/ui with Tailwind CSS | Owner, 13 October 2026 |
 | D18 | HR authors forms | **Confirmed:** core-release builder for questions, uploads, signatures, recipients and assignments | Owner, 13 October 2026 |
 | D19 | Guarantor actor | **Confirmed:** employee sends request; guarantor fills/signs own form; employee proxy submission denied | Owner, 13 October 2026 |
 | D20 | Responsive coverage | **Confirmed:** all portals and builder across screen sizes, keyboard/touch signing | Owner, 13 October 2026 |
 
+| D21 | Signature image storage | **Superseded by D22:** earlier Base64 database proposal; no signature storage was implemented under this decision. | Owner, 13 October 2026 |
+
+| D22 | Signature/file storage | **Confirmed:** private object storage for signature images/signed PDFs; PostgreSQL stores stable references, signer, exact form/response version, timestamp and checksum. Authorised short-lived retrieval. Implementation pending. | Owner, 13 October 2026 |
+
 ## Approval record
 
-Roadmap approval: pending.
+Roadmap approval: owner approved local implementation on 13 October 2026 ("ok now let start building").
 
-Approved scope/stack amendments: D17?D20 confirmed by owner; detailed acceptance in `FORM_BUILDER.md`. Overall roadmap approval still pending.
+Approved scope/stack amendments: D17-D20 confirmed by owner; detailed acceptance in `FORM_BUILDER.md`. Local implementation approved; unresolved HR/legal/provider decisions remain open.
 
-Implementation started: no.
+Implementation started: yes; tracked in `../TRACKER.md`.
 
 Production deployment authorised: no.
 

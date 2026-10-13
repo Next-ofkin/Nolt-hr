@@ -1,0 +1,14 @@
+{
+  "name": "@nolt/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "openapi-fetch": "^0.17.0",
+    "@nolt/form-schemas": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
