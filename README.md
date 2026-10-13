@@ -1,171 +1,102 @@
-# Nolt HR
+# NOLT HR Employee Lifecycle Portal
 
-Fullstack HR application built with **React 19 + Vite + Supabase** (Auth + PostgreSQL with Row Level Security).
+A secure portal for NOLT Finance to manage employee pre-onboarding, HR reviews, policy acknowledgements, agreements, benefits, induction, company assets and offboarding.
 
-## Stack
+**Current status:** planning complete; roadmap approval pending. Application code has not been scaffolded. shadcn/ui and the HR-owned form builder requirements are confirmed; remaining stack choices and overall implementation await approval.
 
-- **Frontend:** React 19, TypeScript, React Router v7, React Hook Form, TanStack Query
-- **Backend:** Supabase (PostgREST + RLS) plus an Edge Function for email invites
-- **Auth:** Supabase Auth magic links for invited users; password login only for the seeded admin
-- **RBAC:** Three roles enforced in the database, not just in the UI
+## Languages, frameworks and tools
 
-| Role       | Can                                                        |
-| ---------- | ---------------------------------------------------------- |
-| `admin`    | Everything: invite users with any role, change roles        |
-| `hr`       | Invite employees, view the employee directory              |
-| `employee` | Own profile only                                            |
+| Area | Language / technology | Purpose |
+|---|---|---|
+| Main application language | **TypeScript** | Shared language for frontend, backend, workers and API client |
+| Frontend framework | **Next.js App Router + React** | Employee, HR/admin and external respondent web experiences |
+| Markup and styling | **HTML via TSX, CSS + Tailwind CSS** | Responsive layouts and accessible UI components |
+| UI components | **shadcn/ui** | Shared components for all portals and the responsive HR form builder |
+| Forms | **HR-owned schema-driven builder + React Hook Form** | HR creates/publishes forms, conditional fields, attachments and signature requests; versioned server validation |
+| Backend framework | **NestJS on Node.js** | REST API, permissions and lifecycle business rules |
+| API contract | **REST + OpenAPI** | Versioned `/api/v1` endpoints and generated TypeScript client |
+| Database | **PostgreSQL / SQL** | Employee records, requirements, submissions, decisions and audit history |
+| Database access | **Prisma** | Typed queries and version-controlled migrations |
+| Background processing | **TypeScript worker on Node.js** | Transactional outbox, email, file scanning, exports and reminders |
+| Authentication | **Managed OIDC provider** | Email-based access, account recovery and privileged MFA; vendor pending |
+| File storage | **Private S3-compatible object storage** | Protected uploads, quarantine and completed agreement files; vendor pending |
+| Automated verification | **Unit/integration tests + Playwright** | Domain rules, API permissions and complete browser journeys |
+| Local document utilities | **Python + pypdf + PyYAML** | PRD extraction and skill validation only; Python is not the proposed application backend |
 
-## Who can invite
+Email, hosting, identity, scanning and storage providers remain to be selected. Framework/runtime versions will be checked and locked when implementation begins. There are no install, development-server or build commands yet because the application has not been created.
 
-Users are **invited by email** — there is no self-service signup page. An invite is sent through a [Supabase Edge Function](supabase/functions/invite-user/index.ts) that:
+## Confirmed product requirements
 
-1. Verifies the caller's JWT and looks up their role in `profiles`
-2. Rejects the request unless the caller is `admin` or `hr`
-3. Lets HR invite only `employee`; only `admin` may grant `hr`/`admin`
-4. Calls `supabase.auth.admin.inviteUserByEmail()`, assigns the authorized role, and emails the invite link
+- **HR creates and configures forms and requirements:** questions, sections, conditional rules, uploads, signatures, recipients and assignments through a visual builder. This is core scope.
+- **Signatures:** HR can request a drawn signature, signature-image attachment or signed-document attachment. Evidence is tied to the signer and exact form version.
+- **Guarantor delivery:** the employee sends a secure request; the guarantor completes and signs their own form directly. Employees cannot complete it on their behalf.
+- **Responsive throughout:** employee, HR, builder and guarantor screens work on mobile, tablet, desktop and wide screens with touch and keyboard support.
 
-Accepting an invitation signs the user in and sends them through `/auth/callback` to the dashboard. Later sign-ins use one-time magic links. `shouldCreateUser: false` ensures the login form cannot create accounts.
+See [form builder and signing requirements](docs/planning/FORM_BUILDER.md).
 
-Access control is also enforced **server-side** via:
+## Application connection
 
-1. **Row Level Security policies** on the `profiles` table — employees only read/write their own row; `hr`/`admin` may read all; `admin` may update/delete any.
-2. A `SECURITY DEFINER` Postgres function `update_user_role` (admin-only) for role changes.
-3. The invite role is written to protected `app_metadata` and the profile by the Edge Function. User-editable metadata is never trusted for authorization.
-
-The React app additionally hides routes by role (`RequireRole`) for UX, but RLS/Edge Function checks are the real gate.
-
-## Setup
-
-### 1. Configure environment
-
-```bash
-cp .env.example .env
+```text
+Employee / HR / external respondent
+                 |
+          Next.js frontend
+                 |
+       Same-origin NestJS API
+                 |
+       +---------+------------+
+       |                      |
+   PostgreSQL          Private file storage
+       |
+  Outbox + worker --> Email / scanning / exports
 ```
 
-Fill in your Supabase project URL and anon key:
+The API verifies identity and permissions, validates submissions, controls lifecycle transitions, and writes audit evidence. The frontend communicates through the API contract. Files remain private and access is granted through authorised, short-lived links. A managed OIDC provider supports the API/session authentication boundary.
 
-```
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
-VITE_ADMIN_EMAIL=admin@your-company.com
-```
+## Current folder structure
 
-> The anon key is safe for the browser; it is restricted by RLS. The service role key never touches the client.
-
-### 2. Apply the database migrations
-
-```bash
-npm run db:link    # links to the remote project (prompts for your DB password)
-npm run db:migrate # pushes supabase/migrations/*.sql to the remote database
-```
-
-Or run the files manually in the Supabase **SQL editor**:
-
-- [`0001_init_auth_rbac.sql`](supabase/migrations/0001_init_auth_rbac.sql) — creates `profiles`, the `user_role` enum, the auto-profile trigger, RLS policies, and `update_user_role`.
-- [`0002_email_invites.sql`](supabase/migrations/0002_email_invites.sql) — removes the old password-based `create_user_with_role`, lets the trigger pick the role up from invite metadata.
-- [`0003_fix_rls_recursion.sql`](supabase/migrations/0003_fix_rls_recursion.sql) — **required fix**: the 0001 RLS policies self-referenced `profiles`, which makes Postgres raise *"infinite recursion detected in policy for relation profiles"* (a 500 for every `GET /profiles`). Role checks now go through a `SECURITY DEFINER` helper.
-- [`0004_secure_invite_roles.sql`](supabase/migrations/0004_secure_invite_roles.sql) — prevents user-editable metadata from assigning privileged roles; the authorized invite function now owns role assignment.
-
-### 3. Deploy the invite Edge Function
-
-```bash
-supabase functions deploy invite-user
-supabase secrets set SITE_URL=http://localhost:5173   # or your production URL
+```text
+Nolt-hr/
+├── README.md                         Project overview and proposed stack
+├── AGENTS.md                         Instructions for coding agents
+├── .gitignore                        Local utility dependencies excluded
+├── docs/
+│   ├── source/
+│   │   ├── NOLT_HR_Employee_Lifecycle_Portal_Full_PRD (3).pdf
+│   │   └── prd-extracted.txt          Page-labelled PRD text
+│   └── planning/
+│       ├── ROADMAP.md                 Architecture, milestones and estimates
+│       ├── API_AND_CONNECTIONS.md     API inventory and integration flows
+│       ├── TRACEABILITY.md            PRD coverage and acceptance checks
+│       └── DECISIONS.md               Approval and unresolved choices
+├── skills/
+│   └── nolt-hr-delivery/
+│       └── SKILL.md                   Reusable project delivery skill
+├── tools/
+│   └── python/                       Local PDF/validation dependencies
+├── .agents/                          Existing protected skills
+├── .codex/                           Existing protected tool settings
+└── .git/                             Existing Git history
 ```
 
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically at deploy time. Keep `verify_jwt = true` (already set in `supabase/config.toml`) so only signed-in users can reach it.
+The supplied PDF is preserved under `docs/source/`. Existing protected configuration/history folders are retained. Application directories will be created after roadmap approval: `apps/web`, `apps/api`, `apps/worker`, shared `packages`, `database` and `tests/e2e`. The detailed proposed structure is in the roadmap.
 
-Make sure a real SMTP provider is configured (**Authentication → Email templates → Invite user** sends the email).
+## Planning documents
 
-In **Authentication → URL Configuration**, add these allowed redirect URLs:
+1. [Roadmap](docs/planning/ROADMAP.md): scope, architecture, frontend/backend responsibilities, milestone order and release gates.
+2. [API and connections](docs/planning/API_AND_CONNECTIONS.md): proposed endpoints, sessions, uploads, notifications and service configuration.
+3. [Requirements coverage](docs/planning/TRACEABILITY.md): PRD requirements mapped to delivery and acceptance evidence.
+4. [Decision log](docs/planning/DECISIONS.md): pending owner, HR, legal and operational decisions.
+5. [Original PRD](docs/source/NOLT_HR_Employee_Lifecycle_Portal_Full_PRD%20%283%29.pdf) and [extracted text](docs/source/prd-extracted.txt).
+6. [Implementation skill](skills/nolt-hr-delivery/SKILL.md): project-specific instructions for the approved build.
 
-```
-http://localhost:5173/auth/callback
-http://127.0.0.1:5173/auth/callback
-https://your-production-domain.example/auth/callback
-```
+## Delivery phases
 
-Set the hosted project's Site URL to the production domain. If you customized the invite or magic-link email templates, use Supabase's `{{ .ConfirmationURL }}` link so the configured redirect is preserved.
+| Phase | Scope |
+|---|---|
+| Foundation | Confirm decisions, designs, permissions, data model and API contracts |
+| Phase 1 | Authentication, invitations, checklist, biodata/declarations, files, HR form builder, signature fields, drafts, review/correction, progress and audit |
+| Phase 2A | Guarantors/references, policies, confidentiality/indemnity and beneficiaries |
+| Phase 2B | HMO/AXA exports, induction, assets and reports; builder already delivered in Phase 1 |
+| Phase 3 | Handover, asset returns, departmental clearance, exit interview and closure |
 
-### 4. Seed the first admin
-
-Self-registration is disabled, so use the seed script (needs the service role key — server side only):
-
-```bash
-cp .env.seed.example .env.seed   # fill in URL, service role key, admin email + password
-npm run db:seed
-```
-
-It creates the admin (or promotes them if the email already exists) and sets the admin role on both the auth user and the `profiles` row.
-
-Set `VITE_ADMIN_EMAIL` to the same value as `SEED_ADMIN_EMAIL`. The address is used only to select the admin password form; the app verifies the signed-in user's database role before accepting the password login. Never put the admin password in a `VITE_` variable.
-
-Afterwards, invite everyone else from **HR → Invite a user** and manage roles in **Admin → User management**.
-
-### 5. Run
-
-```bash
-npm install
-npm run dev
-```
-
-## Pages
-
-| Route      | Access              | Purpose                                         |
-| ---------- | ------------------- | ----------------------------------------------- |
-| `/login`   | Public              | Sign in (invited users land here to authenticate) |
-| `/`        | Any user            | Dashboard with your profile                     |
-| `/profile` | Any user            | Edit your name/email                             |
-| `/hr`      | `hr`, `admin`       | Invite users + employee directory                |
-| `/admin`   | `admin`             | Manage user roles                                |
-
-## Scripts
-
-| Script               | What it does                                  |
-| -------------------- | --------------------------------------------- |
-| `npm run dev`        | Start the Vite dev server                     |
-| `npm run build`      | Type-check + production build                 |
-| `npm run lint`       | ESLint                                        |
-| `npm run db:link`    | Link Supabase CLI to the remote project       |
-| `npm run db:migrate` | Push local migrations to the remote database  |
-| `npm run db:seed`    | Create/promote the admin user (reads `.env.seed`) |
-| `npm run db:pull`    | Pull remote schema changes into migrations    |
-| `npm run db:start`   | Start a local Supabase stack                  |
-| `npm run functions:deploy` | Deploy the `invite-user` edge function |
-| `npm run deploy`     | Migrate + seed + deploy edge functions         |
-
-## Project layout
-
-```
-src/
-  lib/
-    supabase.ts          Supabase client (typed)
-    database.types.ts    Hand-written types matching the migration
-    auth-context.ts      Context + types for the auth state
-    auth.tsx             <AuthProvider> — session state
-    useAuth.ts           useAuth() hook
-    queries.ts           TanStack Query hooks (profiles, invites, roles)
-  components/
-    AppLayout.tsx        Nav bar with role-aware links + sign out
-    RequireAuth.tsx      Redirects unauthenticated users to /login
-    RequireRole.tsx      Renders 403 for unauthorized roles
-    RoleBadge.tsx        Role pill
-  pages/
-    Login.tsx Dashboard.tsx ProfilePage.tsx HrPage.tsx AdminPage.tsx
-supabase/
-  migrations/            Backend schema + RLS
-  functions/invite-user/ Edge Function that sends email invites
-scripts/
-  seed-admin.mjs         Creates/promotes the first admin (npm run db:seed)
-```
-
-## Production notes
-
-- Keep **Email confirmations** on and disable public signups in the Supabase dashboard.
-- Never ship the service role key to the client; it lives only in the Edge Function's secrets.
-- Regenerate types after schema changes with `npx supabase gen types typescript` and reconcile with `src/lib/database.types.ts` (`npm run gen:types`).
-
-## Data fetching & forms
-
-- **TanStack Query** drives all server data: `useCurrentProfile`, `useProfiles`, `useUpdateProfile`, `useInviteUser`, `useUpdateUserRole` in [`src/lib/queries.ts`](src/lib/queries.ts). `QueryClientProvider` is mounted in `src/main.tsx`.
-- **React Hook Form** powers every form (login, profile edit, invite) with declarative validation.
+The roadmap flags the PRD's conflicting placement of induction in its MVP description. Proposed delivery follows the PRD release table and places full induction in Phase 2B. Confirm this and the proposed stack with roadmap approval before implementation starts.
