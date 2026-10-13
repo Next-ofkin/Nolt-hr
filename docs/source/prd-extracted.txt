@@ -1,0 +1,790 @@
+--- PDF PAGE 1 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 1
+NOLT FINANCE
+HR Employee Lifecycle Portal
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+Pre-Onboarding, Onboarding & Induction, Post-Onboarding and Offboarding
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Document status Draft for stakeholder review
+Version 1.0
+Date 9 September 2026
+Product owner NOLT Finance - Human Resources
+Primary users HR/Admin, Employees, Guarantors/External Respondents
+Prepared from NOLT HR Policy Manual and onboarding forms supplied for this project
+Confidential working document. Requirements marked “HR decision required” must be validated before production implementation.
+
+--- PDF PAGE 2 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 2
+1. Executive Summary
+NOLT Finance currently uses multiple HR forms, policy acknowledgements, document uploads and manual
+review steps during the employee lifecycle. This PRD defines a secure web-based portal that centralises those
+activities, gives employees a clear checklist and progress view, and gives HR a controlled review and audit
+workflow.
+Product vision
+A single HR lifecycle portal where HR can invite an employee, assign the correct requirements, collect forms and
+supporting documents, review each item, request corrections with reasons, complete induction steps, track company
+assets, and later manage exit clearance without relying on fragmented email chains.
+1.1 Core outcomes
+ Reduce HR follow-up effort by making requirements, due items and rejection reasons visible to employees.
+ Create one source of truth for onboarding status, submissions, approvals, acknowledgements and audit
+history.
+ Convert suitable paper/PDF forms into structured digital forms while retaining upload capability where
+originals or supporting evidence are required.
+ Provide role-based access to sensitive personal, health, banking and employment information.
+ Make the platform extensible from onboarding into a complete employee lifecycle process, including
+offboarding and asset return.
+1.2 Recommended delivery approach
+Phase Scope Outcome
+Phase 1 - Core portal
+Authentication; employee creation; email
+invite; employee checklist; forms;
+uploads; save draft; submit; HR
+approve/reject; rejection reasons;
+progress; audit log.
+Usable minimum viable onboarding
+portal.
+Phase 2 - NOLT workflows
+Guarantor links; policy
+acknowledgement; confidentiality;
+indemnity; beneficiary; HMO; induction;
+work tools; export templates.
+Replaces most manual onboarding
+administration.
+Phase 3 - Offboarding
+Exit initiation; handover; asset return;
+department clearance; exit interview;
+final HR closure.
+Full employee lifecycle coverage.
+
+--- PDF PAGE 3 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 3
+2. Source Documents Reviewed
+The requirements in this PRD are grounded in the documents supplied for the project. Where two source
+documents conflict, the PRD does not silently choose one rule; the issue is listed as a decision for HR.
+Source Key requirements extracted
+NOLT Human Resource Policy Manual, Version 2.0
+Pre-employment requirements; biodata; two guarantors and
+two references; personnel documents; induction; HR policy
+acknowledgement; company property; separation; exit
+interview.
+Employee Data Form Personal/contact information; education; bank/pension/tax; next of kin; emergency contact; health information.
+Employee Declaration & Background Information Criminal/misconduct/investigation declarations; truthfulness declaration; consent for checks.
+NOLT Guarantor Form
+Guarantor undertaking; guarantor details; ID/address/income
+evidence; passport/signature; guarantor eligibility
+requirements.
+NOLT Confidentiality Agreement Employee confidentiality obligations, governing law/data protection and signature sections.
+Employee Indemnity Agreement Employee obligations, post-employment obligations, guarantor/surety and NOLT execution sections.
+Beneficiary Nomination Form Employee details; multiple beneficiaries and proportions; guardian/trustee for minors; authorisation.
+AXA HMO Enrollment Sheet
+Consent text and enrolment fields including plan, staff ID,
+dependent status, relationship, hospital selection and pre-
+existing condition.
+New Employees Induction Checklist Personal documentation, company orientation, conditions of service, HMO, rules, job, welfare, safety, tours and sign-off.
+Assigned Work Tools Form Asset item, quantity, serial number, issues, employee acknowledgement; return on exit.
+
+--- PDF PAGE 4 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 4
+3. Product Context, Problem and Goals
+3.1 Current-state problems
+ Employees can be unsure which forms and documents are still outstanding.
+ HR must manually chase submissions and explain rejected items by email or messaging.
+ Information is duplicated across forms and spreadsheets, increasing re-entry and inconsistency.
+ Approvals are difficult to audit when they happen outside a central system.
+ Sensitive documents may be shared through channels that do not provide appropriate access control or
+retention management.
+ Company asset records used during onboarding are not automatically connected to offboarding return
+checks.
+3.2 Product goals
+ Provide a secure employee self-service onboarding workspace.
+ Enable HR to assign requirements by employee type or onboarding template.
+ Provide item-level statuses and reasons for required corrections.
+ Allow forms to be saved as drafts and resumed later.
+ Maintain versioned acknowledgements for policies and agreements.
+ Support document review, resubmission and audit history.
+ Enable structured export where third-party providers require spreadsheets or documents.
+ Create a foundation for employee exit clearance and asset return.
+3.3 Non-goals for the first release
+ Payroll processing
+ Full performance management
+ Leave management
+ Recruitment applicant tracking before offer acceptance
+ Employee scheduling/time-and-attendance
+ Replacing third-party HMO/insurance systems themselves
+
+--- PDF PAGE 5 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 5
+4. Users and Permissions
+Role Primary responsibilities Access principles
+HR Administrator
+Create/invite employees, assign
+requirements, review submissions,
+approve/reject, manage templates, view
+reports and audit history.
+Broad HR access, but sensitive categories
+should be permission-controlled.
+HR Reviewer / Operations Review assigned sections such as induction, assets, credentials or HMO. Only modules/records explicitly authorised.
+Employee
+Complete assigned forms, upload
+documents, sign/acknowledge, view
+statuses/reasons and resubmit.
+Own record only.
+Guarantor / External Respondent Complete a secure guarantor or reference request via invitation link. Only the specific request; no employee portal access.
+System Administrator (optional) Manage technical configuration, roles, integrations and support. No routine access to HR content unless explicitly authorised.
+4.1 Permission principles
+ Least privilege: users see only what they need for their role.
+ Health and bank/pension/tax information should be separated from general onboarding permissions.
+ Employee-submitted files must be private by default; no public URLs.
+ Every approval, rejection, resubmission, policy acknowledgement and administrative change must be
+attributable to a user and timestamp.
+
+--- PDF PAGE 6 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 6
+5. End-to-End Lifecycle
+The product should model the employee journey as a lifecycle rather than as a collection of unrelated forms.
+Stage Trigger Main activities Exit condition
+Invitation HR creates employee and sends invite Account activation, view requirements, start forms/uploads. Employee activates access.
+Pre-Onboarding Invitation accepted
+Biodata, background
+declaration,
+guarantors/references,
+credentials, medical report
+and other assigned items.
+Mandatory pre-start items
+approved or waived by HR.
+Ready to Resume HR confirms readiness
+Start-date confirmation and
+any outstanding first-day
+items.
+Employee resumes.
+Onboarding & Induction Employee marked resumed
+Policy acknowledgement,
+confidentiality, indemnity,
+beneficiary, HMO, induction,
+job description, work tools.
+All mandatory
+onboarding/induction items
+complete.
+Onboarding Complete HR closes onboarding
+Employee record retained;
+outstanding conditional
+actions can remain tracked.
+Lifecycle remains active until
+exit event.
+Offboarding HR initiates separation
+Notice/handover, return
+property, departmental
+clearances, exit interview.
+Final HR closure.
+5.1 Overall employee status
+ Invited
+ Pre-Onboarding
+ HR Review
+ Action Required
+ Ready to Resume
+ Induction
+ Onboarding Complete
+ Offboarding
+ Exited
+5.2 Requirement item status
+Standard status model
+Not Started -> Draft -> Submitted -> Under Review -> Approved. If correction is needed: Under Review -> Changes
+Required -> Resubmitted -> Under Review -> Approved. Agreement workflows may also use Awaiting Employee,
+Awaiting Guarantor/Witness, Awaiting NOLT Signatory and Completed.
+
+--- PDF PAGE 7 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 7
+6. Functional Requirements - Core Platform
+ID Capability Requirement Priority
+FR-001 Authentication
+Users can securely sign in using
+email-based account access.
+Password reset or passwordless
+authentication must be
+supported.
+P0
+FR-002 Employee creation
+HR can create an employee with
+name, work/personal email as
+appropriate, job title,
+department, employment type,
+start date and onboarding
+template.
+P0
+FR-003 Invitation email
+HR can send and resend a
+secure invitation. Invite links
+expire and cannot be reused
+indefinitely.
+P0
+FR-004 Checklist
+Employee dashboard displays
+every assigned requirement
+with current status and
+required action.
+P0
+FR-005 Progress
+System shows overall
+completion percentage based on
+mandatory assigned
+requirements.
+P0
+FR-006 Save draft Structured forms save as draft and can be resumed. P0
+FR-007 Submit
+Employees can submit a
+completed form or uploaded
+requirement for HR review.
+P0
+FR-008 Review
+Authorised HR users can open
+submission details and
+attachments.
+P0
+FR-009 Approve
+HR can approve an item,
+recording reviewer and
+timestamp.
+P0
+FR-010 Changes required
+HR can return an item and must
+provide a reason visible to the
+employee.
+P0
+FR-011 Resubmission
+Employee can correct/resubmit
+while prior versions remain in
+audit history.
+P0
+FR-012 Notifications
+System emails the relevant
+party on invitation, submission
+outcomes and important
+outstanding actions.
+P0
+FR-013 Audit log System records key lifecycle events and changes. P0
+FR-014 Search/filter
+HR can search employees and
+filter by department, status,
+start date and employment type.
+P1
+FR-015 Template management
+HR can define reusable
+onboarding templates and
+decide which requirements are
+mandatory/optional.
+P1
+FR-016 Reports/export HR can export
+employee/onboarding status
+P1
+
+--- PDF PAGE 8 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 8
+ID Capability Requirement Priority
+and selected provider formats.
+
+--- PDF PAGE 9 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 9
+7. Functional Requirements - NOLT-Specific Modules
+7.1 Employee Data / Biodata
+ Capture name, employment date/type, date/place of birth, nationality, marital details, residence/address,
+contact information, state of origin/LGA and emergency contact.
+ Capture education history with qualification and date.
+ Capture bank name/account number, pension administrator/number and tax ID.
+ Capture next of kin details.
+ Capture health information in a separately permissioned subsection.
+ Where HR already entered employee identity/employment data, fields should be prefilled to reduce
+duplicate entry.
+7.2 Background Declaration
+ Yes/No questions for criminal record, fraudulent/dishonest/misconduct activity, and investigations.
+ If any answer is Yes, explanation becomes mandatory.
+ Employee must confirm truthfulness and consent to verification/background checks before submission.
+ Declaration version, timestamp and employee acknowledgement must be retained.
+7.3 Supporting Documents
+ Configurable upload slots for passport photo, pre-employment medical report, former employer reference,
+character reference, birth certificate, secondary certificate, degree certificate, NYSC certificate/exemption,
+postgraduate certificate and other HR-requested evidence.
+ Allowed file types and maximum size must be configurable.
+ HR can mark a document as Not Applicable or Waived with a reason.
+ Each document has its own review status; one rejected document must not invalidate unrelated approved
+items.
+7.4 Guarantors and References
+ Default template should support two guarantors and two references where required by HR policy.
+ Employee enters guarantor/reference name, email and phone and sends a secure request.
+ Guarantor can complete their own undertaking/details and upload supporting evidence without seeing the
+employee portal.
+ Guarantor evidence can include government ID, proof of address, proof of income and passport photograph
+where required.
+ HR can review each guarantor independently and request replacement/correction.
+ Guarantor invitation status: Not Invited, Invited, Opened, Draft, Submitted, Changes Required, Approved.
+HR decision required - conflicting source rule
+The HR Policy Manual states an immediate-family member may be a guarantor, while the supplied Guarantor Form
+states that a guarantor must not be a family member or relative. Production validation must remain configurable
+until HR confirms the governing rule.
+
+--- PDF PAGE 10 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 10
+7.5 HR Policy Manual & Acknowledgement
+ HR can upload/publish a policy manual version with effective date and version number.
+ Employee can open/read the manual from the portal.
+ Acknowledgement records staff name, date of resumption, date read, version read and
+signature/acknowledgement date.
+ If a new version is published, HR can require affected employees to acknowledge the new version without
+overwriting earlier evidence.
+7.6 Confidentiality Agreement
+ Display the approved agreement text/version to the employee.
+ Capture employee name, designation, signature/acknowledgement and date.
+ Support NOLT signatory and witness sections where the approved legal process requires them.
+ Retain an immutable completed copy or rendered agreement record for audit.
+7.7 Employee Indemnity Agreement
+ Populate employee identity/designation into the agreement where possible.
+ Support staged execution by Employee -> Guarantor/Surety -> NOLT signatory as configured.
+ Each signatory step is timestamped and cannot be silently overwritten.
+ Completed agreement is locked and retained as a versioned record.
+7.8 Beneficiary Nomination
+ Capture employee/assured details.
+ Allow one or more beneficiaries with surname, first name, relationship, allocation percentage, date of birth
+and contact/address.
+ Validate that total beneficiary percentage equals 100% before final submission, unless HR/provider rules
+explicitly allow otherwise.
+ Where a beneficiary is under 18, prompt for guardian/trustee details.
+ Capture employee authorisation/signature and date.
+ HR can export or download the completed record for insurance administration.
+7.9 AXA HMO Enrollment
+ Present the supplied AXA consent wording or an HR-approved current version and capture consent.
+ Capture enrollee number (for additions), surname, first/middle name, plan, plan type, staff ID,
+member/dependent status, relationship, enrollment date, sex, DOB, phone, pre-existing condition,
+primary/secondary hospital, official email and address.
+ Allow family/dependent rows where applicable.
+ Provide an HR export matching the AXA enrollment spreadsheet columns so HR does not have to rekey
+portal data manually.
+
+--- PDF PAGE 11 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 11
+7.10 Assigned Work Tools / Assets
+ HR/Admin can assign asset items such as laptop/charger/adapter, phone, mouse, ID card, MTN SIM, laptop
+stand, laptop bag and configurable “other” items.
+ For each asset record: item, quantity, serial/identifier, issue condition, issue notes, issued date and issued by.
+ Employee acknowledges receipt and any identifiable issues.
+ Assets remain linked to the employee record for offboarding return and clearance.
+7.11 New Employee Induction Checklist
+ Induction sections should mirror the source checklist: personal documentation, company, conditions of
+service, health/HMO, rules and regulations, employee job, welfare, safety and tours.
+ HR/relevant facilitator marks each item Done or Not Done and may add notes/date.
+ Employee confirms receipt of induction training.
+ Head of Operations/HR or authorised role certifies completion.
+ Overall induction status is complete only when all mandatory items are done and both required
+acknowledgements are present.
+
+--- PDF PAGE 12 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 12
+8. Offboarding Requirements
+Offboarding is recommended as Phase 3, but the data model should support it from the start because onboarding
+asset records and policy obligations directly affect exit clearance.
+ID Requirement
+OFF-001 HR initiates an exit case with reason/type, expected last day and notice details.
+OFF-002 Employee can upload or complete a comprehensive handover note.
+OFF-003 System creates an asset-return checklist from assets previously assigned to the employee.
+OFF-004 HR can track return of ID card, HMO card, phone/SIM and other company property.
+OFF-005 Departments can record clearance status and comments where NOLT chooses to use departmental clearance.
+OFF-006 HR records exit interview responses/notes and completion date.
+OFF-007 Employee access is deactivated according to HR/IT policy after closure.
+OFF-008 Final exit record retains audit history and returned/outstanding asset details.
+
+--- PDF PAGE 13 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 13
+9. Information Architecture and Screen Map
+9.1 Employee portal
+Screen Purpose Key elements
+Login / Invite activation Secure access Invite validation, account setup, password/passwordless flow.
+Home / My Onboarding Immediate progress view Progress bar; stage; outstanding actions; recently updated statuses.
+My Checklist All assigned requirements Status chips; due dates; action buttons; rejection reason.
+Form Workspace Complete structured form Sections; validation; save draft; submit; declaration/consent.
+Documents Upload/view evidence Upload slot; file metadata; status; replacement/resubmission.
+Guarantors / References Invite and track external respondents Invite details; status; resend; replace contact.
+Agreements & Policies Read/acknowledge/sign Document viewer; version; acknowledgement/signature.
+Benefits / HMO Complete HMO/beneficiary data Consent; enrolment data; beneficiaries/dependents.
+Induction View completed induction and sign-off Checklist summary; employee confirmation.
+Notifications / Activity See relevant updates Submission outcomes, reminders, status history.
+9.2 HR/Admin portal
+Screen Purpose Key elements
+Admin Dashboard Operational overview
+KPIs; pending review; action required;
+upcoming start dates; completed
+onboarding.
+Employees Directory and filtering Search; filters; status; progress; start date; department.
+Create Employee Start lifecycle Identity/job details; template; requirements; send invite.
+Employee Record 360-degree HR onboarding view Overview; checklist; forms; documents; guarantors; induction; assets; audit.
+Review Queue Process submissions efficiently Pending items by type/date/employee; approve; changes required.
+Templates Configure onboarding packages Mandatory/optional requirements by employment type/role.
+Policies & Agreements Manage published versions Version, effective date, status, acknowledgement coverage.
+Assets Manage issue/return Asset catalogue/assignments; employee acknowledgement; return state.
+Reports & Exports Operational reporting Status export; outstanding items; HMO/provider exports.
+Settings / Roles Permissions and configuration Roles; data access; file limits; notification
+
+--- PDF PAGE 14 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 14
+Screen Purpose Key elements
+templates.
+
+--- PDF PAGE 15 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 15
+10. Key User Stories and Acceptance Criteria
+US-01 - As HR, I want to invite a new employee so they can complete onboarding before resumption.
+ Acceptance: HR can create the employee and select an onboarding template.
+ Acceptance: The system sends an invitation to the entered email.
+ Acceptance: The invitation action is logged.
+ Acceptance: HR can resend an invitation without creating a duplicate employee.
+US-02 - As an employee, I want to see exactly what I need to complete so I do not have to ask HR.
+ Acceptance: Dashboard lists every assigned requirement and its status.
+ Acceptance: Outstanding/action-required items appear prominently.
+ Acceptance: Progress updates after valid completion/approval events.
+ Acceptance: Rejected items show the HR reason and a resubmit action.
+US-03 - As HR, I want to reject an incomplete document with a reason so the employee knows what to fix.
+ Acceptance: Reviewer cannot select Changes Required without entering a reason.
+ Acceptance: Employee receives notification.
+ Acceptance: Reason is visible on the relevant item only.
+ Acceptance: Previous submission remains retained in history after replacement.
+US-04 - As an employee, I want to save a long form and return later so I do not lose work.
+ Acceptance: Save draft is available before final submission.
+ Acceptance: Draft data is restored on next login.
+ Acceptance: Incomplete required fields do not block saving a draft.
+ Acceptance: Final submission does enforce required validation.
+US-05 - As HR, I want guarantors to submit information directly so sensitive supporting evidence is not passed
+through the employee unnecessarily.
+ Acceptance: Employee/HR can trigger a secure guarantor invitation.
+ Acceptance: Guarantor sees only their request.
+ Acceptance: Link expires or requires verification.
+ Acceptance: HR can review the guarantor response independently.
+US-06 - As HR, I want policy acknowledgements tied to versions so I can prove what an employee accepted.
+ Acceptance: Each acknowledgement references policy version/effective date.
+ Acceptance: Employee identity and timestamp are retained.
+ Acceptance: Publishing a new version does not modify historical acknowledgement records.
+
+--- PDF PAGE 16 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 16
+11. Logical Data Model
+The database implementation can vary by technology, but the following logical entities should exist to avoid
+hard-coding the current forms.
+Entity Purpose / important fields
+User id, email, authentication status, role, last login, active flag.
+Employee user_id, employee/staff ID, names, department, role, employment type, start date, lifecycle status.
+OnboardingCase employee_id, template_id, stage, progress, invited_at, ready_to_resume_at, completed_at.
+RequirementDefinition name, category, form/upload/agreement/checklist type, mandatory rule, review role.
+AssignedRequirement case_id, requirement_id, status, due date, not-applicable/waiver reason.
+FormSubmission assigned_requirement_id, schema/version, draft/submitted data, submitted_at.
+DocumentVersion assigned_requirement_id, secure file reference, filename, MIME type, uploaded_by, uploaded_at, version.
+ReviewDecision item/submission id, reviewer, decision, reason, timestamp.
+ExternalRequest employee_id, type (guarantor/reference), recipient details, token status, request status.
+PolicyDocument title, version, effective date, file reference, status.
+Acknowledgement employee_id, document/version, acknowledgement type, signed/confirmed at, evidence.
+Beneficiary employee_id, beneficiary details, allocation %, guardian/trustee linkage.
+HMOEnrollment employee/dependent rows and AXA-required fields, consent record.
+Asset asset type, serial/identifier, status.
+AssetAssignment asset_id, employee_id, quantity, issue date/condition, acknowledgement, return date/condition.
+InductionChecklist employee_id, checklist version, item completion, facilitator, employee sign-off, HR sign-off.
+OffboardingCase employee_id, separation type, last day, handover, exit interview, final status.
+AuditEvent actor, action, target entity, before/after summary, timestamp, IP/device metadata where appropriate.
+
+--- PDF PAGE 17 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 17
+12. Business Rules and Validation
+Rule Definition
+BR-01 An employee cannot see another employee record.
+BR-02 A requirement can be mandatory, optional, not applicable or waived. Waivers require reason and authorised actor.
+BR-03 An approved submission cannot be directly edited. A correction creates a new version/review cycle.
+BR-04 Changes Required always requires reviewer comments/reason.
+BR-05 Progress is calculated from assigned mandatory requirements, not from a fixed global list.
+BR-06
+Employee onboarding cannot be marked complete while
+mandatory requirements remain unapproved/incomplete
+unless explicitly waived.
+BR-07 Beneficiary allocation should equal 100% before final submission unless HR/provider config says otherwise.
+BR-08 Health and financial details require restricted access groups.
+BR-09 External request links are scoped to one request and expire.
+BR-10 Policy/agreement acknowledgements retain the exact version accepted.
+BR-11 Assigned assets cannot be marked fully cleared at exit until each expected return is recorded or exception approved.
+BR-12 Guarantor-family eligibility rule remains configurable pending HR decision.
+
+--- PDF PAGE 18 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 18
+13. Notifications and Communication
+Event Recipient Example purpose
+Employee invitation Employee Welcome and secure onboarding link.
+Reminder Employee Outstanding or due requirements.
+Submission received Employee Confirmation that an item was submitted.
+Changes required Employee Reason and direct link to correct/resubmit.
+Item approved Employee Status confirmation.
+Guarantor/reference request External respondent Secure link to complete request.
+External response submitted HR Prompt HR review.
+Ready to resume HR / employee Pre-onboarding threshold reached.
+Onboarding complete Employee / HR Completion confirmation.
+Offboarding actions Employee / reviewers Handover/asset/clearance actions.
+Notification wording should be configurable by HR, and messages should not include sensitive document
+contents in email. Emails should direct users back to the secure portal.
+
+--- PDF PAGE 19 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 19
+14. Security, Privacy and Compliance Requirements
+ All portal traffic must use HTTPS/TLS.
+ Files must be stored privately with access controlled by authenticated, authorised requests.
+ Passwords, if used, must be securely hashed; no plaintext password storage.
+ Multi-factor authentication should be available for HR/Admin accounts and considered mandatory for
+privileged access.
+ Role-based access control must distinguish general HR data from sensitive health and financial information.
+ Administrative and review actions must be logged.
+ Uploaded files must be validated for permitted type/size and scanned for malicious content where
+production infrastructure allows.
+ Data retention/deletion rules must be defined by NOLT HR/legal/compliance before go-live.
+ The platform should provide a process for correcting inaccurate personal data while preserving audit
+integrity.
+ Consent/acknowledgement evidence must include version and timestamp.
+ Backups and recovery procedures must be defined for production.
+Compliance note
+The supplied agreements reference Nigerian data protection obligations. Before production launch, NOLT should
+have legal/compliance review the portal privacy notice, consent wording, retention schedule and electronic-
+signature approach. This PRD is a product specification, not legal advice.
+
+--- PDF PAGE 20 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 20
+15. Non-Functional Requirements
+Category Requirement
+Usability
+Responsive design; clear plain-language status labels; accessible
+keyboard/form behaviour; mobile-friendly employee
+completion.
+Performance
+Normal dashboard/form pages should load quickly under
+expected staff volumes; large file upload progress should be
+visible.
+Availability
+Production deployment should include monitoring, backups
+and a documented recovery target appropriate to HR
+operations.
+Scalability
+Requirement templates/forms must be data-driven so new
+employment types and documents can be added without
+redesigning the entire database.
+Auditability Critical events must be traceable by actor and timestamp.
+Accessibility Use semantic labels, visible focus, sufficient contrast and accessible error messages; target WCAG 2.1 AA where practical.
+Browser support Current major desktop browsers and modern mobile browsers.
+Data portability HR can export employee status and selected provider datasets in commonly usable formats.
+
+--- PDF PAGE 21 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 21
+16. Admin Dashboard and Reporting
+16.1 Recommended dashboard KPIs
+ Total active onboarding cases
+ Awaiting employee action
+ Awaiting HR review
+ Changes required
+ Ready to resume
+ Starting within 7 days
+ Onboarding complete this month
+ Overdue requirements
+16.2 Core reports
+ Employee onboarding status report.
+ Outstanding requirements by employee/department/start date.
+ Pending review queue age.
+ Guarantor/reference response status.
+ Policy acknowledgement coverage by version.
+ Induction completion report.
+ Asset assignment/return report.
+ HMO export in AXA-required column structure.
+ Offboarding clearance report (Phase 3).
+
+--- PDF PAGE 22 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 22
+17. Recommended Technical Architecture
+The final technology stack can be selected by the development team. The product architecture should separate
+the user interface, API/business logic, relational data, secure object/file storage, email service and
+audit/notification components.
+Layer Recommendation / responsibility
+Frontend Responsive web application for HR, employee and external request flows.
+Backend/API Authentication, permissions, lifecycle rules, review workflow, form validation, notifications and exports.
+Relational database Employees, cases, requirements, statuses, submissions, reviews, acknowledgements, assets and audit metadata.
+Private file storage Uploaded documents and generated signed/completed artefacts; access via short-lived authorised links.
+Email provider Invitation, reminder and status notifications.
+Background jobs Email sending, file scanning, export generation and scheduled reminders.
+Observability Application logs, error tracking, health monitoring and audit monitoring.
+A suitable implementation could use a modern web framework with PostgreSQL and private object storage. The
+exact stack is intentionally not mandated by this PRD so the team can select tools that fit NOLT hosting, security
+and maintenance requirements.
+
+--- PDF PAGE 23 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 23
+18. MVP Backlog and Release Plan
+Release Must include Can follow
+MVP / Phase 1
+Admin/employee auth; employee
+creation; invite email; checklist; core
+digital forms; file uploads; draft/submit;
+review; approve/changes required;
+resubmit; progress; audit.
+Advanced templates, reminders, detailed
+analytics.
+Phase 2A
+Guarantor/reference external links;
+policy manual acknowledgement;
+confidentiality; indemnity; beneficiary.
+Electronic signature integration if NOLT
+chooses a third-party signature provider.
+Phase 2B AXA HMO module/export; induction checklist; assigned work tools; reports. Additional insurer/provider exports.
+Phase 3 Offboarding, handover, asset return, exit interview, clearance. Automation with IT/account deprovisioning if integrations are later available.
+
+--- PDF PAGE 24 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 24
+19. Testing and Go-Live Acceptance
+19.1 Minimum test scenarios
+ New employee invitation and activation.
+ Draft save/reopen on every structured form.
+ Required-field validation at final submission.
+ File upload validation and secure retrieval.
+ Approve and changes-required flows with correct notifications.
+ Resubmission while preserving earlier versions.
+ Employee isolation: employee A cannot access employee B data/files.
+ HR role restrictions for health/financial sections.
+ Expired external guarantor link handling.
+ Policy version acknowledgement history.
+ Beneficiary percentage validation.
+ AXA export column mapping.
+ Induction dual sign-off.
+ Asset issue/acknowledgement and later return linkage.
+ Audit log creation for all critical events.
+19.2 Go-live gates
+ HR signs off the final onboarding requirement templates.
+ Legal/compliance signs off privacy notice, data retention and electronic acknowledgement/signature
+approach.
+ Guarantor-family eligibility conflict is resolved.
+ Production roles/permissions are approved.
+ Email domain/sender is configured.
+ Backup, restore and incident ownership are documented.
+ Pilot run is completed with test employees before full rollout.
+
+--- PDF PAGE 25 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 25
+20. Open Decisions for NOLT HR
+Decision Why it matters Recommended default
+Include offboarding in initial release? Changes project size and timeline. Build data model now; deliver offboarding in Phase 3.
+Can guarantors be family members? Source documents conflict. Do not enforce until HR confirms; keep rule configurable.
+Electronic acknowledgement vs
+handwritten/e-sign provider?
+Affects agreement execution and
+evidential approach.
+Use portal acknowledgement for
+policy/declarations; legal review for
+agreements requiring
+signatures/witnesses.
+Employee login method Security and user friction. Email + password or passwordless magic link; MFA for HR.
+Which documents are mandatory by
+employment type?
+Controls progress and Ready-to-Resume
+status.
+Create templates by
+Permanent/Contract/Other.
+Who can see health and banking
+information? Sensitive access control. Separate restricted HR permission groups.
+Reminder schedule Determines automated chasing. Configurable reminders, e.g. 7/3/1 days before start and overdue.
+Document retention period Compliance and storage. Define with legal/compliance before launch.
+AXA export ownership Determines workflow after employee submission. HR reviews, then exports approved rows.
+
+--- PDF PAGE 26 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 26
+21. Requirements Traceability to Supplied Documents
+Portal module Primary source evidence
+Pre-employment readiness HR Policy Manual: pre-employment medical report and pre-employment requirements.
+Biodata / Employee Data HR Policy Manual biodata requirement + Employee Data Form.
+Two guarantors / two references HR Policy Manual guarantors and references.
+Credentials uploads HR Policy Manual personnel documents list.
+Background declaration Employee Declaration & Background Information form.
+Guarantor workflow NOLT Guarantor Form + HR Policy Manual.
+Policy acknowledgement HR Policy Manual Appendix 2.
+Confidentiality Employee Confidentiality Agreement + HR Policy ethics/confidentiality provisions.
+Indemnity Employee Indemnity Agreement.
+Beneficiary Beneficiary Nomination Form.
+HMO AXA HMO Consent Form and Enrolment Template + induction checklist medical provision.
+Induction New Employees Induction Checklist.
+Work tools/assets Assigned Work Tools form + HR Policy company property/exit obligations.
+Offboarding HR Policy separation, property return and exit interview provisions.
+
+--- PDF PAGE 27 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 27
+22. Definition of Done for the Product
+The NOLT HR Employee Lifecycle Portal is considered successful when HR can move a new employee from
+invitation through approved pre-onboarding and completed induction without relying on separate email threads
+or manually maintained status spreadsheets, while the employee can always see what is required, what has
+been approved, what needs correction and why.
+MVP definition of done
+HR creates employee -> system sends secure invite -> employee completes forms/uploads -> employee sees progress
+-> HR reviews each requirement -> employee receives approval or correction reason -> employee resubmits where
+required -> HR can confirm Ready to Resume and later complete induction -> every material action is recorded in
+the audit history.
+22.1 Suggested project name
+NOLT HR Employee Lifecycle Portal (working name). The product can be renamed internally before UI design
+and deployment.
+22.2 Next delivery artefacts
+ UI wireframes / clickable prototype
+ Final data dictionary and form schema
+ Technical architecture diagram
+ Database ERD
+ API specification
+ Implementation backlog with estimates
+ Test plan and pilot checklist
+
+--- PDF PAGE 28 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 28
+Appendix A - Initial Digital Form Inventory
+Form / module Recommended digital treatment
+Employee Data Form Structured multi-step web form; sensitive health subsection; prefill known HR data.
+Employee Declaration & Background Information Structured questionnaire with conditional detail and consent/acknowledgement.
+Guarantor Form External secure structured form + supporting document uploads + staged review.
+Confidentiality Agreement Read-only agreement content + employee/NOLT/witness execution workflow based on legal decision.
+Indemnity Agreement Staged employee/guarantor/NOLT execution.
+Beneficiary Nomination Structured repeating beneficiary rows + allocation validation + guardian logic.
+AXA HMO Structured consent and enrollment; export to insurer template.
+Induction Checklist HR/facilitator checklist with employee and HR sign-off.
+Assigned Work Tools Asset assignment register + employee acknowledgement + offboarding return linkage.
+HR Policy Manual Acknowledgement Versioned digital acknowledgement linked to published manual.
+
+--- PDF PAGE 29 ---
+NOLT Finance  |  HR PRD  |  v1.0
+NOLT Finance HR Employee Lifecycle Portal - Product Requirements Document   |   Page 29
+Appendix B - Suggested Status Labels
+Status Meaning Employee action
+Not Started Requirement assigned but untouched. Start
+Draft Work saved but not submitted. Continue
+Submitted Employee/external party submitted. Wait
+Under Review HR is reviewing. Wait
+Changes Required Reviewer needs correction/replacement. Review reason and resubmit
+Resubmitted Corrected version submitted. Wait
+Approved Requirement accepted. None
+Waived Authorised HR exception. None
+Not Applicable Requirement does not apply. None
+Completed Multi-party agreement/checklist fully executed. None
