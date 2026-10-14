@@ -1,10 +1,20 @@
 "use client";
 import { FileUp, PenLine } from "lucide-react";
-import type { FormContent } from "@nolt/form-schemas";
+import type { FormContent, Answers } from "@nolt/form-schemas";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-export function FormPreview({ content }: { content: FormContent }) {
+export function FormPreview({
+  content,
+  answers,
+  onAnswer,
+  errors = {},
+}: {
+  content: FormContent;
+  answers?: Answers;
+  onAnswer?: (id: string, value: string | boolean) => void;
+  errors?: Record<string, string>;
+}) {
   return (
     <div className="mx-auto w-full max-w-xl space-y-6">
       <div>
@@ -37,17 +47,37 @@ export function FormPreview({ content }: { content: FormContent }) {
             {field.type === "textarea" ? (
               <Textarea
                 id={`preview-${field.id}`}
+                maxLength={10000}
+                {...(answers
+                  ? {
+                      value: String(answers[field.id] ?? ""),
+                      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                        onAnswer?.(field.id, e.target.value),
+                    }
+                  : {})}
+                aria-invalid={!!errors[field.id]}
+                aria-describedby={
+                  errors[field.id] ? `error-${field.id}` : undefined
+                }
                 placeholder="Enter your answer"
               />
             ) : field.type === "select" ? (
               <select
                 id={`preview-${field.id}`}
                 className="native-select"
-                defaultValue=""
+                {...(answers
+                  ? {
+                      value: String(answers[field.id] ?? ""),
+                      onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+                        onAnswer?.(field.id, e.target.value),
+                    }
+                  : { defaultValue: "" })}
+                aria-invalid={!!errors[field.id]}
+                aria-describedby={
+                  errors[field.id] ? `error-${field.id}` : undefined
+                }
               >
-                <option value="" disabled>
-                  Select an option
-                </option>
+                <option value="">Select an option</option>
                 {field.options.map((option, index) => (
                   <option key={index}>{option}</option>
                 ))}
@@ -57,6 +87,17 @@ export function FormPreview({ content }: { content: FormContent }) {
                 <input
                   id={`preview-${field.id}`}
                   type="checkbox"
+                  {...(answers
+                    ? {
+                        checked: answers[field.id] === true,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                          onAnswer?.(field.id, e.target.checked),
+                      }
+                    : {})}
+                  aria-invalid={!!errors[field.id]}
+                  aria-describedby={
+                    errors[field.id] ? `error-${field.id}` : undefined
+                  }
                   className="mt-1 size-4 accent-primary"
                 />
                 <span className="text-sm text-muted-foreground">I confirm</span>
@@ -72,7 +113,7 @@ export function FormPreview({ content }: { content: FormContent }) {
                       : "Draw or attach your signature"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Preview only · signing is not enabled yet
+                  Signing is not enabled yet
                 </p>
               </div>
             ) : field.type === "file" ? (
@@ -84,18 +125,33 @@ export function FormPreview({ content }: { content: FormContent }) {
                     : "Attach a supporting document"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Preview only · uploads are not enabled yet
+                  Uploads are not enabled yet
                 </p>
               </div>
             ) : (
               <Input
                 id={`preview-${field.id}`}
+                maxLength={10000}
+                {...(answers
+                  ? {
+                      value: String(answers[field.id] ?? ""),
+                      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                        onAnswer?.(field.id, e.target.value),
+                    }
+                  : {})}
+                aria-invalid={!!errors[field.id]}
+                aria-describedby={
+                  errors[field.id] ? `error-${field.id}` : undefined
+                }
+                inputMode={field.type === "number" ? "decimal" : undefined}
                 type={
-                  field.type === "phone"
-                    ? "tel"
-                    : field.type === "text"
-                      ? "text"
-                      : field.type
+                  answers && field.type === "number"
+                    ? "text"
+                    : field.type === "phone"
+                      ? "tel"
+                      : field.type === "text"
+                        ? "text"
+                        : field.type
                 }
                 placeholder={
                   field.type === "date" ? undefined : "Enter your answer"
@@ -107,13 +163,20 @@ export function FormPreview({ content }: { content: FormContent }) {
                 {field.helpText}
               </p>
             )}
+            {errors[field.id] && (
+              <p id={`error-${field.id}`} className="text-sm text-destructive">
+                {errors[field.id]}
+              </p>
+            )}
           </div>
         ))
       )}
-      <p className="border-t pt-4 text-xs leading-5 text-muted-foreground">
-        This is a form preview. Answers are not collected, signed or submitted
-        here.
-      </p>
+      {!answers && (
+        <p className="border-t pt-4 text-xs leading-5 text-muted-foreground">
+          This is a form preview. Answers are not collected, signed or submitted
+          here.
+        </p>
+      )}
     </div>
   );
 }

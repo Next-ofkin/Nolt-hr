@@ -1,9 +1,9 @@
 import { WorkspaceShell } from "@/components/workspace-shell";
-import { FormsWorkspace } from "@/components/forms-workspace";
+import { HomeWorkspace } from "@/components/onboarding-home";
 export default function Page() {
   return (
     <WorkspaceShell>
-      <FormsWorkspace />
+      <HomeWorkspace />
     </WorkspaceShell>
   );
 }

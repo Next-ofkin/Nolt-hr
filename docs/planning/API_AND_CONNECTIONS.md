@@ -1,5 +1,9 @@
 # API and integration plan
 
+Implemented contract: [generated OpenAPI JSON](../api/openapi.json), with generated frontend types in `packages/api-client/src/schema.d.ts`. The inventory below retains the roadmap proposals; delivered paths are generated from the actual Nest controllers.
+
+Employee response paths delivered on 14 October 2026 are `GET`/`PUT /api/v1/me/assignments/{id}/response` and `POST /api/v1/me/assignments/{id}/response/submit`. They enforce own-record/recipient access, revision checks, server validation and transactional immutable evidence. See [response contract and limits](../development/RESPONSES.md).
+
 Status: proposed contract inventory for roadmap approval, not an implemented or executable OpenAPI specification. Source: PRD pp5–19,22–24. Generate and commit `openapi.yaml` during M0/M1, then generate the TypeScript client from it. Never hand-maintain a second incompatible client contract.
 
 ## Confirmed form-builder and signature contract additions
@@ -22,7 +26,7 @@ Employees may create/send/resend/replace external requests. Only the assigned gu
 
 ## Boundary and contract conventions
 
-- Same-origin `/api/v1` behind TLS. Browser uses HttpOnly/Secure/SameSite session cookies and CSRF token on mutations. OIDC tokens stay server-side. API checks active local account status on requests, including after exit deactivation.
+- Same-origin `/api/v1` behind TLS. Browser uses HttpOnly/Secure/SameSite session cookies and CSRF token on mutations. Supabase tokens stay encrypted server-side. API checks active local account status on requests, including after exit deactivation.
 - Identity-provider login/callback validates state, nonce and PKCE. Redirect targets are allowlisted. Sessions rotate after login/privilege change; logout/revocation invalidates server state.
 - Lists use bounded cursor pagination, allowlisted sort/filter fields and scoped totals. Timestamps are ISO 8601 UTC; calendar dates are `YYYY-MM-DD`.
 - Validate path, query and body server-side. IDs do not imply permission. Sensitive DTOs are distinct from general record DTOs.
@@ -38,7 +42,7 @@ Paths below are relative to `/api/v1`. `self` means current employee; `HR` inclu
 
 | Group | Proposed operations | Access and integration |
 |---|---|---|
-| Identity | `GET /auth/login`, `GET /auth/callback`, `POST /auth/logout`, `GET /me`, `GET /me/permissions` | OIDC/session adapter; recovery/MFA delegated to provider UI |
+| Identity | `POST /auth/login`, `/auth/signup`, `/auth/recovery`, `/auth/callback`, `/auth/mfa/enroll`, `/auth/mfa/verify`, `/auth/password`; `GET /auth/session`, `/auth/flow` | Supabase Auth through the server; mandatory TOTP and opaque application sessions |
 | Invitations | `POST /employees/{id}/invitations`, `POST /invitations/exchange`, `POST /invitations/activate` | HR send/resend; public exchange rate-limited; activation binds verified identity to intended employee |
 | Employees | `POST /employees`, `GET /employees`, `GET /employees/{id}`, `PATCH /employees/{id}` | HR fields/scope only; create snapshots template and queues invite only when requested |
 | Employee self | `GET /me/employee`, `GET /me/onboarding`, `GET /me/requirements`, `GET /me/activity` | Own safe record and actionable checklist |
@@ -119,3 +123,7 @@ One database transaction verifies reviewer scope and current submission/version,
 | Monitoring | Redacted logs, alert routes, correlation IDs | Simulate API failure, stalled worker and delivery failure |
 
 Store secrets only server-side. Use environment placeholders in examples, never live credentials. Providers, costs and production accounts remain unselected until owner decisions. No third-party e-sign, payroll, AXA API or automatic IT deprovisioning integration is assumed in baseline scope.
+
+## Implemented identity/session baseline
+
+The executable contract in `../api/openapi.json` contains the real Supabase Auth endpoints listed above plus configuration and current/all logout. Browser-bound PKCE email flows, encrypted provider tokens, signed AAL2 verification and actual provider-session revocation checks replace the synthetic OIDC fixture. Signup defaults to EMPLOYEE; a private one-time verified-email bootstrap grants the approved HR account. Supabase sends email through the owner?s Resend SMTP configuration. Email delivery/link exchange remains an explicit verification gate. See [identity setup](../development/IDENTITY.md). Broader lifecycle routes above remain proposed until implemented.

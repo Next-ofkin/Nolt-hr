@@ -8,8 +8,22 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Database } from "./database.js";
+import { ResponsesController, ResponsesService } from "./responses.js";
 import { AuthController, HrGuard, SessionGuard } from "./auth.js";
 import { FormsController, FormsService } from "./forms.js";
+import { Sessions } from "./sessions.js";
+import { SupabaseAuth } from "./supabase-auth.js";
+import {
+  InvitationsService,
+  InvitationsController,
+  InvitationActivationController,
+} from "./invitations.js";
+import {
+  EmployeesController,
+  EmployeesService,
+  EmployeesGuard,
+  MyOnboardingController,
+} from "./employees.js";
 @Controller("health")
 @ApiTags("Health")
 class HealthController {
@@ -27,7 +41,27 @@ class HealthController {
   }
 }
 @Module({
-  controllers: [HealthController, AuthController, FormsController],
-  providers: [Database, SessionGuard, HrGuard, FormsService],
+  controllers: [
+    HealthController,
+    ResponsesController,
+    AuthController,
+    FormsController,
+    EmployeesController,
+    MyOnboardingController,
+    InvitationsController,
+    InvitationActivationController,
+  ],
+  providers: [
+    Database,
+    ResponsesService,
+    Sessions,
+    SupabaseAuth,
+    SessionGuard,
+    HrGuard,
+    FormsService,
+    EmployeesService,
+    EmployeesGuard,
+    InvitationsService,
+  ],
 })
 export class AppModule {}

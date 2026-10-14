@@ -136,28 +136,6 @@ export function FormsWorkspace() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  async function signIn() {
-    setBusy(true);
-    setNotice(null);
-    try {
-      const { data, error } = await api.POST("/api/v1/auth/local-session", {
-        body: { role: "HR" },
-      });
-      if (error || !data) throw new Error(errorMessage(error));
-      setCsrf(data.csrfToken);
-      await refresh();
-    } catch (error) {
-      setNotice({
-        kind: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Local sign-in failed. Check the API and database.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
   async function create(values: {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
@@ -313,25 +291,6 @@ export function FormsWorkspace() {
               </DialogContent>
             </Dialog>
           </div>
-          {!csrf && !loading && (
-            <div className="mt-7 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-accent p-5">
-              <div>
-                <p className="font-semibold">Open your local HR workspace</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Synthetic identity for development. No production account or
-                  real employee data.
-                </p>
-              </div>
-              <Button onClick={signIn} disabled={busy}>
-                {busy ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <ArrowRight size={16} />
-                )}
-                Continue as local HR
-              </Button>
-            </div>
-          )}
           <div className="my-7 grid gap-4 sm:grid-cols-3">
             {[
               {
@@ -468,8 +427,8 @@ export function FormsWorkspace() {
           </section>
           <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
             <ShieldCheck size={15} className="mt-0.5 shrink-0" />
-            Published in this view stay locked. Create a new version to make changes
-            without rewriting earlier records.
+            Published in this view stay locked. Create a new version to make
+            changes without rewriting earlier records.
           </div>
         </>
       )}

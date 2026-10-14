@@ -70,6 +70,86 @@ export const createFormSchema = z.object({
 export type FormField = z.infer<typeof fieldSchema>;
 export type FormContent = z.infer<typeof formContentSchema>;
 export type Recipient = (typeof recipientTypes)[number];
+export const answersSchema = z
+  .record(
+    z.string().uuid(),
+    z.union([z.string().max(10000), z.boolean(), z.null()]),
+  )
+  .refine(
+    (v) =>
+      Object.keys(v).length <= 100 &&
+      new TextEncoder().encode(JSON.stringify(v)).length <= 100000,
+    "Answers exceed the supported size.",
+  );
+export type Answers = z.infer<typeof answersSchema>;
+export const saveResponseSchema = z
+  .object({
+    expectedRevision: z.number().int().min(0),
+    answers: answersSchema,
+  })
+  .strict();
+export const submitResponseSchema = z
+  .object({
+    expectedRevision: z.number().int().min(0),
+    requestKey: z.string().uuid(),
+  })
+  .strict();
+export function validateAnswers(
+  fields: FormField[],
+  input: unknown,
+  final: boolean,
+) {
+  const answers = answersSchema.parse(input);
+  const issues: { fieldId: string; message: string }[] = [];
+  const known = new Set(fields.map((f) => f.id));
+  for (const id of Object.keys(answers))
+    if (!known.has(id))
+      issues.push({
+        fieldId: id,
+        message: "This question is not in the assigned form.",
+      });
+  for (const f of fields) {
+    const v = answers[f.id];
+    const empty =
+      v === undefined ||
+      v === null ||
+      (typeof v === "string" && v.trim() === "");
+    const add = (message: string) => issues.push({ fieldId: f.id, message });
+    if (f.type === "file" || f.type === "signature") {
+      if (!empty || (final && f.required))
+        add(
+          "File or signature capture is not available yet. This question cannot be submitted.",
+        );
+      continue;
+    }
+    if (empty) {
+      if (final && f.required) add("This question is required.");
+      continue;
+    }
+    if (f.type === "checkbox") {
+      if (typeof v !== "boolean") add("Choose checked or unchecked.");
+      else if (final && f.required && !v) add("This confirmation is required.");
+      continue;
+    }
+    if (typeof v !== "string") {
+      add("Enter a text answer.");
+      continue;
+    }
+    if (!final) continue;
+    const s = v.trim();
+    if (f.type === "email" && !z.email().safeParse(s).success)
+      add("Enter a valid email address.");
+    if (f.type === "number" && !/^-?\d+(\.\d+)?$/.test(s))
+      add("Enter a valid number.");
+    if (f.type === "date" && !z.iso.date().safeParse(s).success)
+      add("Enter a valid calendar date.");
+    if (f.type === "phone" && !/^\+?[\d ()\-.]{6,40}$/.test(s))
+      add("Enter a valid phone number.");
+    if (f.type === "select" && !f.options.includes(v))
+      add("Choose one of the listed options.");
+  }
+  return { answers, issues };
+}
 export function createField(type: FormField["type"], id: string): FormField {
   const labels: Record<FormField["type"], string> = {
     text: "Short answer",

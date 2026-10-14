@@ -1,4 +1,7 @@
+"use client";
 import Link from "next/link";
+import { useAuth } from "./auth-provider";
+import { AccountMenu } from "./account-menu";
 import {
   ArrowUpRight,
   ClipboardList,
@@ -10,8 +13,9 @@ export function WorkspaceShell({
   active = "forms",
 }: {
   children: React.ReactNode;
-  active?: "forms" | "tracker";
+  active?: "forms" | "tracker" | "employees";
 }) {
+  const { session } = useAuth();
   return (
     <div className="min-h-screen">
       <header className="border-b bg-white">
@@ -32,12 +36,22 @@ export function WorkspaceShell({
             </span>
           </Link>
           <nav aria-label="Main navigation" className="flex gap-1 text-sm">
+            {session?.permissions.includes("employees.manage") && (
+              <Link
+                href="/employees"
+                className={`rounded-lg px-3 py-2 ${active === "employees" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
+              >
+                Employees
+              </Link>
+            )}
             <Link
               href="/"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "forms" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
             >
               <FileStack size={16} />
-              Forms
+              {session?.permissions.includes("profile.own")
+                ? "My onboarding"
+                : "Forms"}
             </Link>
             <Link
               href="/tracker"
@@ -47,18 +61,12 @@ export function WorkspaceShell({
               Build tracker
             </Link>
           </nav>
-          <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
-            <ShieldCheck size={16} />
-            <span>HR workspace</span>
-            <span className="ml-2 flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary">
-              HR
-            </span>
-          </div>
+          <AccountMenu />
         </div>
       </header>
       <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
-        Local development · synthetic data only · managed login, signing and
-        delivery are still being built{" "}
+        Development workspace · HR review, signing and third-party requests are
+        being built{" "}
         <Link
           href="/tracker"
           className="inline-flex items-center gap-1 underline underline-offset-2"

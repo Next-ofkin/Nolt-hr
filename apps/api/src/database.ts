@@ -8,6 +8,7 @@ export class Database extends PrismaClient implements OnModuleDestroy {
     super({
       adapter: new PrismaPg({
         connectionString: process.env.DATABASE_URL,
+        options: "-c timezone=UTC",
         max: 8,
       }),
     });

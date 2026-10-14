@@ -10,7 +10,11 @@ model User {
   name String
   role String
   active Boolean @default(true)
+  authVersion Int @default(1)
+  permissions String[] @default([])
+  identities Identity[]
   sessions Session[]
+  employee Employee?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 model Session {
@@ -20,7 +24,45 @@ model Session {
   userId String @db.Uuid
   user User @relation(fields:[userId], references:[id], onDelete:Restrict)
   expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  authVersion Int @default(1)
+  authMethod String @default("LOCAL")
+  mfaVerified Boolean @default(false)
+  providerSession String?
   @@index([userId])
+  @@index([expiresAt])
+}
+model AuthFlow {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  csrfHash String
+  kind String
+  encryptedState String
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+model Identity {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+  issuer String
+  subject String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([issuer,subject])
+  @@index([userId])
+}
+model OidcAttempt {
+  id String @id @default(uuid()) @db.Uuid
+  stateHash String @unique
+  browserHash String
+  verifier String?
+  nonce String
+  returnTo String @default("/")
+  expiresAt DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
   @@index([expiresAt])
 }
 model Form {
@@ -28,6 +70,7 @@ model Form {
   createdBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   versions FormVersion[]
+  assignments FormAssignment[]
   @@index([createdAt])
 }
 model FormVersion {
@@ -43,8 +86,84 @@ model FormVersion {
   fields Json @default("[]")
   publishedAt DateTime? @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  assignments FormAssignment[]
+  @@unique([id,formId])
   @@unique([formId,version])
   @@index([status,updatedAt])
+}
+model Employee {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @unique @db.Uuid
+  user User? @relation(fields:[userId],references:[id],onDelete:Restrict)
+  employeeNumber String? @unique
+  fullName String
+  email String @unique
+  jobTitle String
+  department String
+  employmentType String
+  startDate DateTime @db.Date
+  revision Int @default(1)
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  cases OnboardingCase[]
+  invitations EmployeeInvitation[]
+  @@index([department,startDate])
+  @@index([createdAt,id])
+}
+model OnboardingCase {
+  id String @id @default(uuid()) @db.Uuid
+  employeeId String @db.Uuid
+  employee Employee @relation(fields:[employeeId],references:[id],onDelete:Restrict)
+  status String @default("ACTIVE")
+  stage String @default("PRE_ONBOARDING")
+  revision Int @default(1)
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  assignments FormAssignment[]
+  @@index([employeeId,createdAt])
+}
+model FormAssignment {
+  id String @id @default(uuid()) @db.Uuid
+  caseId String @db.Uuid
+  onboardingCase OnboardingCase @relation(fields:[caseId],references:[id],onDelete:Restrict)
+  formId String @db.Uuid
+  form Form @relation(fields:[formId],references:[id],onDelete:Restrict)
+  formVersionId String @db.Uuid
+  formVersion FormVersion @relation(fields:[formVersionId,formId],references:[id,formId],onDelete:Restrict)
+  required Boolean @default(true)
+  dueDate DateTime? @db.Date
+  assignedBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  response EmployeeResponse?
+  submissions FormSubmission[]
+  @@unique([id,formVersionId])
+  @@unique([caseId,formId])
+  @@index([formVersionId,formId])
+  @@index([formId])
+}
+model EmployeeResponse {
+  assignmentId String @id @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  revision Int @default(1)
+  status String @default("DRAFT")
+  answers Json @default("{}")
+  updatedBy String @db.Uuid
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+}
+model FormSubmission {
+  id String @id @default(uuid()) @db.Uuid
+  assignmentId String @db.Uuid
+  formVersionId String @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId,formVersionId],references:[id,formVersionId],onDelete:Restrict,onUpdate:NoAction)
+  version Int
+  sourceRevision Int
+  requestKey String @db.Uuid
+  answers Json
+  submittedBy String @db.Uuid
+  submittedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([assignmentId,version])
+  @@unique([assignmentId,requestKey])
 }
 model AuditEvent {
   id String @id @default(uuid()) @db.Uuid
@@ -55,11 +174,44 @@ model AuditEvent {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([targetId,createdAt])
 }
+model EmployeeInvitation {
+  id String @id @default(uuid()) @db.Uuid
+  employeeId String @db.Uuid
+  employee Employee @relation(fields:[employeeId],references:[id],onDelete:Restrict)
+  requestKey String @db.Uuid
+  requestHash String
+  state String @default("QUEUED")
+  requiresPassword Boolean
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  sentAt DateTime? @db.Timestamptz(3)
+  acceptedAt DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  acceptedBy String? @db.Uuid
+  delivery InvitationDelivery?
+  @@unique([employeeId,requestKey])
+  @@index([employeeId,createdAt])
+}
+model InvitationDelivery {
+  id String @id @default(uuid()) @db.Uuid
+  invitationId String @unique @db.Uuid
+  invitation EmployeeInvitation @relation(fields:[invitationId],references:[id],onDelete:Restrict)
+  outboxId String @unique @db.Uuid
+  outbox OutboxEvent @relation(fields:[outboxId],references:[id],onDelete:Restrict)
+  state String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now()) @db.Timestamptz(3)
+  leaseUntil DateTime? @db.Timestamptz(3)
+  errorCode String?
+  @@index([state,availableAt])
+}
 model OutboxEvent {
   id String @id @default(uuid()) @db.Uuid
   type String
   targetId String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   processedAt DateTime? @db.Timestamptz(3)
+  invitationDelivery InvitationDelivery?
   @@index([processedAt,createdAt])
 }

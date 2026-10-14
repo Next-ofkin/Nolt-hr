@@ -1,0 +1,23 @@
+ALTER TABLE "User" ADD COLUMN "authVersion" INTEGER NOT NULL DEFAULT 1 CHECK ("authVersion">0);
+ALTER TABLE "User" ADD COLUMN "permissions" TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE "User" DROP CONSTRAINT "User_role_check";
+ALTER TABLE "User" ADD CONSTRAINT "User_role_check" CHECK ("role" IN ('HR','HR_REVIEWER','EMPLOYEE','SYSTEM_ADMIN'));
+ALTER TABLE "Session" ADD COLUMN "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Session" ADD COLUMN "lastSeenAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Session" ADD COLUMN "revokedAt" TIMESTAMPTZ(3);
+ALTER TABLE "Session" ADD COLUMN "authVersion" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "Session" ADD COLUMN "authMethod" TEXT NOT NULL DEFAULT 'LOCAL' CHECK ("authMethod" IN ('LOCAL','OIDC'));
+ALTER TABLE "Session" ADD COLUMN "mfaVerified" BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE "Identity" (
+ "id" UUID PRIMARY KEY, "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+ "issuer" TEXT NOT NULL, "subject" TEXT NOT NULL,
+ "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT "Identity_issuer_subject_key" UNIQUE ("issuer","subject")
+);
+CREATE INDEX "Identity_userId_idx" ON "Identity"("userId");
+CREATE TABLE "OidcAttempt" (
+ "id" UUID PRIMARY KEY, "stateHash" TEXT NOT NULL UNIQUE, "browserHash" TEXT NOT NULL,
+ "verifier" TEXT, "nonce" TEXT NOT NULL, "returnTo" TEXT NOT NULL DEFAULT '/',
+ "expiresAt" TIMESTAMPTZ(3) NOT NULL, "consumedAt" TIMESTAMPTZ(3)
+);
+CREATE INDEX "OidcAttempt_expiresAt_idx" ON "OidcAttempt"("expiresAt");

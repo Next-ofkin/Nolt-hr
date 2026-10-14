@@ -1,0 +1,224 @@
+import {
+  Inject,
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import type { Request, Response } from "express";
+import { randomBytes } from "node:crypto";
+import type { User, Prisma } from "@prisma/client";
+import { Database } from "./database.js";
+import { SupabaseAuth } from "./supabase-auth.js";
+import {
+  assertOrigin,
+  clearCookie,
+  cookie,
+  digest,
+  localEnabled,
+  permissionsFor,
+  privileged,
+  setCookie,
+} from "./security.js";
+export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
+export const SESSION_IDLE_MS = 30 * 60 * 1000;
+export type Actor = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  permissions: string[];
+  mfaVerified: boolean;
+  authMethod: string;
+  expiresAt: string;
+};
+export type AuthRequest = Request & {
+  actor: Actor;
+  sessionId: string;
+  sessionToken: string;
+};
+@Injectable()
+export class Sessions {
+  constructor(
+    @Inject(Database) private db: Database,
+    @Inject(SupabaseAuth) private provider: SupabaseAuth,
+  ) {}
+  async issue(
+    user: User,
+    method: "SUPABASE",
+    mfaVerified: boolean,
+    req: Request,
+    res: Response,
+    providerSession: string,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const token = randomBytes(32).toString("hex"),
+      csrfToken = digest("csrf:" + token),
+      expiresAt = new Date(Date.now() + SESSION_ABSOLUTE_MS);
+    const work = async (tx: Prisma.TransactionClient) => {
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (!current?.active || current.authVersion !== user.authVersion)
+        throw new UnauthorizedException(
+          "Account access changed. Sign in again.",
+        );
+      const old = cookie(req, "session");
+      if (old)
+        await tx.session.updateMany({
+          where: { tokenHash: digest(old) },
+          data: { revokedAt: new Date() },
+        });
+      await tx.session.create({
+        data: {
+          tokenHash: digest(token),
+          csrfHash: digest(csrfToken),
+          userId: user.id,
+          authMethod: method,
+          authVersion: user.authVersion,
+          mfaVerified,
+          providerSession,
+          expiresAt,
+        },
+      });
+      await tx.outboxEvent.create({
+        data: { type: "SESSION_CREATED", targetId: user.id },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: user.id,
+          action: "SESSION_CREATED",
+          targetId: user.id,
+          metadata: { method, mfaVerified },
+        },
+      });
+    };
+    if (transaction) await work(transaction);
+    else await this.db.$transaction(work);
+    setCookie(res, "session", token, SESSION_ABSOLUTE_MS);
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: permissionsFor(user),
+      authMethod: method,
+      mfaVerified,
+      expiresAt: expiresAt.toISOString(),
+      csrfToken,
+    };
+  }
+  async authenticate(req: AuthRequest) {
+    const token = cookie(req, "session");
+    if (!token || !/^[a-f0-9]{64}$/.test(token))
+      throw new UnauthorizedException("Sign in to continue.");
+    const session = await this.db.session.findUnique({
+      where: { tokenHash: digest(token) },
+      include: { user: true },
+    });
+    const now = new Date();
+    if (
+      !session ||
+      session.revokedAt ||
+      session.expiresAt <= now ||
+      now.getTime() - session.lastSeenAt.getTime() > SESSION_IDLE_MS ||
+      !session.user.active ||
+      session.authVersion !== session.user.authVersion ||
+      session.authMethod !== "SUPABASE" ||
+      !session.providerSession
+    )
+      throw new UnauthorizedException(
+        "Your session has expired or access was revoked.",
+      );
+    if (!session.mfaVerified)
+      throw new UnauthorizedException("Multi-factor sign-in is required.");
+    if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      assertOrigin(req);
+      const csrf = req.headers["x-csrf-token"];
+      if (typeof csrf !== "string" || digest(csrf) !== session.csrfHash)
+        throw new ForbiddenException("Invalid request verification token.");
+    }
+    await this.db
+      .$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM public."Session" WHERE id=${session.id}::uuid FOR UPDATE`;
+          const current = await tx.session.findUnique({
+            where: { id: session.id },
+          });
+          if (!current?.providerSession || current.revokedAt)
+            throw new UnauthorizedException("Your session was revoked.");
+          const provider = await this.provider.validate(
+            current.providerSession,
+            tx,
+          );
+          if (
+            provider.user.id !== session.userId ||
+            provider.user.authVersion !== session.authVersion
+          )
+            throw new UnauthorizedException(
+              "Account access changed. Sign in again.",
+            );
+          await tx.session.update({
+            where: { id: session.id },
+            data: {
+              lastSeenAt: new Date(),
+              providerSession: provider.encrypted,
+            },
+          });
+        },
+        { timeout: 30000, maxWait: 10000 },
+      )
+      .catch((error: unknown) => {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          ["P2028", "P2024"].includes(String(error.code))
+        )
+          throw new ServiceUnavailableException(
+            "Sign-in verification is temporarily unavailable. Please retry.",
+          );
+        throw error;
+      });
+    req.actor = {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      role: session.user.role,
+      permissions: permissionsFor(session.user),
+      authMethod: session.authMethod,
+      mfaVerified: session.mfaVerified,
+      expiresAt: session.expiresAt.toISOString(),
+    };
+    req.sessionId = session.id;
+    req.sessionToken = token;
+  }
+  async revoke(req: AuthRequest, res: Response, all = false) {
+    const current = await this.db.session.findUnique({
+      where: { id: req.sessionId },
+    });
+    await this.db.$transaction(async (tx) => {
+      await tx.session.updateMany({
+        where: all
+          ? { userId: req.actor.id, revokedAt: null }
+          : { id: req.sessionId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          type: all ? "ALL_SESSIONS_REVOKED" : "SESSION_REVOKED",
+          targetId: req.actor.id,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: req.actor.id,
+          action: all ? "ALL_SESSIONS_REVOKED" : "SESSION_REVOKED",
+          targetId: req.actor.id,
+        },
+      });
+    });
+    clearCookie(res, "session");
+    if (current?.providerSession)
+      await this.provider.signOut(current.providerSession, all);
+    return { signedOut: true };
+  }
+}

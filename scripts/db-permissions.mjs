@@ -11,6 +11,8 @@ await db.connect();
 await db.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO nolt_app;
 GRANT SELECT ON "User" TO nolt_app;
+GRANT SELECT ON "Identity" TO nolt_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "OidcAttempt" TO nolt_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON "Session" TO nolt_app;
 GRANT SELECT, INSERT, UPDATE ON "Form", "FormVersion" TO nolt_app;
 GRANT SELECT, INSERT ON "AuditEvent", "OutboxEvent" TO nolt_app;`);

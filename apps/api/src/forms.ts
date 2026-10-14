@@ -74,7 +74,7 @@ export class FormDto {
   @ApiProperty({ type: String }) updatedAt!: string;
   @ApiProperty({ nullable: true, type: String }) publishedAt!: string | null;
 }
-function dto(row: {
+export function dto(row: {
   id: string;
   formId: string;
   title: string;

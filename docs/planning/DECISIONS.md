@@ -8,7 +8,7 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 | D02 | Release scope | PRD phase table; full induction Phase 2B despite p27 MVP wording | HR/product owner, roadmap approval |
 | D03 | Templates/readiness | Employment-type templates, requirement stage/mandatory/optional rules | HR, M0/M2 |
 | D04 | Guarantor family | Conflicting source rule; configurable; governing rule not selected | HR/legal, before 2A launch |
-| D05 | Identity | Managed OIDC, email login and privileged MFA; select provider | Owner/IT, M0 |
+| D05 | Identity | Owner selected Supabase Auth with real password login, verified email and authenticator MFA; Resend connects directly via Supabase SMTP. | Owner, 13 October 2026; signup/email delivery and MFA owner-verified; recovery verification pending |
 | D06 | Access | Health/finance permissions separate; reviewer record/module scope | HR/security, M0 |
 | D07 | Legal execution | Obtain approved policy, confidentiality, indemnity, witness/surety and consent wording | Legal/HR, M5 |
 | D08 | Progress/status | Mandatory-only formula, waiver/NA treatment, zero-denominator and status precedence | HR, M2/M4 |
@@ -29,7 +29,13 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 
 | D22 | Signature/file storage | **Confirmed:** private object storage for signature images/signed PDFs; PostgreSQL stores stable references, signer, exact form/response version, timestamp and checksum. Authorised short-lived retrieval. Implementation pending. | Owner, 13 October 2026 |
 
+| D23 | Superseded local identity baseline | OIDC/PKCE with explicit subject provisioning; privileged ACR checks; 30-minute idle/eight-hour absolute application sessions; role/permission changes revoke access. Real provider policy and HR role memberships still need approval. | Local implementation, 13 October 2026 |
+
+| D24 | Real authentication | **Confirmed:** replace synthetic login with Supabase Auth; real email/password accounts and authenticator MFA. Bootstrap the owner-approved personal HR email after verification. Resend SMTP is configured directly by the owner in Supabase. | Owner, 13 October 2026 |
+
 ## Approval record
+
+Hosted development database: owner selected project `llslubzdkdnvhbatmfug` on 13 October 2026 and authorised migration and current-feature testing. CLI linking, migrations, trusted TLS and actual hosted application tests are verified. Four synthetic identities and three test forms remain as QA evidence. No real employee imports, paid upgrades or production app deployment are authorised. Render remains a recommendation for later app hosting.
 
 Roadmap approval: owner approved local implementation on 13 October 2026 ("ok now let start building").
 

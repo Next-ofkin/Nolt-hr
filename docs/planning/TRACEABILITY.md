@@ -4,6 +4,8 @@ Status: requirement-to-milestone baseline. Local implementation has started; ver
 
 ## Core requirements
 
+Verified development evidence for FR-006 and the current structured-field portion of FR-007: [employee responses](../development/RESPONSES.md), accepted 14 October 2026. Drafts, final validation and immutable first submissions are delivered. Conditional/repeating rules, files/signatures, domain-specific forms and review-driven resubmission remain open; this does not mark those wider requirements complete.
+
 | PRD ID | PDF page | Milestone | Acceptance evidence required |
 |---|---:|---|---|
 | FR-001 | 7 | M1 | Email login/recovery, active-account check and HR MFA; wrong/expired identity denied |

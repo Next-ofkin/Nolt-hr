@@ -1,7 +1,9 @@
-import { test, expect } from "@playwright/test";
-test("HR creates, previews, publishes and reopens a form", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue as local HR" }).click();
+import { test, expect, signIn } from "../support/browser-auth.js";
+test("HR creates, previews, publishes and reopens a form", async ({
+  page,
+  realUser,
+}) => {
+  await signIn(page, realUser);
   await page.getByRole("button", { name: "Create form", exact: true }).click();
   const title = `Browser form ${Date.now()}`;
   await page.getByLabel("Form title", { exact: true }).fill(title);
@@ -34,9 +36,9 @@ test("HR creates, previews, publishes and reopens a form", async ({ page }) => {
 });
 test("builder and preview fit phone, tablet and wide screens", async ({
   page,
+  realUser,
 }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue as local HR" }).click();
+  await signIn(page, realUser);
   await page.getByRole("button", { name: "Create form", exact: true }).click();
   await page
     .getByLabel("Form title", { exact: true })

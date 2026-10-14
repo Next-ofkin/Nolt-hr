@@ -13,11 +13,23 @@ export async function createApp() {
     logger: ["error", "warn", "log"],
   });
   app.setGlobalPrefix("api/v1");
+  app.use(
+    (
+      req: import("express").Request,
+      res: import("express").Response,
+      next: () => void,
+    ) => {
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      next();
+    },
+  );
   app.enableShutdownHooks();
   const options = new DocumentBuilder()
     .setTitle("NOLT HR API")
     .setDescription(
-      "Initial HR form authoring slice. Local identity is development-only.",
+      "HR form authoring with real Supabase Auth, browser-bound email verification/recovery and mandatory authenticator MFA.",
     )
     .setVersion("0.1.0")
     .addCookieAuth("nolt_session", { type: "apiKey", in: "cookie" }, "session")

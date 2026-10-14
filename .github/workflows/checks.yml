@@ -7,6 +7,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://nolt_app:local-app-password@127.0.0.1:54329/nolt_hr
+      DIRECT_DATABASE_URL: postgresql://postgres:local-owner-password@127.0.0.1:54329/nolt_hr
     services:
       postgres:
         image: postgres:18
@@ -37,7 +40,6 @@ jobs:
           npm run db:generate
           npm run db:migrate
           npm run db:permissions
-          npm run db:seed
       - run: npm run api:generate
       - name: Check generated contract is current
         run: git diff --exit-code -- docs/api/openapi.json packages/api-client/src/schema.d.ts
@@ -50,6 +52,8 @@ jobs:
           npm run start -w @nolt/web > /tmp/nolt-web.log 2>&1 &
           node scripts/wait-for-services.mjs
       - run: npm test
+      - name: Verify isolated workflow persistence and concurrency
+        run: npm run test:domain
       - run: npm run test:e2e
       - name: Upload browser failure evidence
         if: failure()

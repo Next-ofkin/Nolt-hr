@@ -1,0 +1,47 @@
+-- Supabase hosting integration. Runtime credentials never receive user/role write privileges.
+BEGIN;
+CREATE SCHEMA IF NOT EXISTS nolt_private;
+REVOKE ALL ON SCHEMA nolt_private FROM PUBLIC,anon,authenticated,service_role,nolt_app;
+CREATE TABLE IF NOT EXISTS nolt_private.bootstrap_hr (
+ email TEXT PRIMARY KEY,
+ claimed_subject UUID,
+ claimed_at TIMESTAMPTZ
+);
+REVOKE ALL ON TABLE nolt_private.bootstrap_hr FROM PUBLIC,anon,authenticated,service_role,nolt_app;
+ALTER TABLE nolt_private.bootstrap_hr ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION nolt_private.provision_auth_user() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE claimed UUID;
+BEGIN
+ IF NEW.email IS NULL THEN RETURN NEW; END IF;
+ INSERT INTO public."User" (id,email,name,role)
+ VALUES (NEW.id,lower(NEW.email),left(COALESCE(NULLIF(trim(NEW.raw_user_meta_data->>'name'),''),split_part(NEW.email,'@',1)),160),'EMPLOYEE')
+ ON CONFLICT(id) DO UPDATE SET email=EXCLUDED.email;
+ INSERT INTO public."Identity" (id,"userId",issuer,subject)
+ VALUES (gen_random_uuid(),NEW.id,'https://llslubzdkdnvhbatmfug.supabase.co/auth/v1',NEW.id::text)
+ ON CONFLICT(issuer,subject) DO NOTHING;
+ IF NEW.email_confirmed_at IS NOT NULL THEN
+  UPDATE nolt_private.bootstrap_hr SET claimed_subject=NEW.id,claimed_at=now()
+  WHERE email=lower(NEW.email) AND claimed_subject IS NULL RETURNING claimed_subject INTO claimed;
+  IF claimed IS NOT NULL THEN
+   UPDATE public."User" SET role='HR' WHERE id=NEW.id;
+   INSERT INTO public."AuditEvent" (id,"actorId",action,"targetId",metadata)
+   VALUES(gen_random_uuid(),NEW.id,'BOOTSTRAP_HR_PROVISIONED',NEW.id,'{"source":"verified_supabase_email"}');
+   INSERT INTO public."OutboxEvent" (id,type,"targetId") VALUES(gen_random_uuid(),'BOOTSTRAP_HR_PROVISIONED',NEW.id);
+  END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION nolt_private.provision_auth_user() FROM PUBLIC,anon,authenticated,service_role,nolt_app;
+DROP TRIGGER IF EXISTS nolt_auth_user_provision ON auth.users;
+CREATE TRIGGER nolt_auth_user_provision AFTER INSERT OR UPDATE OF email,email_confirmed_at ON auth.users
+FOR EACH ROW EXECUTE FUNCTION nolt_private.provision_auth_user();
+-- The API must reject provider sessions revoked outside this application too.
+CREATE OR REPLACE FUNCTION nolt_private.auth_session_active(p_user UUID,p_session UUID) RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT EXISTS(SELECT 1 FROM auth.sessions WHERE user_id=p_user AND id=p_session AND (not_after IS NULL OR not_after>now()));
+$$;
+REVOKE ALL ON FUNCTION nolt_private.auth_session_active(UUID,UUID) FROM PUBLIC,anon,authenticated,service_role;
+GRANT USAGE ON SCHEMA nolt_private TO nolt_app;
+GRANT EXECUTE ON FUNCTION nolt_private.auth_session_active(UUID,UUID) TO nolt_app;
+COMMIT;

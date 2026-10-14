@@ -1,85 +1,49 @@
-# Local development
+﻿# Run and review the current project
 
-This first slice implements HR form authoring. It does not yet implement production login, employee assignment/submission, third-party delivery, private uploads or actual signing. Use synthetic data only. The local identity endpoint is disabled unless explicitly enabled, rejects non-loopback callers/untrusted browser origins, and is unavailable under `NODE_ENV=production`.
+The portal uses real Supabase Auth and the hosted Supabase PostgreSQL database. The previous synthetic login, OIDC fixture, seed and access CLI are retired. See [identity setup](IDENTITY.md) and [Supabase setup](SUPABASE_SETUP.md).
 
-## First setup
+## Start
 
-Use Node.js 24 LTS and npm. From the repository root:
+Use Node 24 and install workspace dependencies with `npm ci`. Keep `.env` for loopback transport and ignored `.env.supabase` for the real project, restricted/owner database URLs, public CA path and Auth encryption key. Never commit either local secret file. On a fresh checkout, copy `.env.example` only if `.env` does not exist, then populate the ignored hosted file privately.
 
 ```powershell
-npm ci
-Copy-Item .env.example .env
-npm run contracts:build
 npm run db:generate
-```
-
-Do not overwrite an existing `.env` when repeating setup. The example passwords are only for the workspace-local development database.
-
-Start PostgreSQL in one terminal:
-
-```powershell
-npm run db:local
-```
-
-This starts a real PostgreSQL server on `127.0.0.1:54329`, stores its persistent data under ignored `.local/postgres`, and provisions a restricted runtime role. It does not install a system service or change system accounts. Stop it with Ctrl+C. If the port is occupied, stop the existing project server before starting another.
-
-In another terminal, initialise the database and start the applications:
-
-```powershell
-npm run db:migrate
-npm run db:permissions
-npm run db:seed
+npm run contracts:build
+npm run db:hosted:status
+npm run db:hosted:verify
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000** and choose **Continue as local HR**. API documentation is at **http://127.0.0.1:4000/api/docs**. The web application forwards same-origin API requests to NestJS; no database credentials are sent to the browser.
+Open `http://127.0.0.1:3000`. Choose **Create an account**, use the approved real email and your own password, open the confirmation email in the same browser, then enrol an authenticator app and verify its code. The approved first HR email receives HR after verification; ordinary signups receive EMPLOYEE access. API docs: `http://127.0.0.1:4000/api/docs`.
 
-On later runs, start `db:local` and `dev`; migration/permissions/seed only need repeating when setup or schema changes. Seed is idempotent and creates only `hr@example.test` and `employee@example.test` identities. Forms created during tests remain synthetic development records.
+Connect Resend directly in Supabase SMTP first to validate email delivery. No test login button or preselected synthetic identity is available. Your password is chosen by you and is not stored in the repository.
 
-## Working feature
+## HR form review
 
-1. Create a form and choose Employee, Guarantor or Reference as its respondent.
-2. Add/reorder/remove supported fields and change labels, help text and required flags.
-3. Configure dropdown choices, signature method or signed-document attachment purpose.
-4. Save the draft and reopen it from the form library.
-5. Preview the respondent layout, then publish a locked version.
-6. Create a new version without changing the previous published content.
+Create a draft, choose employee/guarantor/reference, add fields, edit labels/choices/requiredness, reorder/remove fields, save/reopen, preview, publish and create a new version. Published definitions remain immutable. Signature and attachment fields configure requirements only; capture/storage and external delivery remain pending.
 
-Signature and attachment fields currently configure requirements and display a labelled preview; they do not collect/store files or signatures. Guarantor recipient selection does not yet send invitations. The tracker keeps those tasks open. The initial library shows the latest version of up to 100 forms; full pagination/history browsing is tracked separately.
-
-## Verification
-
-With local PostgreSQL/API/web running:
+## Checks
 
 ```powershell
-npm run typecheck
-npm test
-npx playwright install chromium
-npm run test:e2e
-npm run build
-```
-
-`npm test` includes real PostgreSQL/API integration, so it deliberately fails if the API/database is unavailable. Browser checks exercise authoring/publishing/versioning and layouts at 320, 375, 768, 1024, 1440 and 1920 CSS pixels. Full application accessibility, zoom and touch signing remain future acceptance work.
-
-After API contract changes:
-
-```powershell
-npm run contracts:build
 npm run api:generate
+npm run typecheck
+npm run build
+npm test
 ```
 
-The command compiles NestJS (including decorator metadata), exports `docs/api/openapi.json`, then regenerates the frontend client types. Zod supplies input schemas and server validation; cross-field refinements are enforced at runtime even where OpenAPI cannot express them.
+With the real API/web running:
 
-## Current architecture notes
+```powershell
+npm run test:hosted
+npm run test:e2e:hosted
+```
 
-- `apps/web`: Next.js/React, official shadcn component source and Tailwind CSS.
-- `apps/api`: NestJS, session/HR guards, CSRF verification and transactional form mutations.
-- `packages/form-schemas`: shared field/content validation and defaults, compiled before applications.
-- `packages/api-client`: generated OpenAPI types and browser fetch client.
-- `database`: Prisma schema, checked-in migration and synthetic seed. Additional SQL checks and the immutability trigger are intentional database protections beyond Prisma's declarative model.
-- `scripts`: workspace-local PostgreSQL and restricted runtime grants.
-- `docs/TRACKER.md`: implementation checklist, also read by the local `/tracker` page.
+These explicit live suites create disposable accounts in real Supabase Auth and exercise actual TOTP, sessions, permission denial and HR authoring. They require the server-only Auth administration key and never email those disposable accounts or modify the owner's account. Their application audit/form evidence is retained with deactivated identities. Do not point them at production.
 
-The application runtime cannot create schema objects, modify users, or update/delete audit/outbox evidence. Domain changes write audit and outbox in the same transaction. Outbox events are retained pending the worker/notification milestone; no mail delivery is claimed.
+`npm test` runs provider-independent validation, encryption and security unit tests. `npm run test:e2e` runs public Auth-screen checks; the explicit hosted command includes real-login journeys. Authentication email delivery and the owner's confirmation/recovery journeys need separate mailbox testing after SMTP setup.
 
-Managed OIDC, production session controls, rate limits, idempotent invitation/submission handling, complete role scopes and provider configuration must be completed before production deployment. API startup intentionally refuses `NODE_ENV=production` until that identity milestone is implemented. A successful frontend production build verifies compilation; it is not production readiness.
+The architecture remains Next/shadcn/Tailwind → generated OpenAPI client → Nest permission-checked API → restricted PostgreSQL runtime role. All provider tokens and secrets stay on the server. Production deployment, full lifecycle workflows, actual signatures/uploads, comprehensive browser/zoom/touch coverage, shared rate limiting and backup restore remain gated.
+
+For response workflow verification without watch restarts, run `npm run build`, then `node scripts/hosted-qa.mjs preview` instead of the development launcher. The preview stays on loopback and uses the approved hosted development environment. Run the focused journey with `npm run test:e2e:hosted -- tests/e2e/responses.live.spec.ts`. See [employee responses](RESPONSES.md).
+
+For invitation delivery, run `npm run worker:hosted` alongside the app after building the API. Development recipients must be explicitly approved in the private `INVITATION_TEST_RECIPIENTS` setting. Email uses the existing Supabase SMTP connection to Resend. See [invitations](INVITATIONS.md) for retry behavior and the controlled one-email smoke command. Actual invitation inbox receipt and activation were owner-verified on 14 October 2026.

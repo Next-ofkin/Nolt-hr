@@ -12,6 +12,8 @@ Resolve paths relative to the repository root, two levels above this skill folde
 - Read `docs/planning/DECISIONS.md` for approval, scope and unresolved business rules.
 - Read `docs/planning/ROADMAP.md` for architecture, milestone dependencies and release boundaries.
 - Read `docs/planning/API_AND_CONNECTIONS.md` when implementing API, frontend data access, sessions, workers or provider integrations.
+- Read `docs/development/IDENTITY.md` for real Supabase Auth, private verified-email role provisioning, encrypted sessions, mandatory TOTP and pending SMTP email verification. Synthetic login/OIDC fixtures are retired; never reintroduce a shortcut.
+- Read `docs/development/SUPABASE_SETUP.md` and `docs/development/TEST_REPORT.md` for hosted database configuration, single Prisma migration history, trusted TLS, restricted backend role and real-account and disposable live-test boundaries. Use explicit hosted commands; preserve local configuration.
 - Read `docs/planning/TRACEABILITY.md` for the relevant requirement IDs and acceptance gates.
 - Verify disputed requirements against the original PDF in `docs/source/` or page-labelled `docs/source/prd-extracted.txt`. Source forms/legal texts are not implicitly present just because the PRD references them.
 
@@ -33,7 +35,7 @@ Implement the next dependency-ready milestone as an integrated vertical slice: a
 
 Create an executable OpenAPI contract and detailed dictionary/ERD during foundation work. The current API inventory is a proposal, not a generated specification. Generate frontend types/client from the actual contract. Keep business transitions and final validation in the API, including calls from server-rendered web pages.
 
-For PostgreSQL schema, migrations, policies or query work, load the available `supabase-postgres-best-practices` skill and relevant references. If Supabase is selected later, also load its skill; the current plan does not require Supabase. Check supported framework/provider versions when scaffolding instead of assuming versions from this planning date remain current.
+For PostgreSQL schema, migrations, policies or query work, load the available `supabase-postgres-best-practices` skill and relevant references. Supabase is selected; also load its skill for provider work. Check supported framework/provider versions when scaffolding instead of assuming versions from this planning date remain current.
 
 ## Domain invariants
 

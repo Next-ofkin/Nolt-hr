@@ -21,3 +21,10 @@ export function errorMessage(value: unknown) {
   }
   return "The request could not be completed. Please try again.";
 }
+
+api.use({
+  onResponse({ response }) {
+    if (response.status === 401 && typeof window !== "undefined")
+      window.dispatchEvent(new Event("nolt:session-expired"));
+  },
+});
