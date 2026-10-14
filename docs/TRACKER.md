@@ -9,7 +9,8 @@ Owner approved local implementation on 13 October 2026. This file is the working
 - [x] Employee records, onboarding cases, published-form assignments and own employee checklist completed and verified against hosted Supabase.
 - [x] Employee invitations, real email delivery, authenticator MFA and employee activation verified on 14 October 2026.
 - [x] Saved employee form drafts, validated submissions and immutable submission history verified with real Auth against hosted Supabase.
-- [ ] Next delivery: HR review, Changes Required reasons and version-preserving resubmission cycles.
+- [x] HR review and corrections verified through the real HR dialog, employee resubmission and final approval, with explicit record scope and sensitive-data permission checks.
+- [ ] Next delivery: private uploads/signatures, followed by employee-sent guarantor/reference requests.
 
 ## Employee records and onboarding assignments - complete (hosted development)
 
@@ -53,14 +54,33 @@ Implementation and boundaries: [employee invitations](development/INVITATIONS.md
 - [x] Apply migration 007; verify seven checksums, hosted permissions/RLS and public API denial. Final builds, all 14 unit/live backend checks and isolated domain checks passed.
 - [x] Pass affected renderer/onboarding browser regressions and the final response journey. Mobile submission evidence reviewed; initial interrupted/timeout runs are recorded in the test report.
 
-Evidence and limits: [employee responses](development/RESPONSES.md). Required files/signatures block final submission until capture is implemented. Conditional/repeating fields, domain-specific validation and correction cycles remain pending.
+Evidence and limits: [employee responses](development/RESPONSES.md). Required files/signatures block final submission until capture is implemented. Conditional/repeating fields and domain-specific validation remain pending. Review-driven correction cycles are verified below.
 
-## Immediate next delivery - HR review and corrections
+## HR review and versioned corrections - complete (hosted development)
 
-- [ ] Build HR review, Changes Required reasons and resubmission cycles.
-- [ ] Review an exact immutable submission with authorised record/module access; reject stale or competing decisions.
-- [ ] Require a reason for Changes Required, expose it on the employee's item and preserve all prior submission/review evidence on resubmission.
-- [ ] Verify the complete employee submits -> HR requests changes -> employee corrects/resubmits -> HR decides journey with real Auth.
+- [x] Verify HR review, mandatory correction reasons and version-preserving resubmission from screen to database.
+- [x] Verify explicit reviewer assignment, sensitivity permissions, cross-record/technical-admin denial and competing-decision conflicts.
+- [x] Apply review migrations 008/009 to hosted development Supabase; nine checksums, hosted permissions/RLS and security advisors verified. Only the existing leaked-password-protection warning remains.
+- [x] Pass the real-Auth browser journey through the actual HR review dialog, including six viewport widths and mobile evidence review (5.1 minutes on 14 October 2026).
+
+Evidence and limits: [HR reviews](development/REVIEWS.md).
+
+The delivered HR workflow uses an explicit initial reviewer assignment and trusted whole-form classification. Dedicated specialist-reviewer UI, reassignment/revocation administration, per-field sensitivity, production role/classification policy and wider browser/zoom/touch acceptance remain separate gates. Correction requests appear in the portal; no review email delivery is claimed.
+
+## Railway staging preparation - 14 October 2026
+
+- [x] Add an explicit staging startup gate, Railway port binding, API-only build/start commands and deployment guide; configuration security tests passed.
+- [ ] Deploy API to Railway and verify online liveness/readiness. Owner requested guidance; no resource has been provisioned.
+- [ ] Connect an HTTPS frontend and verify real hosted login/MFA through the same-origin API proxy. Frontend is currently local.
+
+## Next delivery - private files and signatures
+
+Security fixes in progress (14 October): private Supabase storage adapter with no overwrite; fail-closed ClamAV scanning; actual image decoding/normalisation; save-before-sign and content-change invalidation; server signing-method/confirmation validation; checksum-checked authorised attachment downloads. Required fields no longer permanently disable Submit. Full delivery remains unchecked: live scanner configuration, hosted storage/browser acceptance, orphan/expiry cleanup, final consent policy and keyboard accommodation for draw-only forms are still pending. Isolated storage/scanner test doubles do not establish hosted acceptance.
+
+- [x] Install and verify official project-local ClamAV LTS binaries and add localhost configuration/start-stop-update commands.
+- [ ] Download official definitions and verify real clean/EICAR scanning. Blocked by updater DNS failure; direct endpoint diagnostic returned 403. See [local scanner setup](development/CLAMAV_LOCAL.md).
+- [ ] Run the new real-Auth upload/drawn-signature browser journey after scanner readiness; the test is written but has not passed yet.
+
 - [ ] Build private uploads/signatures and employee-sent guarantor/reference requests, completed by the actual recipient.
 
 ## Foundation setup and first HR form slice — complete (local development)

@@ -1,4 +1,35 @@
-# Employee response acceptance - 14 October 2026
+# GitHub checkpoint and Railway staging preparation - 14 October 2026
+
+Final checks passed: 22 unit/security checks, workspace type checks, the exact API-only Railway build command including Prisma generation, generated OpenAPI/client, isolated PostgreSQL workflow/concurrency acceptance and the final Next.js production build. Hosted Supabase verification reconfirmed all ten exact migration checksums, restricted runtime verified TLS, denied audit deletion and rollback-only RLS/grant/immutable-form checks. The first frontend build was interrupted by a concurrent dev server rewriting generated type files; the identified project dev tree was stopped and the final build passed.
+
+Explicit staging uses the platform `PORT` and `0.0.0.0`, real Supabase configuration, HTTPS origin and verified restricted database TLS. Unsafe staging configuration and unapproved production startup are rejected by tests. Railway deployment and hosted browser authentication are not verified: the frontend is still local and no Railway service has been provisioned. Scanner definitions remain blocked; uploads/signatures are implemented/domain-tested but not complete live workflows. Prior real-Auth review browser evidence below remains historical, not a new run for this checkpoint. Remote GitHub CI status is reported separately after push.
+
+# Local scanner installation - 14 October 2026
+
+Official ClamAV 1.4.6 LTS portable x64 installation completed in ignored project-local storage. Official release checksum and Cisco Talos detached signature verified. Supported executable options were inspected. Start/stop/update/status commands, loopback-only configuration, private API environment settings, real-scanner clean/EICAR verification script and a real-Auth browser upload/signature test were added.
+
+Official virus-definition download failed with DNS resolution errors from FreshClam; a direct HTTPS diagnostic returned 403. Neither scanner nor updater is running. Real clean/infected acceptance and browser acceptance are pending, not passed. No TLS or antivirus protection was disabled. See [local scanner setup](CLAMAV_LOCAL.md).
+
+# Upload/signature security fixes - 14 October 2026
+
+Private Supabase development bucket setup was run and verified private. The hosted Prisma status check reports all ten migrations applied; no migration SQL was edited or applied during these fixes. Files now use a server-only Supabase Storage adapter with overwrite disabled, permission-checked downloads and stored-checksum verification. ClamAV INSTREAM is fail-closed; PNG/JPEG inputs must decode and are normalised before final-byte checksums. Header detection is explicitly not malware scanning. HR signing methods and the development confirmation version are server-checked; unapproved typed-signature equivalence and legally-binding claims were removed. The screen saves answers before signing, invalidates signatures on content changes and allows submission of required attachment/signature forms.
+
+Twenty unit checks passed, including malformed image rejection, genuine image normalisation, strict payload decoding, missing scanner denial and a test-only ClamAV protocol success response. Workspace type checks, generated API/client, API compilation and the final Next.js production build passed. Final isolated database acceptance passed after adding signing-method/consent denial and idempotent signature replay checks. Domain tests use explicit memory-storage/scanner test doubles and genuine image fixtures; they do not establish real scanning or hosted object acceptance. Earlier nine-migration review acceptance below remains historical evidence.
+
+Remaining delivery gates: configure a real maintained ClamAV service (`CLAMAV_HOST`, `CLAMAV_PORT`), verify live clean/infected files and the real-Auth browser workflow against hosted uploads, implement expired/orphan-object cleanup, approve final consent/retention policies and resolve keyboard accommodation for draw-only forms. No production release, paid scanner service or real employee import is authorised. Upload confirmation returns 503 when scanning is unavailable. No uploaded body or secret is logged.
+
+# HR review and corrections acceptance - 14 October 2026
+
+- Fourteen unit checks passed; workspace and browser-spec type checks passed. API/Next production compilation and generated contract/client passed.
+- Isolated PostgreSQL acceptance passed with all nine migrations: explicit record scope, case-owner-only reviewer setup, separate health/financial permission checks and removal, technical-admin denial, competing decisions (one success/one 409), mandatory reasons, immutable reviews/submissions, rejected reuse of prior review evidence, versioned corrections and approved-answer locking. Existing response/onboarding/invitation domain regressions also passed.
+- Hosted review migrations 008/009 applied successfully. Nine checksums, trusted restricted-runtime TLS, rollback-only schema/RLS/grant checks and denied public Data API access to review/access tables passed. Security advisors report only the existing leaked-password-protection warning.
+- The real Supabase Auth browser journey passed in 5.1 minutes. It uses actual HR/employee MFA sessions, the HR review setup/dialog, required reason controls, employee correction/resubmission, historical/current submission navigation, approval confirmation and locked approved answers. Employee and unrelated HR reads/decisions were denied. The HR dialog fit all six target viewport widths; mobile evidence was reviewed.
+
+No synthetic Auth shortcut, email delivery, production release or real employee import was used. Disposable provider accounts were retired after the run; synthetic application/audit evidence remains. A pg driver deprecation notice occurred under concurrent queries with the pinned dependency version; the assertions and shutdown passed. Functional acceptance does not establish production performance targets.
+
+Access/classification is provisional development policy: explicit single-reviewer assignments, classification by the HR case owner and separate sensitive-data permissions. Dedicated HR_REVIEWER UI, reassignment/revocation administration, per-field sensitivity and final production role/classification policy remain pending. Correction reasons appear in the portal; review email delivery is not implemented. See [review behavior and limits](REVIEWS.md).
+
+## Previous employee response acceptance - 14 October 2026
 
 - Workspace type checks, generated OpenAPI/client and API/Next production compilation passed.
 - All 14 unit/live backend checks passed in the final authentication regression run, including response validation/type/size/decimal precision, real MFA, permissions, revocation and idle expiry. A deliberate unavailable transport with a real session returned 503 without granting access or changing encrypted session/last-seen evidence; normal access recovered after transport restoration.

@@ -15,6 +15,11 @@ model User {
   identities Identity[]
   sessions Session[]
   employee Employee?
+  assignedReviews AssignmentReviewAccess[] @relation("ReviewAssignee")
+  grantedReviews AssignmentReviewAccess[] @relation("ReviewGrantor")
+  reviewDecisions SubmissionReview[] @relation("ReviewActor")
+  uploadedFiles StoredFile[]
+  signatures SignatureEvidence[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 model Session {
@@ -136,11 +141,26 @@ model FormAssignment {
   assignedBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   response EmployeeResponse?
+  reviewAccess AssignmentReviewAccess?
   submissions FormSubmission[]
+  files StoredFile[]
+  signatures SignatureEvidence[]
   @@unique([id,formVersionId])
   @@unique([caseId,formId])
   @@index([formVersionId,formId])
   @@index([formId])
+}
+model AssignmentReviewAccess {
+  assignmentId String @id @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  reviewerId String @db.Uuid
+  reviewer User @relation("ReviewAssignee",fields:[reviewerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  sensitivity String
+  grantedBy String @db.Uuid
+  grantor User @relation("ReviewGrantor",fields:[grantedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([reviewerId,createdAt])
+  @@index([grantedBy])
 }
 model EmployeeResponse {
   assignmentId String @id @db.Uuid
@@ -162,8 +182,20 @@ model FormSubmission {
   answers Json
   submittedBy String @db.Uuid
   submittedAt DateTime @default(now()) @db.Timestamptz(3)
+  review SubmissionReview?
   @@unique([assignmentId,version])
   @@unique([assignmentId,requestKey])
+}
+model SubmissionReview {
+  id String @id @default(uuid()) @db.Uuid
+  submissionId String @unique @db.Uuid
+  submission FormSubmission @relation(fields:[submissionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  decision String
+  reason String?
+  reviewedBy String @db.Uuid
+  reviewer User @relation("ReviewActor",fields:[reviewedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  reviewedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([reviewedBy,reviewedAt])
 }
 model AuditEvent {
   id String @id @default(uuid()) @db.Uuid
@@ -214,4 +246,52 @@ model OutboxEvent {
   processedAt DateTime? @db.Timestamptz(3)
   invitationDelivery InvitationDelivery?
   @@index([processedAt,createdAt])
+}
+
+model StoredFile {
+  id String @id @default(uuid()) @db.Uuid
+  assignmentId String @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  fieldId String @db.Uuid
+  uploadedBy String @db.Uuid
+  uploader User @relation(fields:[uploadedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  purpose String
+  bucket String @default("nolt-private-documents")
+  storageKey String @unique
+  fileName String
+  mimeType String
+  byteSize Int
+  sha256 String
+  scanStatus String @default("QUARANTINED")
+  scanReason String?
+  status String @default("PENDING")
+  requestKey String @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  confirmedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  signature SignatureEvidence?
+  @@unique([assignmentId,requestKey])
+  @@index([assignmentId,fieldId])
+  @@index([uploadedBy,createdAt])
+  @@index([status,expiresAt])
+}
+
+model SignatureEvidence {
+  id String @id @default(uuid()) @db.Uuid
+  assignmentId String @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  formVersionId String @db.Uuid
+  fieldId String @db.Uuid
+  signerId String @db.Uuid
+  signer User @relation(fields:[signerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  signerRole String
+  signingMethod String
+  consentVersion String
+  sourceRevision Int
+  contentDigest String
+  fileId String @unique @db.Uuid
+  file StoredFile @relation(fields:[fileId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  signedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([assignmentId,fieldId])
+  @@index([signerId,signedAt])
 }

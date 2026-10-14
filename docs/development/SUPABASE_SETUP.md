@@ -1,14 +1,14 @@
-﻿# Supabase setup
+# Supabase setup
 
 Project: [llslubzdkdnvhbatmfug](https://supabase.com/dashboard/project/llslubzdkdnvhbatmfug). Real Supabase PostgreSQL and Auth are integrated. The owner configures Resend directly in Supabase SMTP; real invitation receipt and activation were owner-verified on 14 October 2026.
 
 ## Database and TLS
 
-Seven Prisma migrations are applied. `_prisma_migrations` stores the original names and exact SHA-256 checksums, independently verified against local files. There is no competing Supabase application migration history.
+Ten Prisma migrations are applied. `_prisma_migrations` stores the original names and exact SHA-256 checksums, independently verified against local files. There is no competing Supabase application migration history.
 
 Migration files retain their exact applied bytes through `.gitattributes` (`-text diff`). Existing history contains both CRLF and LF files; do not normalise their line endings. Staged content is checked against the applied local files before publishing, so Windows/Linux checkouts preserve the same checksums.
 
-The restricted `nolt_app` role has only required table operations, no schema creation/superuser/role creation/RLS bypass and no user/role mutation rights. All 16 application tables and migration history have RLS; public API roles have no table access. Audit and submission evidence are append-only to the runtime role. Private hosting functions handle verified Auth identity provisioning and actual provider-session revocation checks without exposing Auth tables to the API.
+The restricted `nolt_app` role has only required table operations, no schema creation/superuser/role creation/RLS bypass and no user/role mutation rights. All 20 application tables and migration history have RLS; public API roles have no table access. Audit and submission evidence are append-only to the runtime role. Private hosting functions handle verified Auth identity provisioning and actual provider-session revocation checks without exposing Auth tables to the API.
 
 The Session pooler endpoint is `aws-0-eu-west-1.pooler.supabase.com:5432`. Ignored connection URLs use `sslmode=verify-full` and `sslrootcert` pointing to `database/certs/supabase-prod-ca-2021.crt`, downloaded from the official dashboard's public certificate URL. Node client TLS and hostname verification passed. On another machine, update the absolute certificate path in the ignored URLs. Never disable certificate verification.
 

@@ -33,7 +33,14 @@
     "predev:hosted": "npm run contracts:build",
     "db:hosted:migrate": "node scripts/hosted-qa.mjs migrate",
     "auth:setup": "node scripts/hosted-qa.mjs setup",
-    "worker:hosted": "node scripts/hosted-qa.mjs worker"
+    "worker:hosted": "node scripts/hosted-qa.mjs worker",
+    "scanner:start": "powershell -NoProfile -File scripts/clamav-local.ps1 start",
+    "scanner:stop": "powershell -NoProfile -File scripts/clamav-local.ps1 stop",
+    "scanner:update": "powershell -NoProfile -File scripts/clamav-local.ps1 update",
+    "scanner:status": "powershell -NoProfile -File scripts/clamav-local.ps1 status",
+    "scanner:test": "node scripts/test-clamav.mjs",
+    "build:api": "npm run db:generate && npm run contracts:build && npm run build -w @nolt/api",
+    "start:api": "node apps/api/dist/main.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

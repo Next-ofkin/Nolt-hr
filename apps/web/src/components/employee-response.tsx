@@ -128,7 +128,9 @@ export function EmployeeResponse({
       }
       setNotice(
         submit
-          ? "Form submitted. Your answers are locked; HR review follows separately."
+          ? data.status === "CHANGES_REQUIRED"
+            ? "Corrections resubmitted. Your answers are locked; HR review follows separately."
+            : "Form submitted. Your answers are locked; HR review follows separately."
           : "Draft saved. You can return and continue later.",
       );
       await onChanged();
@@ -142,9 +144,9 @@ export function EmployeeResponse({
   }
   const content = data ? normaliseForm(data.form) : null,
     submitted = data?.status === "SUBMITTED",
-    blocked = content?.fields.some(
-      (f) => f.required && (f.type === "file" || f.type === "signature"),
-    );
+    approved = data?.status === "APPROVED",
+    changesRequired = data?.status === "CHANGES_REQUIRED",
+    isLocked = submitted || approved;
   return (
     <section
       ref={section}
@@ -153,7 +155,13 @@ export function EmployeeResponse({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">
-          {submitted ? "Your submitted form" : "Complete your form"}
+          {approved
+            ? "Approved form"
+            : submitted
+              ? "Your submitted form"
+              : changesRequired
+                ? "Update your submission"
+                : "Complete your form"}
         </h2>
         <Button
           variant="outline"
@@ -189,24 +197,50 @@ export function EmployeeResponse({
         </div>
       )}
       {notice && <p role="status">{notice}</p>}
+      {changesRequired && data?.latestReview && (
+        <div
+          role="alert"
+          className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900"
+        >
+          <p className="font-semibold">Changes requested by HR reviewer</p>
+          <p className="text-sm">
+            {data.latestReview.reason ||
+              "Please review and update your answers."}
+          </p>
+          <p className="text-xs text-amber-700">
+            Requested on{" "}
+            {new Date(data.latestReview.reviewedAt).toLocaleString()}
+          </p>
+        </div>
+      )}
+      {approved && (
+        <div
+          role="status"
+          className="rounded-lg border border-green-300 bg-green-50 p-4 text-green-900"
+        >
+          <p className="font-semibold">Submission approved</p>
+          <p className="text-sm">
+            HR has reviewed and approved your submission. Your answers are
+            locked.
+          </p>
+        </div>
+      )}
       {data && content && (
         <>
           <p className="text-sm text-muted-foreground">
             Version {content.version} ·{" "}
-            {submitted
-              ? "Submitted — awaiting HR review"
-              : dirty
-                ? "Unsaved changes"
-                : data.status === "DRAFT"
-                  ? "Saved draft"
-                  : "Not started"}
+            {approved
+              ? "Approved"
+              : submitted
+                ? "Submitted — awaiting HR review"
+                : changesRequired
+                  ? "Changes requested — edit and resubmit"
+                  : dirty
+                    ? "Unsaved changes"
+                    : data.status === "DRAFT"
+                      ? "Saved draft"
+                      : "Not started"}
           </p>
-          {blocked && !submitted && (
-            <p className="rounded-lg border p-3 text-sm">
-              This form requires a file or signature. You can save your answers
-              now; final submission will be available when capture is enabled.
-            </p>
-          )}
           <form
             noValidate
             onSubmit={(e) => {
@@ -214,22 +248,52 @@ export function EmployeeResponse({
               void persist(true);
             }}
           >
-            <fieldset
-              disabled={busy || submitted}
-              className="min-w-0 space-y-6"
-            >
+            <fieldset disabled={busy || isLocked} className="min-w-0 space-y-6">
               <FormPreview
                 content={content}
                 answers={answers}
                 errors={errors}
+                assignmentId={assignmentId}
+                revision={data.revision}
+                beforeSign={async () => {
+                  if (!session || !data) throw Error("Sign in before signing.");
+                  setBusy(true);
+                  try {
+                    const r = await api.PUT(
+                      "/api/v1/me/assignments/{id}/response",
+                      {
+                        params: { path: { id: assignmentId } },
+                        headers: { "x-csrf-token": session.csrfToken },
+                        body: { expectedRevision: data.revision, answers },
+                      },
+                    );
+                    if (r.error) throw fail(r.error);
+                    setData(r.data);
+                    setAnswers(r.data.answers);
+                    setDirty(false);
+                    return r.data.revision;
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                disabled={busy || isLocked}
                 onAnswer={(id, value) => {
-                  setAnswers((previous) => ({ ...previous, [id]: value }));
+                  setAnswers((previous) => {
+                    const next = { ...previous, [id]: value };
+                    if (
+                      content.fields.find((f) => f.id === id)?.type !==
+                      "signature"
+                    )
+                      for (const f of content.fields)
+                        if (f.type === "signature") next[f.id] = "";
+                    return next;
+                  });
                   setDirty(true);
                   setNotice("");
                   setErrors((previous) => ({ ...previous, [id]: "" }));
                 }}
               />
-              {!submitted && (
+              {!isLocked && (
                 <div className="flex flex-wrap gap-3">
                   <Button
                     type="button"
@@ -238,8 +302,8 @@ export function EmployeeResponse({
                   >
                     Save draft
                   </Button>
-                  <Button type="submit" disabled={blocked}>
-                    Submit form
+                  <Button type="submit">
+                    {changesRequired ? "Resubmit for review" : "Submit form"}
                   </Button>
                 </div>
               )}
@@ -248,19 +312,48 @@ export function EmployeeResponse({
           {data.submissions.length > 0 && (
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold">Submission history</h3>
-              {data.submissions.map((s) => (
-                <div key={s.id} className="space-y-2 text-sm">
-                  <p>
-                    Submission {s.version} ·{" "}
-                    {new Date(s.submittedAt).toLocaleString()} · form v
-                    {content.version}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Submitted answers are preserved. Corrections will use a
-                    separate review cycle.
-                  </p>
-                </div>
-              ))}
+              <ul className="space-y-3">
+                {data.submissions.map((s) => (
+                  <li
+                    key={s.id}
+                    className="space-y-1.5 rounded-lg border bg-slate-50/50 p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium">
+                        Submission {s.version} ·{" "}
+                        {new Date(s.submittedAt).toLocaleString()}
+                      </p>
+                      {s.review ? (
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
+                            s.review.decision === "APPROVED"
+                              ? "bg-green-100 text-green-800 border border-green-300"
+                              : "bg-amber-100 text-amber-800 border border-amber-300"
+                          }`}
+                        >
+                          {s.review.decision === "APPROVED"
+                            ? "Approved"
+                            : "Changes requested"}
+                        </span>
+                      ) : (
+                        <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs text-muted-foreground border">
+                          Awaiting HR review
+                        </span>
+                      )}
+                    </div>
+                    {s.review?.reason && (
+                      <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded p-2">
+                        <strong className="font-medium">HR reason:</strong>{" "}
+                        {s.review.reason}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                All submitted versions are preserved for compliance and audit
+                evidence.
+              </p>
             </div>
           )}
         </>

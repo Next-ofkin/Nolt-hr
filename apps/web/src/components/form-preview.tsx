@@ -4,16 +4,27 @@ import type { FormContent, Answers } from "@nolt/form-schemas";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { SignaturePad } from "./signature-pad";
+import { FileUpload } from "./file-upload";
+
 export function FormPreview({
   content,
   answers,
   onAnswer,
   errors = {},
+  assignmentId,
+  revision = 0,
+  beforeSign,
+  disabled = false,
 }: {
   content: FormContent;
   answers?: Answers;
   onAnswer?: (id: string, value: string | boolean) => void;
   errors?: Record<string, string>;
+  assignmentId?: string;
+  revision?: number;
+  beforeSign?: () => Promise<number>;
+  disabled?: boolean;
 }) {
   return (
     <div className="mx-auto w-full max-w-xl space-y-6">
@@ -103,31 +114,61 @@ export function FormPreview({
                 <span className="text-sm text-muted-foreground">I confirm</span>
               </div>
             ) : field.type === "signature" ? (
-              <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-background p-4 text-center">
-                <PenLine size={20} className="text-primary" />
-                <p className="text-sm">
-                  {field.signatureMethod === "DRAW"
-                    ? "Draw your signature"
-                    : field.signatureMethod === "UPLOAD"
-                      ? "Attach your signature"
-                      : "Draw or attach your signature"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Signing is not enabled yet
-                </p>
-              </div>
+              assignmentId ? (
+                <SignaturePad
+                  assignmentId={assignmentId}
+                  fieldId={field.id}
+                  allowedMethod={field.signatureMethod}
+                  expectedRevision={revision}
+                  beforeSign={beforeSign}
+                  existingSignatureId={
+                    answers?.[field.id] ? String(answers[field.id]) : null
+                  }
+                  disabled={disabled}
+                  onSigned={(sigId) => onAnswer?.(field.id, sigId)}
+                  onClear={() => onAnswer?.(field.id, "")}
+                />
+              ) : (
+                <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-background p-4 text-center">
+                  <PenLine size={20} className="text-primary" />
+                  <p className="text-sm">
+                    {field.signatureMethod === "DRAW"
+                      ? "Draw your signature"
+                      : field.signatureMethod === "UPLOAD"
+                        ? "Attach your signature"
+                        : "Draw or attach your signature"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Signature preview (interactive in respondent flow)
+                  </p>
+                </div>
+              )
             ) : field.type === "file" ? (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-5 text-center">
-                <FileUp size={20} className="text-primary" />
-                <p className="text-sm">
-                  {field.attachmentPurpose === "SIGNED_DOCUMENT"
-                    ? "Attach a signed document"
-                    : "Attach a supporting document"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Uploads are not enabled yet
-                </p>
-              </div>
+              assignmentId ? (
+                <FileUpload
+                  assignmentId={assignmentId}
+                  fieldId={field.id}
+                  purpose={field.attachmentPurpose}
+                  existingFileId={
+                    answers?.[field.id] ? String(answers[field.id]) : null
+                  }
+                  disabled={disabled}
+                  onUploaded={(fileId) => onAnswer?.(field.id, fileId)}
+                  onClear={() => onAnswer?.(field.id, "")}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-5 text-center">
+                  <FileUp size={20} className="text-primary" />
+                  <p className="text-sm">
+                    {field.attachmentPurpose === "SIGNED_DOCUMENT"
+                      ? "Attach a signed document"
+                      : "Attach a supporting document"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    File upload preview (interactive in respondent flow)
+                  </p>
+                </div>
+              )
             ) : (
               <Input
                 id={`preview-${field.id}`}

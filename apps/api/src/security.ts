@@ -7,7 +7,7 @@ export const digest = (value: string) =>
 export const privileged = (role: string) =>
   ["HR", "HR_REVIEWER", "SYSTEM_ADMIN"].includes(role);
 const grants: Record<string, string[]> = {
-  HR: ["forms.manage", "employees.manage"],
+  HR: ["forms.manage", "employees.manage", "reviews.assigned"],
   HR_REVIEWER: ["reviews.assigned"],
   EMPLOYEE: ["profile.own"],
   SYSTEM_ADMIN: ["system.manage"],

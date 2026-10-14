@@ -6,7 +6,15 @@ import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Badge } from "./ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
 import { EmployeeInvitations } from "./employee-invitations";
+import { SubmissionReview } from "./submission-review";
 type Detail = components["schemas"]["EmployeeDetailDto"];
 type Employee = components["schemas"]["EmployeeDto"];
 type Published = components["schemas"]["FormDto"];
@@ -49,6 +57,9 @@ export function EmployeesWorkspace() {
     [versionId, setVersionId] = useState(""),
     [required, setRequired] = useState(true),
     [dueDate, setDueDate] = useState("");
+  const [reviewingAssignmentId, setReviewingAssignmentId] = useState<
+    string | null
+  >(null);
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -433,18 +444,70 @@ export function EmployeesWorkspace() {
                 <div className="space-y-4 border-t pt-5">
                   <h3 className="font-semibold">Onboarding · Pre-onboarding</h3>
                   <ul className="space-y-3">
-                    {c.assignments.map((a) => (
-                      <li key={a.id} className="rounded-lg border p-3">
-                        <p className="break-words font-medium">
-                          {a.title} · v{a.version}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {a.recipient.toLowerCase()} ·{" "}
-                          {a.required ? "Required" : "Optional"} · Not started
-                          {a.dueDate ? ` · Due ${a.dueDate}` : ""}
-                        </p>
-                      </li>
-                    ))}
+                    {c.assignments.map((a) => {
+                      const hasSubmission =
+                        a.status === "SUBMITTED" ||
+                        a.status === "CHANGES_REQUIRED" ||
+                        a.status === "APPROVED";
+                      return (
+                        <li
+                          key={a.id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3.5"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <p className="break-words font-medium">
+                              {a.title} · v{a.version}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                              <span>
+                                {a.recipient.toLowerCase()} ·{" "}
+                                {a.required ? "Required" : "Optional"}
+                              </span>
+                              <span>·</span>
+                              {a.status === "APPROVED" ? (
+                                <Badge className="bg-green-600 hover:bg-green-700 text-xs">
+                                  Approved
+                                </Badge>
+                              ) : a.status === "CHANGES_REQUIRED" ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500 text-amber-700 bg-amber-50 text-xs"
+                                >
+                                  Changes Requested
+                                </Badge>
+                              ) : a.status === "SUBMITTED" ? (
+                                <Badge className="bg-amber-600 hover:bg-amber-700 text-xs">
+                                  Submitted — Review Required
+                                </Badge>
+                              ) : a.status === "DRAFT" ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  Draft Saved
+                                </Badge>
+                              ) : (
+                                <span className="text-xs">Not started</span>
+                              )}
+                              {a.dueDate ? (
+                                <span>· Due {a.dueDate}</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {hasSubmission && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={
+                                a.status === "SUBMITTED" ? "default" : "outline"
+                              }
+                              onClick={() => setReviewingAssignmentId(a.id)}
+                            >
+                              {a.status === "SUBMITTED"
+                                ? "Review submission"
+                                : "View submission"}
+                            </Button>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                   {!c.assignments.length && (
                     <p className="text-sm text-muted-foreground">
@@ -561,6 +624,29 @@ export function EmployeesWorkspace() {
           )}
         </section>
       </div>
+      {reviewingAssignmentId && detail && (
+        <Dialog
+          open={!!reviewingAssignmentId}
+          onOpenChange={(open) => {
+            if (!open) setReviewingAssignmentId(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle className="sr-only">Submission review</DialogTitle>
+            <DialogDescription className="sr-only">
+              Review the assigned form and record a decision on an exact
+              submitted version.
+            </DialogDescription>
+            <SubmissionReview
+              assignmentId={reviewingAssignmentId}
+              onClose={() => setReviewingAssignmentId(null)}
+              onDecided={async () => {
+                await select(detail.employee.id);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -35,6 +35,11 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 
 ## Approval record
 
+Railway staging preparation, 14 October 2026: owner requested a reviewed GitHub checkpoint and guidance for deploying the API to Railway's free/trial environment. Prepare an explicit staging startup/configuration and deployment guide. This authorises repository preparation and the requested GitHub push, not production release, paid services or real employee imports. No Railway resource is provisioned by this checkpoint.
+
+
+Development review access, 14 October 2026: following the owner's approval to fix the reviewed security/concurrency gaps, require an explicit assignment-level reviewer and an explicit whole-form sensitivity classification by the HR account that opened the case. No legacy answer access is automatically granted. Health/financial classes additionally require the corresponding private account permissions; technical administrators do not inherit review access. The initial assignment is immutable. Production classification authority, reviewer delegation/revocation administration and the final organisational matrix remain D06/release gates. Classification is an explicit trusted HR responsibility, not inferred from question labels or proof that arbitrary answer text contains no sensitive information.
+
 Hosted development database: owner selected project `llslubzdkdnvhbatmfug` on 13 October 2026 and authorised migration and current-feature testing. CLI linking, migrations, trusted TLS and actual hosted application tests are verified. Four synthetic identities and three test forms remain as QA evidence. No real employee imports, paid upgrades or production app deployment are authorised. Render remains a recommendation for later app hosting.
 
 Roadmap approval: owner approved local implementation on 13 October 2026 ("ok now let start building").

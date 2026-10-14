@@ -2,7 +2,7 @@
 
 A secure portal for NOLT Finance to manage employee pre-onboarding, HR reviews, policy acknowledgements, agreements, benefits, induction, company assets and offboarding.
 
-**Current status:** local implementation approved and started. The first working slice is HR form authoring: create/save/reopen, field configuration, respondent preview, immutable publication and new versions. Supabase PostgreSQL stores the records. Real Supabase Auth now handles password login and authenticator MFA; signup/email delivery and MFA are owner-verified. Password recovery remains a separate check. Employee directory, onboarding cases, fixed published-form assignments and private employee checklists are now verified against hosted Supabase. Employee invitations, real email delivery and activation are also verified. Employee form drafts, validated submissions and immutable submission history are now verified. Next: HR review, correction reasons and resubmission cycles.
+**Current status:** local implementation approved and started. The first working slice is HR form authoring: create/save/reopen, field configuration, respondent preview, immutable publication and new versions. Supabase PostgreSQL stores the records. Real Supabase Auth now handles password login and authenticator MFA; signup/email delivery and MFA are owner-verified. Password recovery remains a separate check. Employee directory, onboarding cases, fixed published-form assignments and private employee checklists are now verified against hosted Supabase. Employee invitations, real email delivery and activation are also verified. Employee form drafts, validated submissions and immutable submission history are now verified. HR review, mandatory correction reasons and versioned resubmission are now verified with explicitly scoped review access. Next: private uploads and signature capture.
 
 **Track progress:** [implementation checklist](docs/TRACKER.md), also visible at `/tracker` in the local app. Completed boxes require verification evidence.
 
@@ -22,7 +22,7 @@ Keep `.env` and `.env.supabase` configured privately as described in the setup g
 
 See [identity/session setup and limits](docs/development/IDENTITY.md). Production deployment remains gated.
 
-Signature/attachment fields currently configure what will be requested; actual signing, file collection and third-party sending remain on the tracker.
+Private Supabase file/signature code is implemented and domain-tested, but live scanning and upload/browser acceptance remain blocked by scanner definition downloads. Third-party sending remains pending. See [Railway API staging setup](docs/development/RAILWAY_STAGING.md) for the prepared API deployment configuration; no hosted API deployment is claimed.
 
 ## Languages, frameworks and tools
 
@@ -40,7 +40,7 @@ Signature/attachment fields currently configure what will be requested; actual s
 | Background processing | **TypeScript worker on Node.js** | Transactional outbox, email, file scanning, exports and reminders |
 | Authentication | **Supabase Auth** | Real email/password access, PKCE email flows and authenticator MFA |
 | Authentication email | **Resend through Supabase SMTP** | Owner-managed sender configuration; signup delivery owner-verified |
-| File storage | **Private S3-compatible object storage** | Protected uploads, quarantine and completed agreement files; vendor pending |
+| File storage | **Supabase private Storage** | Protected uploads and signature objects; live scanning/acceptance pending |
 | Automated verification | **Unit/integration tests + Playwright** | Domain rules, API permissions and complete browser journeys |
 | Local document utilities | **Python + pypdf + PyYAML** | PRD extraction and skill validation only; Python is not the proposed application backend |
 

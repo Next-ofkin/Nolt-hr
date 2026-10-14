@@ -1,8 +1,19 @@
+import { runtimeSettings } from "./runtime.js";
 import { createApp } from "./bootstrap.js";
 const { app } = await createApp();
-if (process.env.NODE_ENV === "production")
-  throw new Error(
-    "Production startup is disabled until managed identity and release controls are implemented.",
-  );
-await app.listen(Number(process.env.API_PORT ?? 4000), "127.0.0.1");
-console.log("NOLT API: http://127.0.0.1:4000/api/docs");
+const { port, host } = runtimeSettings(process.env);
+const maxRetries = 15;
+for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  try {
+    await app.listen(port, host);
+    break;
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === "EADDRINUSE" && attempt < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      continue;
+    }
+    throw err;
+  }
+}
+console.log(`NOLT API: http://${host}:${port}/api/docs`);

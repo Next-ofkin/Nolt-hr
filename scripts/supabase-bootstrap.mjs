@@ -1,7 +1,13 @@
 // One-time bootstrap through the authenticated CLI when direct PostgreSQL is unavailable.
 // Existing Prisma SQL and exact byte checksums remain the single migration history.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  mkdirSync,
+  writeFileSync,
+  unlinkSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse } from "dotenv";
@@ -16,15 +22,32 @@ const envText = readFileSync(envPath, "utf8");
 if (parse(envText).SUPABASE_PROJECT_REF !== ref)
   throw new Error("Hosted environment project mismatch.");
 if (parse(envText).DATABASE_URL)
-  throw new Error("Runtime credentials already exist. Bootstrap is one-time; do not overwrite them.");
-const tables = ["User", "Session", "Form", "FormVersion", "AuditEvent", "OutboxEvent", "Identity", "OidcAttempt"];
+  throw new Error(
+    "Runtime credentials already exist. Bootstrap is one-time; do not overwrite them.",
+  );
+const tables = [
+  "User",
+  "Session",
+  "Form",
+  "FormVersion",
+  "AuditEvent",
+  "OutboxEvent",
+  "Identity",
+  "OidcAttempt",
+];
 const migrations = readdirSync("database/migrations", { withFileTypes: true })
-  .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-if (migrations.length !== 3) throw new Error("Review bootstrap for the current migration set.");
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+if (migrations.length !== 3)
+  throw new Error("Review bootstrap for the current migration set.");
 const quote = (value) => "'" + value.replaceAll("'", "''") + "'";
 const password = randomBytes(32).toString("base64url");
-const pooler = new URL(readFileSync("supabase/.temp/pooler-url", "utf8").trim());
-if (!decodeURIComponent(pooler.username).endsWith("." + ref)) throw new Error("Pooler target mismatch.");
+const pooler = new URL(
+  readFileSync("supabase/.temp/pooler-url", "utf8").trim(),
+);
+if (!decodeURIComponent(pooler.username).endsWith("." + ref))
+  throw new Error("Pooler target mismatch.");
 pooler.username = "nolt_app." + ref;
 pooler.password = password;
 pooler.searchParams.set("sslmode", "verify-full");
@@ -52,7 +75,9 @@ CREATE TABLE public._prisma_migrations (
 );
 `;
 for (const name of migrations) {
-  const bytes = readFileSync(resolve("database/migrations", name, "migration.sql"));
+  const bytes = readFileSync(
+    resolve("database/migrations", name, "migration.sql"),
+  );
   const checksum = createHash("sha256").update(bytes).digest("hex");
   sql += "\n" + bytes.toString("utf8") + "\n";
   sql += `INSERT INTO public._prisma_migrations (id,checksum,migration_name,finished_at,applied_steps_count)
@@ -82,15 +107,30 @@ SELECT migration_name,checksum,finished_at IS NOT NULL AS applied FROM public._p
 mkdirSync(".local", { recursive: true });
 const file = resolve(".local/supabase-bootstrap.sql");
 // Persist credentials before execution so a successful transaction is recoverable after interruption.
-const nextEnv = envText.replace(/^DATABASE_URL=.*$/m, "DATABASE_URL=" + JSON.stringify(pooler.toString()));
+const nextEnv = envText.replace(
+  /^DATABASE_URL=.*$/m,
+  "DATABASE_URL=" + JSON.stringify(pooler.toString()),
+);
 writeFileSync(envPath, nextEnv, { mode: 0o600 });
 writeFileSync(file, sql, { mode: 0o600 });
 try {
-  const result = spawnSync(cli, ["db", "query", "--linked", "--file", file, "--output", "json"], { encoding: "utf8", windowsHide: true });
-  const output = ((result.stdout ?? "") + (result.stderr ?? "")).replaceAll(password, "[REDACTED]");
+  const result = spawnSync(
+    cli,
+    ["db", "query", "--linked", "--file", file, "--output", "json"],
+    { encoding: "utf8", windowsHide: true },
+  );
+  const output = ((result.stdout ?? "") + (result.stderr ?? "")).replaceAll(
+    password,
+    "[REDACTED]",
+  );
   console.log(output);
-  if (result.error || result.status !== 0) throw new Error("Bootstrap failed. Check remote state before retrying; do not reset the database.");
-  console.log("Bootstrap completed; restricted runtime credentials saved in ignored .env.supabase. App connectivity still needs verified TLS.");
+  if (result.error || result.status !== 0)
+    throw new Error(
+      "Bootstrap failed. Check remote state before retrying; do not reset the database.",
+    );
+  console.log(
+    "Bootstrap completed; restricted runtime credentials saved in ignored .env.supabase. App connectivity still needs verified TLS.",
+  );
 } finally {
   unlinkSync(file);
 }

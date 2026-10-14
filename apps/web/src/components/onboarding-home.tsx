@@ -118,11 +118,21 @@ function EmployeeHome() {
                     </h2>
                     <p className="text-sm">
                       {a.required ? "Required" : "Optional"} ·{" "}
-                      {a.status === "SUBMITTED"
-                        ? "Submitted — awaiting HR review"
-                        : a.status === "DRAFT"
-                          ? "Draft saved"
-                          : "Not started"}
+                      {a.status === "APPROVED" ? (
+                        <span className="font-medium text-green-700">
+                          Approved
+                        </span>
+                      ) : a.status === "CHANGES_REQUIRED" ? (
+                        <span className="font-semibold text-amber-700">
+                          Changes requested — action required
+                        </span>
+                      ) : a.status === "SUBMITTED" ? (
+                        <span>Submitted — awaiting HR review</span>
+                      ) : a.status === "DRAFT" ? (
+                        <span>Draft saved</span>
+                      ) : (
+                        <span>Not started</span>
+                      )}
                       {a.dueDate ? ` · Due ${a.dueDate}` : ""}
                     </p>
                     {a.recipient === "EMPLOYEE" ? (
@@ -134,11 +144,15 @@ function EmployeeHome() {
                             setResponseId(a.id);
                           }}
                         >
-                          {a.status === "SUBMITTED"
-                            ? "View submitted form"
-                            : a.status === "DRAFT"
-                              ? "Continue form"
-                              : "Fill form"}
+                          {a.status === "APPROVED"
+                            ? "View approved form"
+                            : a.status === "CHANGES_REQUIRED"
+                              ? "Update & resubmit"
+                              : a.status === "SUBMITTED"
+                                ? "View submitted form"
+                                : a.status === "DRAFT"
+                                  ? "Continue form"
+                                  : "Fill form"}
                         </Button>
                         <Button
                           variant="outline"

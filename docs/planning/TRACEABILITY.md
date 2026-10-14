@@ -4,6 +4,8 @@ Status: requirement-to-milestone baseline. Local implementation has started; ver
 
 ## Core requirements
 
+Development acceptance for the current structured-form portions of FR-008–FR-011 is recorded in [HR review evidence](../development/REVIEWS.md), 14 October 2026: assigned reviewer, exact immutable submission, mandatory correction reason, versioned resubmission and competing-decision conflicts. Private attachment retrieval, final production permissions and wider module-specific rules remain open.
+
 Verified development evidence for FR-006 and the current structured-field portion of FR-007: [employee responses](../development/RESPONSES.md), accepted 14 October 2026. Drafts, final validation and immutable first submissions are delivered. Conditional/repeating rules, files/signatures, domain-specific forms and review-driven resubmission remain open; this does not mark those wider requirements complete.
 
 | PRD ID | PDF page | Milestone | Acceptance evidence required |

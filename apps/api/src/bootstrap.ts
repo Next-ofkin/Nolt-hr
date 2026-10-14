@@ -9,9 +9,13 @@ export async function createApp() {
     path: resolve(import.meta.dirname, "../../..", ".env"),
     quiet: true,
   });
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<
+    import("@nestjs/platform-express").NestExpressApplication
+  >(AppModule, {
     logger: ["error", "warn", "log"],
+    bodyParser: false,
   });
+  app.useBodyParser("json", { limit: "15mb" });
   app.setGlobalPrefix("api/v1");
   app.use(
     (

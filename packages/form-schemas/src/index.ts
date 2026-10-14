@@ -94,6 +94,79 @@ export const submitResponseSchema = z
     requestKey: z.string().uuid(),
   })
   .strict();
+export const reviewDecisionSchema = z
+  .object({
+    decision: z.enum(["APPROVED", "CHANGES_REQUIRED"]),
+    reason: z.string().trim().max(2000).optional().default(""),
+    expectedSubmissionVersion: z.number().int().positive(),
+    expectedResponseRevision: z.number().int().min(0),
+  })
+  .strict()
+  .refine((d) => d.decision === "APPROVED" || d.reason.length > 0, {
+    message: "A specific reason is required when requesting changes.",
+    path: ["reason"],
+  });
+export type ReviewDecisionInput = z.infer<typeof reviewDecisionSchema>;
+export const reviewAccessSchema = z
+  .object({
+    reviewerEmail: z
+      .email()
+      .trim()
+      .max(254)
+      .transform((v) => v.toLowerCase()),
+    sensitivity: z.enum(["GENERAL", "HEALTH", "FINANCIAL", "HEALTH_FINANCIAL"]),
+  })
+  .strict();
+export const uploadIntentSchema = z
+  .object({
+    fieldId: z.string().uuid(),
+    purpose: z.enum(["SUPPORTING_DOCUMENT", "SIGNED_DOCUMENT", "SIGNATURE_IMAGE"]),
+    fileName: z.string().trim().min(1).max(255),
+    mimeType: z.string().trim().min(1).max(100),
+    byteSize: z.number().int().positive().max(10485760),
+    requestKey: z.string().uuid(),
+  })
+  .strict();
+export type UploadIntentInput = z.infer<typeof uploadIntentSchema>;
+
+export const uploadPayloadSchema = z
+  .object({
+    requestKey: z.string().uuid(),
+    payloadBase64: z.string().min(1).max(15000000),
+  })
+  .strict();
+export type UploadPayloadInput = z.infer<typeof uploadPayloadSchema>;
+
+export const signatureIntentSchema = z
+  .object({
+    fieldId: z.string().uuid(),
+    signingMethod: z.enum(["DRAWN", "TYPED", "UPLOADED"]),
+    consentVersion: z.string().trim().min(1).max(500),
+    consentConfirmed: z.literal(true),
+    expectedRevision: z.number().int().min(0),
+    typedName: z.string().trim().min(1).max(160).optional(),
+    signatureImageBase64: z.string().min(1).max(2000000),
+    requestKey: z.string().uuid(),
+  })
+  .strict();
+export type SignatureIntentInput = z.infer<typeof signatureIntentSchema>;
+
+export function canonicalAnswersJson(
+  fields: FormField[],
+  answers: Answers,
+): string {
+  const nonSignatureFieldIds = fields
+    .filter((f) => f.type !== "signature")
+    .map((f) => f.id)
+    .sort();
+  const canonical: Record<string, unknown> = {};
+  for (const id of nonSignatureFieldIds) {
+    const val = answers[id];
+    canonical[id] = val === undefined ? null : val;
+  }
+  return JSON.stringify(canonical);
+}
+
 export function validateAnswers(
   fields: FormField[],
   input: unknown,
@@ -115,11 +188,26 @@ export function validateAnswers(
       v === null ||
       (typeof v === "string" && v.trim() === "");
     const add = (message: string) => issues.push({ fieldId: f.id, message });
-    if (f.type === "file" || f.type === "signature") {
-      if (!empty || (final && f.required))
-        add(
-          "File or signature capture is not available yet. This question cannot be submitted.",
-        );
+    if (f.type === "file") {
+      if (empty) {
+        if (final && f.required) add("This attachment is required.");
+      } else if (
+        typeof v !== "string" ||
+        !z.string().uuid().safeParse(v.trim()).success
+      ) {
+        add("Invalid attachment reference.");
+      }
+      continue;
+    }
+    if (f.type === "signature") {
+      if (empty) {
+        if (final && f.required) add("Your signature is required.");
+      } else if (
+        typeof v !== "string" ||
+        !z.string().uuid().safeParse(v.trim()).success
+      ) {
+        add("Invalid signature reference.");
+      }
       continue;
     }
     if (empty) {

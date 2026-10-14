@@ -44,6 +44,8 @@ Hosting-specific SQL in `database/supabase-auth-provisioning.sql` defines privat
 
 ## Employee response extension
 
+Review migrations 008/009 add immutable SubmissionReview decisions and AssignmentReviewAccess (one explicitly classified initial reviewer assignment per form assignment). Foreign keys preserve actor links. Backend-only RLS/grants protect the tables; sensitivity checks consult current account permissions. Database guards bind review transitions to the exact latest pending submission in an active case and preserve earlier evidence. Repeated corrections create successive FormSubmission versions. See [review contract and boundaries](REVIEWS.md).
+
 Migration 007 adds EmployeeResponse (one revision-checked saved draft/status per assignment) and FormSubmission (immutable answers, exact assigned form version, actor/time, source revision and idempotency key). Composite foreign keys prevent a submission from referencing a different form version. Database guards reject submitted-response changes, incorrect employee actors, third-party proxy responses and immutable-history mutation. Audit/outbox commit with each accepted save/submission. See [response behavior and limits](RESPONSES.md).
 
 ## Employee invitation extension

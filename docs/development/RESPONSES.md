@@ -2,7 +2,7 @@
 
 Implemented and verified 14 October 2026 against the approved hosted development project. All 14 unit/live backend checks, isolated persistence checks and three affected browser journeys passed across focused runs. Seven migration checksums, hosted permissions/RLS and denied public API access were verified. See the [test report](TEST_REPORT.md) for initial interruptions, the session-timeout correction and remaining release gates.
 
-Employees open their exact assigned employee form from My onboarding. Save draft retains incomplete answers; reopening loads the saved database state. Final submission validates the published definition on the API, creates immutable submission evidence and locks the response. Submitted means awaiting HR review; it does not mean approved, complete or ready for employment. HR review and correction cycles follow in the next slice.
+Employees open their exact assigned employee form from My onboarding. Save draft retains incomplete answers; reopening loads the saved database state. Final submission validates the published definition on the API, creates immutable submission evidence and locks the response. Submitted means awaiting HR review; it does not mean approved, complete or ready for employment. HR review and versioned correction cycles are now delivered; see REVIEWS.md for scoped access and acceptance evidence.
 
 ## Contract and persistence
 
@@ -20,7 +20,7 @@ The renderer supports the builder's current text, long text, email, phone, decim
 
 File/signature answers cannot be supplied as strings, Base64 or fabricated references. Required file/signature fields block final submission until the private capture/scan/evidence slice is delivered; the employee can still save ordinary answers. Optional file/signature fields may remain empty. Conditional/repeating fields and domain-specific legal/benefit validation remain pending builder/module work. No signature equivalence or legal wording is invented here.
 
-The current history has one immutable submission per assignment. The model includes versioning for later correction cycles, but reopening submitted answers is deliberately unavailable until authorised HR review is implemented. Submission outbox events are committed evidence; this slice does not add submission email delivery.
+The initial response slice allowed one immutable submission per assignment. The review slice now permits successive submissions only after an authorised Changes Required decision. Prior answers and review evidence stay immutable; approved responses remain locked. See REVIEWS.md. Submission outbox events are committed evidence; this slice does not add submission email delivery.
 
 ## Verification
 

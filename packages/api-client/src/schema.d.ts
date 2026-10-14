@@ -68,6 +68,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReviewsController_getReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{id}/review-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReviewsController_reviewAccess"];
+        put?: never;
+        post: operations["ReviewsController_assignReviewer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/submissions/{id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReviewsController_decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/config": {
         parameters: {
             query?: never;
@@ -516,6 +564,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/assignments/{id}/files/intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FilesController_createIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/assignments/{id}/files/{fileId}/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FilesController_uploadFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/assignments/{id}/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FilesController_captureSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FilesController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -550,6 +662,14 @@ export interface components {
             updatedAt: string;
             publishedAt: string | null;
         };
+        SubmissionReviewDto: {
+            id: string;
+            /** @enum {string} */
+            decision: "APPROVED" | "CHANGES_REQUIRED";
+            reason: string | null;
+            reviewedBy: string;
+            reviewedAt: string;
+        };
         SubmissionDto: {
             id: string;
             version: number;
@@ -559,18 +679,37 @@ export interface components {
             answers: {
                 [key: string]: (string | boolean) | null;
             };
+            review?: components["schemas"]["SubmissionReviewDto"] | null;
         };
         ResponseDto: {
             assignmentId: string;
             form: components["schemas"]["FormDto"];
             revision: number;
             /** @enum {string} */
-            status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
+            status: "NOT_STARTED" | "DRAFT" | "SUBMITTED" | "CHANGES_REQUIRED" | "APPROVED";
             updatedAt: string | null;
             answers: {
                 [key: string]: (string | boolean) | null;
             };
             submissions: components["schemas"]["SubmissionDto"][];
+            latestReview?: components["schemas"]["SubmissionReviewDto"] | null;
+        };
+        ReviewAssignmentDto: {
+            assignmentId: string;
+            employeeName: string;
+            employeeEmail: string;
+            form: components["schemas"]["FormDto"];
+            /** @enum {string} */
+            status: "NOT_STARTED" | "DRAFT" | "SUBMITTED" | "CHANGES_REQUIRED" | "APPROVED";
+            revision: number;
+            submissions: components["schemas"]["SubmissionDto"][];
+            latestReview: components["schemas"]["SubmissionReviewDto"] | null;
+        };
+        ReviewAccessDto: {
+            canConfigure: boolean;
+            canReview: boolean;
+            reviewerEmail: string | null;
+            sensitivity: string | null;
         };
         AuthConfigDto: {
             enabled: boolean;
@@ -677,6 +816,39 @@ export interface components {
             employeeName: string;
             email: string;
             requiresPassword: boolean;
+        };
+        UploadIntentDto: {
+            /** Format: uuid */
+            fileId: string;
+            /** Format: uuid */
+            requestKey: string;
+            storageKey: string;
+            expiresAt: string;
+        };
+        StoredFileDto: {
+            /** Format: uuid */
+            fileId: string;
+            /** Format: uuid */
+            assignmentId: string;
+            /** Format: uuid */
+            fieldId: string;
+            fileName: string;
+            mimeType: string;
+            byteSize: number;
+            sha256: string;
+            /** @enum {string} */
+            scanStatus: "QUARANTINED" | "CLEAN" | "REJECTED";
+            /** @enum {string} */
+            status: "PENDING" | "CONFIRMED" | "ABANDONED";
+            confirmedAt: Record<string, never> | null;
+        };
+        SignatureResultDto: {
+            /** Format: uuid */
+            signatureId: string;
+            /** Format: uuid */
+            fileId: string;
+            contentDigest: string;
+            signedAt: string;
         };
     };
     responses: never;
@@ -885,6 +1057,272 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResponseValidationErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    ReviewsController_getReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAssignmentDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    ReviewsController_reviewAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAccessDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    ReviewsController_assignReviewer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    reviewerEmail: string;
+                    /** @enum {string} */
+                    sensitivity: "GENERAL" | "HEALTH" | "FINANCIAL" | "HEALTH_FINANCIAL";
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        configured: boolean;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    ReviewsController_decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "APPROVED" | "CHANGES_REQUIRED";
+                    /** @default  */
+                    reason?: string;
+                    expectedSubmissionVersion: number;
+                    expectedResponseRevision: number;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAssignmentDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
                 };
             };
             401: {
@@ -2785,6 +3223,257 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    FilesController_createIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    fieldId: string;
+                    /** @enum {string} */
+                    purpose: "SUPPORTING_DOCUMENT" | "SIGNED_DOCUMENT" | "SIGNATURE_IMAGE";
+                    fileName: string;
+                    mimeType: string;
+                    byteSize: number;
+                    /** Format: uuid */
+                    requestKey: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadIntentDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    FilesController_uploadFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    requestKey: string;
+                    payloadBase64: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredFileDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    FilesController_captureSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    fieldId: string;
+                    /** @enum {string} */
+                    signingMethod: "DRAWN" | "TYPED" | "UPLOADED";
+                    consentVersion: string;
+                    /** @enum {boolean} */
+                    consentConfirmed: true;
+                    expectedRevision: number;
+                    typedName?: string;
+                    signatureImageBase64: string;
+                    /** Format: uuid */
+                    requestKey: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureResultDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    FilesController_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Streams raw file content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
