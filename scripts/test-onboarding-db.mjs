@@ -57,7 +57,8 @@ try {
     REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO nolt_app;
     GRANT SELECT ON public."User",public."Identity" TO nolt_app;
     GRANT SELECT,INSERT ON public."AuditEvent",public."OutboxEvent" TO nolt_app;
-    GRANT SELECT ON public."Form" TO nolt_app;\n    GRANT SELECT,UPDATE ON public."FormVersion" TO nolt_app;`);
+    GRANT SELECT ON public."Form" TO nolt_app;
+    GRANT SELECT,UPDATE ON public."FormVersion" TO nolt_app;`);
   await owner.query(
     readFileSync("database/supabase-auth-provisioning.sql", "utf8"),
   );
