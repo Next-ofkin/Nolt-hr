@@ -24,7 +24,7 @@
     "contracts:build": "npm run build -w @nolt/form-schemas",
     "predev": "npm run contracts:build",
     "db:permissions": "node scripts/db-permissions.mjs",
-    "format": "prettier --write apps packages/form-schemas/src packages/api-client/src/index.ts tests scripts database/*.ts package.json tsconfig*.json playwright.config.ts .github/workflows/checks.yml",
+    "format": "prettier --write apps packages/form-schemas/src packages/api-client/src/index.ts tests scripts database/*.ts package.json tsconfig*.json playwright.config.ts",
     "dev:hosted": "node scripts/hosted-qa.mjs dev",
     "db:hosted:verify": "node scripts/hosted-qa.mjs verify",
     "db:hosted:status": "node scripts/hosted-qa.mjs status",
@@ -42,7 +42,9 @@
     "build:api": "npm run db:generate && npm run contracts:build && npm run build -w @nolt/api",
     "start:api": "node apps/api/dist/main.js",
     "build:web": "npm run contracts:build && npm run build -w @nolt/web",
-    "start:web": "npm run start:railway -w @nolt/web"
+    "start:web": "npm run start:railway -w @nolt/web",
+    "auth:developer:preflight": "node scripts/developer-bootstrap.mjs",
+    "auth:developer:apply": "node scripts/developer-bootstrap.mjs --apply"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
