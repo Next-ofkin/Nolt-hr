@@ -57,3 +57,14 @@ Implementation started: yes; tracked in `../TRACKER.md`.
 Production deployment authorised: no.
 
 When the user approves, record the exact approved scope here before implementation. Approval of local implementation does not resolve undecided HR/legal rules or authorise production purchases/data import.
+
+
+## Owner-approved lifecycle redesign — 15 October 2026
+
+- D26: Replace email-based HR bootstrap with one-time trusted developer/system-owner setup. Developer may invite/manage HR, HR may invite employees. No hardcoded HR/employee addresses or unrestricted active self-registration. Supabase email/password and TOTP AAL2 remain mandatory for internal users. Role changes are server-authorised and audited.
+- D27: HR creates reusable permanent form templates and pack templates. Draft-only, never-published and never-assigned forms may be permanently deleted after explicit confirmation; published versions cannot be deleted. HR may unpublish a version from future assignment without rewriting or removing existing evidence and assigned instances. Authoring edits create new versions.
+- D28: Packs hold published form versions and are assigned per employee with isolated progress, statuses and timelines. A pack and a standalone form default to five calendar days after assignment, customisable by HR; forms inside a pack can have their own due dates. Expiry locks new work; HR can extend or reopen with reason and audit trail. Templates never expire. An embedded form must have both an active parent pack and active form assignment.
+- D29: Employee sends an assigned guarantor/referee form invitation but cannot open, read, fill or submit its contents. External recipient has no account and responds only via a secure scoped email link. HR reviews and approves or rejects with reason; employee sees safe status/comment and sends a new correction invitation. Preserve every version, decision and invitation attempt; prevent expired/replayed links.
+- D30: All screens must be exceptionally responsive and professional, with fast perceived loading, bounded/paginated APIs and measured performance budgets. Use shadcn-style notifications (not browser-native alerts); accessible loading, error, empty and success states are required. Performance claims require measured testing.
+
+These decisions update design scope only. Their presence here does not indicate completed implementation or authorise production data use.

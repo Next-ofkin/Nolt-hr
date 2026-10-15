@@ -63,3 +63,13 @@ test("signatures and signed-document fields preserve HR configuration", () => {
     false,
   );
 });
+
+// Keep these rules executable independently of hosted Supabase.
+import { canDeleteUnpublishedDraft } from "../apps/api/src/forms.js";
+test("only a never-published, never-assigned single draft is deletable", () => {
+  assert.equal(canDeleteUnpublishedDraft([{ status: "DRAFT" }], 0), true);
+  assert.equal(canDeleteUnpublishedDraft([{ status: "DRAFT" }], 1), false);
+  assert.equal(canDeleteUnpublishedDraft([{ status: "PUBLISHED" }], 0), false);
+  assert.equal(canDeleteUnpublishedDraft([{ status: "UNPUBLISHED" }], 0), false);
+  assert.equal(canDeleteUnpublishedDraft([{ status: "PUBLISHED" }, { status: "DRAFT" }], 0), false);
+});

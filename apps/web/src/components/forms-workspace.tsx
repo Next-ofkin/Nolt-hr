@@ -58,6 +58,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FormPreview } from "./form-preview";
+import { toast } from "sonner";
 
 const recipients = {
   EMPLOYEE: "Employee",
@@ -136,6 +137,12 @@ export function FormsWorkspace() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    if (!notice) return;
+    if (notice.kind === "error") toast.error(notice.text);
+    else toast.success(notice.text);
+    setNotice(null);
+  }, [notice]);
   async function create(values: {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
@@ -189,20 +196,6 @@ export function FormsWorkspace() {
   );
   return (
     <>
-      {notice && (
-        <div
-          role={notice.kind === "error" ? "alert" : "status"}
-          className={`mb-5 flex items-start justify-between gap-4 rounded-lg border px-4 py-3 text-sm ${notice.kind === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
-        >
-          {notice.text}
-          <button
-            onClick={() => setNotice(null)}
-            aria-label="Dismiss notification"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
       {active ? (
         <FormEditor
           key={active.id}
@@ -414,7 +407,7 @@ export function FormsWorkspace() {
                         form.status === "PUBLISHED" ? "default" : "secondary"
                       }
                     >
-                      {form.status === "PUBLISHED" ? "Published" : "Draft"}
+                      {form.status === "PUBLISHED" ? "Published" : form.status === "UNPUBLISHED" ? "Unpublished" : "Draft"}
                     </Badge>
                     <ChevronRight
                       size={17}
@@ -459,8 +452,9 @@ function FormEditor({
       record.fields[0]?.id ?? null,
     ),
     [busy, setBusy] = useState(false),
-    [preview, setPreview] = useState(false);
-  const published = record.status === "PUBLISHED",
+    [preview, setPreview] = useState(false),
+    [confirmAction, setConfirmAction] = useState<"delete" | "unpublish" | null>(null);
+  const published = record.status !== "DRAFT",
     dirty =
       JSON.stringify(content) !==
       JSON.stringify({
@@ -593,8 +587,67 @@ function FormEditor({
       setBusy(false);
     }
   }
+  async function changePublication() {
+    if (!confirmAction) return;
+    const operation = confirmAction;
+    setBusy(true);
+    onNotice(null);
+    try {
+      const response = await fetch(
+        operation === "delete"
+          ? `/api/v1/forms/${record.formId}/draft`
+          : `/api/v1/form-versions/${record.id}/unpublish`,
+        {
+          method: operation === "delete" ? "DELETE" : "POST",
+          headers: {
+            "x-csrf-token": csrf,
+            ...(operation === "unpublish" ? { "content-type": "application/json" } : {}),
+          },
+          credentials: "same-origin",
+          ...(operation === "unpublish"
+            ? { body: JSON.stringify({ expectedRevision: record.revision }) }
+            : {}),
+        },
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(errorMessage(error));
+      }
+      if (operation === "unpublish") {
+        onChange(normaliseForm(await response.json()));
+        onNotice({ kind: "success", text: "Form unpublished. Existing assigned copies are preserved." });
+      } else {
+        onNotice({ kind: "success", text: "Unpublished draft permanently deleted." });
+        onBack();
+      }
+      setConfirmAction(null);
+    } catch (error) {
+      onNotice({ kind: "error", text: error instanceof Error ? error.message : "Unable to update form." });
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
+      <Dialog open={confirmAction !== null} onOpenChange={(open) => { if (!open && !busy) setConfirmAction(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmAction === "delete" ? "Delete this draft?" : "Unpublish this form?"}</DialogTitle>
+            <DialogDescription>
+              {confirmAction === "delete"
+                ? "This permanently deletes a form that has never been published or assigned. This cannot be undone."
+                : "This version can no longer be assigned to new employees. Existing assignments, answers and evidence remain unchanged."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" disabled={busy} onClick={() => setConfirmAction(null)}>Cancel</Button>
+            <Button variant={confirmAction === "delete" ? "destructive" : "default"} disabled={busy} onClick={() => void changePublication()}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : null}
+              {confirmAction === "delete" ? "Delete draft" : "Unpublish version"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <button
         onClick={leave}
         className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
@@ -609,7 +662,7 @@ function FormEditor({
               {record.title}
             </h1>
             <Badge variant={published ? "default" : "secondary"}>
-              {published ? "Published" : "Draft"} · v{record.version}
+              {record.status === "PUBLISHED" ? "Published" : record.status === "UNPUBLISHED" ? "Unpublished" : "Draft"} · v{record.version}
             </Badge>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -626,12 +679,22 @@ function FormEditor({
             Preview
           </Button>
           {published ? (
+            <>
+            <Button variant="outline" disabled={busy} onClick={() => setConfirmAction("unpublish")}>
+              Unpublish
+            </Button>
             <Button onClick={nextVersion} disabled={busy}>
               <CopyPlus size={16} />
               New version
             </Button>
+            </>
           ) : (
             <>
+              {record.version === 1 && (
+                <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
+                  <Trash2 size={16} /> Delete draft
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => void action(false)}

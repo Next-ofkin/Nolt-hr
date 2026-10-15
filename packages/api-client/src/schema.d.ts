@@ -356,6 +356,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-versions/{id}/unpublish": {
+        parameters: { query?: never; header?: never; path?: never; cookie?: never; };
+        get?: never; put?: never; post: operations["FormsController_unpublish"];
+        delete?: never; options?: never; head?: never; patch?: never; trace?: never;
+    };
+    "/api/v1/forms/{id}/draft": {
+        parameters: { query?: never; header?: never; path?: never; cookie?: never; };
+        get?: never; put?: never; post?: never;
+        delete: operations["FormsController_deleteDraft"];
+        options?: never; head?: never; patch?: never; trace?: never;
+    };
     "/api/v1/forms/{id}/versions": {
         parameters: {
             query?: never;
@@ -653,7 +664,7 @@ export interface components {
             /** @enum {string} */
             recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
             /** @enum {string} */
-            status: "DRAFT" | "PUBLISHED";
+            status: "DRAFT" | "PUBLISHED" | "UNPUBLISHED";
             version: number;
             revision: number;
             fields: {
@@ -2277,6 +2288,49 @@ export interface operations {
                     "application/json": components["schemas"]["FormDto"];
                 };
             };
+        };
+    };
+    FormsController_unpublish: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required for mutations; obtained from the authenticated session */
+                "x-csrf-token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDto"];
+                };
+            };
+        };
+    };
+    FormsController_deleteDraft: {
+        parameters: {
+            query?: never;
+            header?: { "x-csrf-token"?: string; };
+            path: { id: string; };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description  */
+            200: { headers: { [name: string]: unknown; }; content?: never; };
         };
     };
     FormsController_newVersion: {

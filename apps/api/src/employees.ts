@@ -418,6 +418,8 @@ export class EmployeesService {
             throw new ConflictException(
               "The case changed or is closed. Reload first.",
             );
+          // Serialize assignment with unpublishing of this version.
+          await tx.$queryRaw`SELECT id FROM public."FormVersion" WHERE id=${p.formVersionId}::uuid FOR UPDATE`;
           const v = await tx.formVersion.findUnique({
             where: { id: p.formVersionId },
           });

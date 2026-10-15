@@ -5,12 +5,14 @@ import type { Request, Response } from "express";
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export const privileged = (role: string) =>
-  ["HR", "HR_REVIEWER", "SYSTEM_ADMIN"].includes(role);
+  ["HR", "HR_REVIEWER", "SYSTEM_ADMIN", "DEVELOPER"].includes(role);
 const grants: Record<string, string[]> = {
   HR: ["forms.manage", "employees.manage", "reviews.assigned"],
   HR_REVIEWER: ["reviews.assigned"],
   EMPLOYEE: ["profile.own"],
   SYSTEM_ADMIN: ["system.manage"],
+  // Technical account provisioning must never imply permission to read HR records.
+  DEVELOPER: ["system.manage", "hr.accounts.manage"],
 };
 const extraPermissions = new Set(["health.read", "finance.read"]);
 export function permissionsFor(user: { role: string; permissions: string[] }) {

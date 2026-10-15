@@ -95,6 +95,16 @@ export class HrGuard implements CanActivate {
     return true;
   }
 }
+/** Explicit system-owner guard for HR-account administration only. */
+@Injectable()
+export class DeveloperGuard implements CanActivate {
+  canActivate(context: import("@nestjs/common").ExecutionContext) {
+    const actor = context.switchToHttp().getRequest<AuthRequest>().actor;
+    if (!actor?.permissions.includes("hr.accounts.manage"))
+      throw new ForbiddenException("Developer account administration is required.");
+    return true;
+  }
+}
 const email = z
   .string()
   .trim()

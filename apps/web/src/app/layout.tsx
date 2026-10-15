@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
 export const metadata: Metadata = {
   title: "NOLT HR | Form library",
@@ -14,6 +15,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen antialiased">
         <AuthProvider>{children}</AuthProvider>
+        <Toaster />
       </body>
     </html>
   );

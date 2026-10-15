@@ -54,3 +54,10 @@ test("Sign-in throttling is bounded and expires", () => {
   assert.throws(() => limiter.take("local", 2), /Too many/);
   assert.doesNotThrow(() => limiter.take("local", 60001));
 });
+
+test("developer can administer HR accounts without accessing employee or sensitive HR data", () => {
+  const grants = permissionsFor({ role: "DEVELOPER", permissions: [] });
+  assert.deepEqual(grants, ["system.manage", "hr.accounts.manage"]);
+  for (const forbidden of ["forms.manage", "employees.manage", "reviews.assigned", "health.read", "finance.read"])
+    assert.equal(grants.includes(forbidden), false);
+});

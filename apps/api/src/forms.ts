@@ -3,6 +3,7 @@
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   Inject,
   Injectable,
@@ -63,7 +64,7 @@ export class FormDto {
   @ApiProperty({ type: String }) description!: string;
   @ApiProperty({ enum: ["EMPLOYEE", "GUARANTOR", "REFERENCE"] })
   recipient!: string;
-  @ApiProperty({ enum: ["DRAFT", "PUBLISHED"] }) status!: string;
+  @ApiProperty({ enum: ["DRAFT", "PUBLISHED", "UNPUBLISHED"] }) status!: string;
   @ApiProperty({ type: Number }) version!: number;
   @ApiProperty({ type: Number }) revision!: number;
   @ApiProperty({
@@ -93,6 +94,20 @@ export function dto(row: {
     updatedAt: row.updatedAt.toISOString(),
     publishedAt: row.publishedAt?.toISOString() ?? null,
   };
+}
+/**
+ * Permanent draft deletion is allowed only for a form with exactly one
+ * never-published version and no assignment history.
+ */
+export function canDeleteUnpublishedDraft(
+  versions: readonly { status: string }[],
+  assignmentCount: number,
+): boolean {
+  return (
+    versions.length === 1 &&
+    versions[0].status === "DRAFT" &&
+    assignmentCount === 0
+  );
 }
 @Injectable()
 export class FormsService {
@@ -163,6 +178,10 @@ export class FormsService {
   async publish(actorId: string, id: string, input: unknown) {
     const { expectedRevision } = parse(revisionSchema, input);
     return this.db.$transaction(async (tx) => {
+      const initial = await tx.formVersion.findUnique({ where: { id } });
+      if (!initial) throw new NotFoundException();
+      // Draft deletion and version creation acquire the same parent lock.
+      await tx.$queryRaw`SELECT id FROM "Form" WHERE id=${initial.formId}::uuid FOR UPDATE`;
       const row = await tx.formVersion.findUnique({ where: { id } });
       if (!row) throw new NotFoundException();
       parse(publishContentSchema, {
@@ -187,6 +206,35 @@ export class FormsService {
         version: row.version,
       });
       return dto(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
+    });
+  }
+  async unpublish(actorId: string, id: string, input: unknown) {
+    const { expectedRevision } = parse(revisionSchema, input);
+    return this.db.$transaction(async (tx) => {
+      const row = await tx.formVersion.findUnique({ where: { id } });
+      if (!row) throw new NotFoundException("Form version not found.");
+      const updated = await tx.formVersion.updateMany({
+        where: { id, revision: expectedRevision, status: "PUBLISHED" },
+        data: { status: "UNPUBLISHED", revision: { increment: 1 } },
+      });
+      if (updated.count !== 1)
+        throw new ConflictException("This form has changed or is no longer published.");
+      await this.record(tx, actorId, "FORM_UNPUBLISHED", id, { version: row.version });
+      return dto(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
+    });
+  }
+  async deleteDraft(actorId: string, formId: string) {
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;
+      const form = await tx.form.findUnique({ where: { id: formId }, include: { versions: true } });
+      if (!form) throw new NotFoundException("Form not found.");
+      const assignments = await tx.formAssignment.count({ where: { formId } });
+      if (!canDeleteUnpublishedDraft(form.versions, assignments))
+        throw new ConflictException("Only a never-published, never-assigned draft can be deleted.");
+      await tx.formVersion.delete({ where: { id: form.versions[0].id } });
+      await tx.form.delete({ where: { id: formId } });
+      await this.record(tx, actorId, "FORM_DRAFT_DELETED", formId, { title: form.versions[0].title });
+      return { deleted: true };
     });
   }
   async newVersion(actorId: string, formId: string) {
@@ -268,6 +316,23 @@ export class FormsController {
     @Body() body: unknown,
   ): Promise<FormDto> {
     return this.service.publish(req.actor.id, id, body);
+  }
+  @Post("form-versions/:id/unpublish")
+  @ApiOkResponse({ type: FormDto })
+  @ApiBody({ schema: openapi(revisionSchema) })
+  unpublish(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<FormDto> {
+    return this.service.unpublish(req.actor.id, id, body);
+  }
+  @Delete("forms/:id/draft")
+  deleteDraft(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<{ deleted: boolean }> {
+    return this.service.deleteDraft(req.actor.id, id);
   }
   @Post("forms/:id/versions") @ApiCreatedResponse({ type: FormDto }) newVersion(
     @Req() req: AuthRequest,
