@@ -4,6 +4,12 @@ BEGIN;
 CREATE SCHEMA IF NOT EXISTS nolt_private;
 REVOKE ALL ON SCHEMA nolt_private FROM PUBLIC;
 
+-- Extend the existing role whitelist before any approved one-time promotion.
+-- Preserve every previously supported role; no existing User row is rewritten.
+ALTER TABLE public."User" DROP CONSTRAINT "User_role_check";
+ALTER TABLE public."User" ADD CONSTRAINT "User_role_check"
+  CHECK (role IN ('HR','HR_REVIEWER','EMPLOYEE','SYSTEM_ADMIN','DEVELOPER'));
+
 -- A Developer is a single technical owner, not an HR data reviewer.
 -- This also detects any pre-existing duplicate Developer records at migration time.
 CREATE UNIQUE INDEX "User_one_developer_role" ON public."User" (role)
