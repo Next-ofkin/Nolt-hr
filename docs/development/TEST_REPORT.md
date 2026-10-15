@@ -1,3 +1,9 @@
+# Staging CA asset packaging - 15 October 2026
+
+Owner-supplied Railway diagnostics reported ENOENT during readiness. The CA is tracked and not ignored, so container omission was not established. API builds now fingerprint-check and copy the public trust anchor into dist/certs; staging overrides only sslrootcert with a path anchored to the compiled module. Credentials/host/port and sslmode=verify-full remain unchanged. Missing bundled assets fail explicitly rather than disabling TLS. Local non-staging connection strings are preserved.
+
+API compilation/asset packaging and generated contracts passed. All 25 unit/security checks passed, including compiled asset byte equality, Windows-path replacement, credential/host preservation and rejection of weakened TLS. A read-only Supabase SELECT 1 passed using the bundled staging CA and verified TLS. This local connection does not prove Railway network connectivity or its current credentials; hosted readiness must be rechecked after deployment.
+
 # Railway readiness diagnostics - 15 October 2026
 
 API compilation and contract generation passed; all 24 unit/security checks passed. New diagnostics extract only allowlisted codes and adapter categories from nested Prisma/pg errors, discard messages/stacks/SQL/URLs/arbitrary metadata, handle cyclic causes and retain the original public 503 response. A successful query still returns ready without failure logging. The API contract is unchanged.

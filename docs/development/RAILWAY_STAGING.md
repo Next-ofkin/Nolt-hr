@@ -25,7 +25,7 @@ Add values directly to Railway Variables, never GitHub source or chat. Copy priv
 | `SUPABASE_PUBLISHABLE_KEY` | Existing project publishable key |
 | `SUPABASE_SECRET_KEY` | Existing server-only key; never expose to browser code |
 | `AUTH_ENCRYPTION_KEY` | Existing 32-byte Base64 key for this database; do not rotate casually |
-| `DATABASE_URL` | Existing restricted `nolt_app` session-pooler URL, port 5432. Retain `sslmode=verify-full`; replace its Windows `sslrootcert` value with `database/certs/supabase-prod-ca-2021.crt`, relative to the repository root. Never use the migration-owner URL. |
+| `DATABASE_URL` | Existing restricted `nolt_app` session-pooler URL, port 5432. Retain `sslmode=verify-full`; replace its Windows `sslrootcert` value with `database/certs/supabase-prod-ca-2021.crt`, relative to the repository root. Never use the migration-owner URL. The API build now bundles the public CA and staging resolves that bundled asset internally, overriding only the sslrootcert path. |
 | `PUBLIC_APP_URL` | Exact HTTPS frontend origin, without a path. Since the frontend is currently local, use the generated API HTTPS origin temporarily **for API health testing only**. This does not provide a web UI or functioning email callback pages. Replace it with the real HTTPS frontend origin before testing signup/login/invitations. |
 | `INVITATION_TEST_RECIPIENTS` | Preserve the existing explicitly approved development allowlist; do not broaden it |
 | `INVITATION_TTL_MINUTES` | `60` |

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n types,server \"tsc --watch --preserveWatchOutput\" \"node --watch --watch-path=dist dist/main.js\"",
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/copy-api-assets.mjs",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "predev": "npm run build"
