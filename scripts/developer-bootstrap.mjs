@@ -58,10 +58,10 @@ try {
   const role = (await db.query("SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user")).rows[0];
   if (!role || role.name === "nolt_app")
     throw new Error("An approved privileged database owner is required; never use nolt_app.");
-  if (!/^[a-z0-9]{20}$/.test(env.SUPABASE_PROJECT_REF ?? ""))
+  if (env.SUPABASE_PROJECT_REF !== "llslubzdkdnvhbatmfug")
     throw new Error("SUPABASE_PROJECT_REF must identify the approved Supabase project.");
   const host = new URL(env.DIRECT_DATABASE_URL).hostname;
-  if (!host.endsWith(".pooler.supabase.com"))
+  if (!host.endsWith(".pooler.supabase.com") || !decodeURIComponent(new URL(env.DIRECT_DATABASE_URL).username).endsWith(".llslubzdkdnvhbatmfug"))
     throw new Error("The approved hosted Supabase pooler is required.");
   await db.query("BEGIN");
   try {
@@ -90,7 +90,7 @@ try {
       await db.query(`INSERT INTO nolt_private.developer_bootstrap ("userId","providerSubject","approvedEmail")
         VALUES ($1::uuid,$1::uuid,$2)`, [subject, approvedEmail]);
       const updated = await db.query(`UPDATE public."User"
-        SET role='DEVELOPER', permissions=ARRAY[]::text[], "authVersion"="authVersion"+1
+        SET role='DEVELOPER', permissions=ARRAY[]::text[]
         WHERE id=$1::uuid AND role='EMPLOYEE' AND active=true RETURNING id`, [subject]);
       if (updated.rowCount !== 1) throw new Error("Account changed while provisioning.");
       await db.query(`UPDATE public."Session" SET "revokedAt"=now()
