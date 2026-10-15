@@ -95,6 +95,20 @@ export function dto(row: {
     publishedAt: row.publishedAt?.toISOString() ?? null,
   };
 }
+/**
+ * Permanent draft deletion is allowed only for a form with exactly one
+ * never-published version and no assignment history.
+ */
+export function canDeleteUnpublishedDraft(
+  versions: readonly { status: string }[],
+  assignmentCount: number,
+): boolean {
+  return (
+    versions.length === 1 &&
+    versions[0].status === "DRAFT" &&
+    assignmentCount === 0
+  );
+}
 @Injectable()
 export class FormsService {
   constructor(@Inject(Database) private readonly db: Database) {}
@@ -210,11 +224,9 @@ export class FormsService {
       await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;
       const form = await tx.form.findUnique({ where: { id: formId }, include: { versions: true } });
       if (!form) throw new NotFoundException("Form not found.");
-      if (form.versions.length !== 1 || form.versions[0].status !== "DRAFT")
-        throw new ConflictException("Only a never-published draft can be deleted.");
       const assignments = await tx.formAssignment.count({ where: { formId } });
-      if (assignments)
-        throw new ConflictException("This form has assignments and cannot be deleted.");
+      if (!canDeleteUnpublishedDraft(form.versions, assignments))
+        throw new ConflictException("Only a never-published, never-assigned draft can be deleted.");
       await tx.formVersion.delete({ where: { id: form.versions[0].id } });
       await tx.form.delete({ where: { id: formId } });
       await this.record(tx, actorId, "FORM_DRAFT_DELETED", formId, { title: form.versions[0].title });
