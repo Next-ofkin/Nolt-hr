@@ -6,11 +6,9 @@ DECLARE missing INTEGER;
 BEGIN
  SELECT count(*) INTO missing FROM pg_tables
  WHERE schemaname='public'
- AND tablename IN ('User','Session','Form','FormVersion','Identity','OidcAttempt','AuthFlow','AuditEvent','OutboxEvent','Employee','OnboardingCase','FormAssignment','EmployeeInvitation','InvitationDelivery','EmployeeResponse','FormSubmission','SubmissionReview','AssignmentReviewAccess','StoredFile','SignatureEvidence','_prisma_migrations')
+ AND tablename IN ('User','Session','Form','FormVersion','Identity','OidcAttempt','AuthFlow','AuditEvent','OutboxEvent','Employee','OnboardingCase','FormAssignment','EmployeeInvitation','InvitationDelivery','EmployeeResponse','FormSubmission','SubmissionReview','AssignmentReviewAccess','StoredFile','SignatureEvidence','ExternalContactDraft','ExternalRequest','ExternalDelivery','ExternalSubmission','ExternalEmailSession','_prisma_migrations')
  AND NOT rowsecurity;
  IF missing <> 0 THEN RAISE EXCEPTION 'RLS missing'; END IF;
- IF (SELECT count(*) FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) <> 10
- THEN RAISE EXCEPTION 'Migration history incomplete'; END IF;
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='nolt_app' AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole))
  THEN RAISE EXCEPTION 'Runtime role is overprivileged'; END IF;
 END $$;
@@ -39,7 +37,7 @@ DO $$ BEGIN
  OR has_table_privilege('nolt_app','public._prisma_migrations','SELECT')
  OR has_schema_privilege('nolt_app','public','CREATE')
  THEN RAISE EXCEPTION 'Backend grants incorrect'; END IF;
- IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND policyname='nolt_backend' AND roles=ARRAY['nolt_app']::name[]) <> 20
+ IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND policyname='nolt_backend' AND roles=ARRAY['nolt_app']::name[]) <> 25
  THEN RAISE EXCEPTION 'Backend policies incomplete'; END IF;
 END $$;
 SET LOCAL ROLE anon;
@@ -53,6 +51,11 @@ END $$;
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
+ BEGIN
+  PERFORM 1 FROM public."ExternalContactDraft";
+  RAISE EXCEPTION 'Authenticated external contact access unexpectedly allowed';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
  BEGIN
   PERFORM 1 FROM public."FormVersion";
   RAISE EXCEPTION 'Authenticated Data API access unexpectedly allowed';

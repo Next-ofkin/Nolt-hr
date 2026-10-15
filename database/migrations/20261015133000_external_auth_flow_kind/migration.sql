@@ -1,0 +1,5 @@
+BEGIN;
+ALTER TABLE public."AuthFlow" DROP CONSTRAINT "AuthFlow_kind_check";
+ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_kind_check"
+ CHECK(kind IN ('EMAIL_SIGNUP','EMAIL_RECOVERY','MFA','RECOVERY','INVITATION','EXTERNAL'));
+COMMIT;

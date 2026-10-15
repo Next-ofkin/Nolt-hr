@@ -21,6 +21,12 @@ Application sessions retain the 30-minute idle and eight-hour absolute limits. R
 
 Provider proof calls during validation share a 12-second transport deadline. The serialized session transaction has a bounded 30-second deadline and 10-second pool wait. Provider unavailability and transaction/pool expiry return retryable 503 without authorising the request or updating session evidence; invalid/revoked credentials still fail authentication. This retains serialized refresh and authoritative revocation checks.
 
+Creating the encrypted pre-MFA flow uses a 15-second transaction deadline and 10-second acquisition wait. Transaction expiry/pool timeout returns a sanitised retryable 503; no flow cookie is issued before persistence commits. This addresses a hosted-development acceptance failure where the default five-second transaction expired during sign-in. Authentication and MFA requirements are unchanged.
+
+External recipient verification uses an encrypted EXTERNAL AuthFlow and real Supabase email proof/MFA before issuing a one-request Session. Its `externalRequestId` is immutable, ordinary workspace permissions are empty, and all recipient endpoints recheck the bound actor and request availability. Scoped opaque tokens have an `external_` prefix so an older deployed API rejects them; the prefix is included in the database/CSRF hashes and must agree with stored scope. Ordinary sessions retain their prior token format. See [external workflow](EXTERNAL_REQUESTS.md).
+
+Default database transactions now have bounded 10-second acquisition and 15-second execution limits, matching the hosted workflow limits. Explicit longer session/file transaction deadlines remain in place. Form publishing/storage transaction failures return a sanitised retryable 503. This addresses an observed default acquisition timeout; it is not a load/performance acceptance claim.
+
 Private `SECURITY DEFINER` functions have fixed empty search paths and no public API-role execution privileges. The provisioning trigger needs owner privileges to link `auth.users` to application identities; the session-check function exposes only an active-session boolean to the trusted backend. Runtime database credentials cannot change users or roles.
 
 ## Configuration
@@ -45,3 +51,7 @@ References: [Supabase PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-
 
 
 Owner acceptance, 13 October 2026: Resend SMTP email delivery, real signup/email confirmation and authenticator MFA are confirmed working by the owner. Password recovery and first HR bootstrap verification remain separate checks.
+
+## External recipient amendment ? D25, 15 October 2026
+
+Guarantors/references no longer use staff password/signup/MFA screens. They open the private invitation, exchange a real Supabase email proof and receive a separate `nolt_external` HttpOnly cookie for one request. This is verified-mailbox access, not authenticator assurance or legal identity verification. Staff SessionGuard still requires Supabase AAL2; an external cookie alone cannot authenticate any staff/employee endpoint. The new backend external guard checks token hash, active user/access version, recipient binding, expiry/revocation/replacement and CSRF. Mutation services additionally check active case and immutable assigned form. Legacy scoped MFA sessions remain historical records and are not issued by the new flow. Revised direct-form acceptance passed with real Supabase proof and a new recipient without MFA/password (3.0 minutes); staff password/TOTP/global-logout regression also passed (32.5 seconds). Updated real email delivery is still pending approval.

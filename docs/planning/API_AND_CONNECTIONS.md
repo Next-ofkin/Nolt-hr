@@ -2,6 +2,10 @@
 
 Implemented contract: [generated OpenAPI JSON](../api/openapi.json), with generated frontend types in `packages/api-client/src/schema.d.ts`. The inventory below retains the roadmap proposals; delivered paths are generated from the actual Nest controllers.
 
+Recipient preparation delivered on 15 October: `GET`/`PUT /api/v1/me/assignments/{id}/external-contact` persist own employee's unsent guarantor/reference contact draft with revision checks and transactional audit/outbox. This does not create an external access link or dispatch email. See [scope and verification limits](../development/EXTERNAL_REQUESTS.md).
+
+External request/text response increment verified on 15 October: employee `GET`/`POST /api/v1/me/assignments/{id}/external-requests` and `POST .../{requestId}/revoke`; recipient `POST /api/v1/external/exchange`, `POST /api/v1/external/activate`, `GET /api/v1/external/request`, `PUT .../draft` and `POST .../submit`. Provider verification/MFA precede an opaque one-request session; employee DTOs exclude answers. The explicit shared worker processes approved test delivery jobs. HR review/corrections, external files/signatures, multiple recipient slots and hosted worker deployment remain pending.
+
 Employee response paths delivered on 14 October 2026 are `GET`/`PUT /api/v1/me/assignments/{id}/response` and `POST /api/v1/me/assignments/{id}/response/submit`. They enforce own-record/recipient access, revision checks, server validation and transactional immutable evidence. See [response contract and limits](../development/RESPONSES.md).
 
 Status: proposed contract inventory for roadmap approval, not an implemented or executable OpenAPI specification. Source: PRD pp5–19,22–24. Generate and commit `openapi.yaml` during M0/M1, then generate the TypeScript client from it. Never hand-maintain a second incompatible client contract.
@@ -127,3 +131,7 @@ Store secrets only server-side. Use environment placeholders in examples, never 
 ## Implemented identity/session baseline
 
 The executable contract in `../api/openapi.json` contains the real Supabase Auth endpoints listed above plus configuration and current/all logout. Browser-bound PKCE email flows, encrypted provider tokens, signed AAL2 verification and actual provider-session revocation checks replace the synthetic OIDC fixture. Signup defaults to EMPLOYEE; a private one-time verified-email bootstrap grants the approved HR account. Supabase sends email through the owner?s Resend SMTP configuration. Email delivery/link exchange remains an explicit verification gate. See [identity setup](../development/IDENTITY.md). Broader lifecycle routes above remain proposed until implemented.
+
+## D25 recipient API amendment
+
+`POST /external/exchange` validates real Supabase email proof and immediately issues an isolated external session; it no longer starts a staff MFA flow. `GET /external/session` returns request ID, CSRF token and expiry only. `POST /external/logout` revokes and clears only the external cookie. Recipient request/draft/submit endpoints use ExternalSessionGuard, while employee request creation/replacement/revoke retains the mandatory-MFA staff SessionGuard. The legacy `/external/activate` endpoint rejects use with instructions to open the invitation directly. Direct Resend delivers the simple form invitation; Supabase generates/verifies email proof without sending its generic staff invitation. Migration 014 is additive. Updated direct-form end-to-end checks passed with real Supabase proof, as did staff password/TOTP/global-logout regression. Actual updated invitation delivery remains pending approval.

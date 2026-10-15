@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   Body,
   ConflictException,
@@ -8,6 +8,7 @@
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -112,6 +113,22 @@ export function canDeleteUnpublishedDraft(
 @Injectable()
 export class FormsService {
   constructor(@Inject(Database) private readonly db: Database) {}
+  private async transaction<T>(
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    try {
+      return await this.db.$transaction(work);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        ["P2028", "P2024", "P1017", "P1001"].includes(error.code)
+      )
+        throw new ServiceUnavailableException(
+          "Form storage is temporarily unavailable. Reload and retry.",
+        );
+      throw error;
+    }
+  }
   async list() {
     const forms = await this.db.form.findMany({
       take: 100,
@@ -139,7 +156,7 @@ export class FormsService {
   }
   async create(actorId: string, input: unknown) {
     const data = parse(createFormSchema, input);
-    return this.db.$transaction(async (tx) => {
+    return this.transaction(async (tx) => {
       const form = await tx.form.create({ data: { createdBy: actorId } });
       const row = await tx.formVersion.create({
         data: {
@@ -155,7 +172,7 @@ export class FormsService {
   }
   async save(actorId: string, id: string, input: unknown) {
     const { expectedRevision, content } = parse(saveFormSchema, input);
-    return this.db.$transaction(async (tx) => {
+    return this.transaction(async (tx) => {
       const updated = await tx.formVersion.updateMany({
         where: { id, revision: expectedRevision, status: "DRAFT" },
         data: {
@@ -177,11 +194,22 @@ export class FormsService {
   }
   async publish(actorId: string, id: string, input: unknown) {
     const { expectedRevision } = parse(revisionSchema, input);
-    return this.db.$transaction(async (tx) => {
-      const initial = await tx.formVersion.findUnique({ where: { id } });
-      if (!initial) throw new NotFoundException();
-      // Draft deletion and version creation acquire the same parent lock.
-      await tx.$queryRaw`SELECT id FROM "Form" WHERE id=${initial.formId}::uuid FOR UPDATE`;
+    return this.transaction(async (tx) => {
+      const initial = await tx.formVersion.findUnique({
+        where: { id },
+      });
+
+      if (!initial) {
+        throw new NotFoundException("Form version not found.");
+      }
+
+      // Prevent a form from being deleted while it is being published.
+      await tx.$queryRaw`
+        SELECT id
+        FROM "Form"
+        WHERE id = ${initial.formId}::uuid
+        FOR UPDATE
+      `;
       const row = await tx.formVersion.findUnique({ where: { id } });
       if (!row) throw new NotFoundException();
       parse(publishContentSchema, {
@@ -238,7 +266,7 @@ export class FormsService {
     });
   }
   async newVersion(actorId: string, formId: string) {
-    return this.db.$transaction(async (tx) => {
+    return this.transaction(async (tx) => {
       const locked = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;

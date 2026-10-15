@@ -2,7 +2,16 @@
 
 Owner approved local implementation on 13 October 2026. This file is the working checklist; checked items require implementation and verification evidence. A phase is not complete simply because its UI exists.
 
-## Current position - updated 14 October 2026
+## Owner amendment ? simple guarantor invitations, 15 October 2026
+
+- [x] Owner confirmed receipt of the guarantor test email.
+- [x] Record D25: guarantors open the invited form directly, without staff signup/password/MFA; staff MFA stays unchanged.
+- [x] Replace the external MFA prototype with verified-email, one-request sessions and a simple Resend invitation. API/client/frontend builds, 36 unit/security checks and the revised real-provider direct-form journey passed locally against hosted Supabase (3.0 minutes). Migration 014 and all 14 hosted checksums/RLS/grants passed.
+- [x] Verify the revised direct-form journey, privacy, expired/revoked-link denial and replacement. New recipient has no password/MFA; six widths, zoom/keyboard and mobile evidence passed.
+- [x] Pass separate real staff password/TOTP/global-logout browser regression (32.5 seconds). Staff MFA remains required; global logout blocks another staff tab.
+- [ ] Verify one updated invitation email after explicit resend approval. Earlier inbox receipt does not verify the revised experience.
+
+## Current position - updated 15 October 2026
 
 - [x] Foundation and first HR form-authoring slice completed for local development.
 - [x] Real signup, Resend SMTP email delivery and authenticator MFA accepted by the owner.
@@ -10,7 +19,7 @@ Owner approved local implementation on 13 October 2026. This file is the working
 - [x] Employee invitations, real email delivery, authenticator MFA and employee activation verified on 14 October 2026.
 - [x] Saved employee form drafts, validated submissions and immutable submission history verified with real Auth against hosted Supabase.
 - [x] HR review and corrections verified through the real HR dialog, employee resubmission and final approval, with explicit record scope and sensitive-data permission checks.
-- [ ] Next delivery: private uploads/signatures, followed by employee-sent guarantor/reference requests.
+- [ ] Next delivery: employee-sent guarantor/reference request workflow. Owner deferred live upload/signature testing on 15 October; scanning remains mandatory before file confirmation.
 
 ## Employee records and onboarding assignments - complete (hosted development)
 
@@ -76,17 +85,40 @@ The delivered HR workflow uses an explicit initial reviewer assignment and trust
 - [x] Independently verify public API endpoints on 15 October 2026: https://noltapi-production.up.railway.app returned HTTP 200 for /api/v1/health/live (ok), /api/v1/health/ready (ready) and /api/docs (Swagger HTML).
 - [x] Prepare Railway frontend build/start commands, platform port binding, HTTPS upstream validation and manual service guide on 15 October. Production build passed; compiled login page and same-origin proxy to the live API both returned HTTP 200 in local smoke checks.
 - [x] Prepare Vercel frontend configuration and a bundled production tracker snapshot on 15 October. Build and local login/tracker/live-API proxy checks passed. Owner deleted the Railway web service and selected Vercel Hobby after its personal/non-commercial restriction was explained; company-use eligibility is not confirmed.
-- [ ] Connect an HTTPS frontend and verify real hosted login/MFA through the same-origin API proxy. Frontend is currently local; Vercel deployment is pending.
+- [x] Owner reports Vercel project nolt-hr deployed commit 4310543 to READY on 15 October. Independently checked the supplied nolt-hr-excel-shogbolas-projects.vercel.app URL: /login, /tracker and proxied readiness each returned a 302 to Vercel authentication. These alias checks were blocked at that time; canonical-domain checks and owner login/MFA acceptance below supersede this limit.
+- [x] Independently verify canonical frontend https://nolt-hr.vercel.app on 15 October: /login and /tracker render with HTTP 200; /api/v1/health/ready returns HTTP 200 with ready through the frontend proxy. No Vercel-authentication redirect or bypass was needed. The additional deployment alias remains a separate protection check.
+- [x] Owner confirmed Railway PUBLIC_APP_URL/Supabase redirect configuration and real hosted login/MFA working at https://nolt-hr.vercel.app on 15 October. Recorded as owner acceptance, not a new automated browser run.
 
 ## Next delivery - private files and signatures
 
 Security fixes in progress (14 October): private Supabase storage adapter with no overwrite; fail-closed ClamAV scanning; actual image decoding/normalisation; save-before-sign and content-change invalidation; server signing-method/confirmation validation; checksum-checked authorised attachment downloads. Required fields no longer permanently disable Submit. Full delivery remains unchecked: live scanner configuration, hosted storage/browser acceptance, orphan/expiry cleanup, final consent policy and keyboard accommodation for draw-only forms are still pending. Isolated storage/scanner test doubles do not establish hosted acceptance.
 
 - [x] Install and verify official project-local ClamAV LTS binaries and add localhost configuration/start-stop-update commands.
+- [x] Verify scanner fail-closed handling for malware, error, truncated and unexpected replies; all seven focused file/security tests passed on 15 October. These protocol fixtures do not establish real scanner readiness.
+- [x] Record owner scanner decision, 15 October: retain ClamAV and defer live upload/signature testing. Cloudmersive is not selected; no new provider is connected. This completes the decision only, not scanner readiness.
 - [ ] Download official definitions and verify real clean/EICAR scanning. Blocked by updater DNS failure; direct endpoint diagnostic returned 403. See [local scanner setup](development/CLAMAV_LOCAL.md).
 - [ ] Run the new real-Auth upload/drawn-signature browser journey after scanner readiness; the test is written but has not passed yet.
 
 - [ ] Build private uploads/signatures and employee-sent guarantor/reference requests, completed by the actual recipient.
+
+Next executable scope: employee enters recipient details for an HR-designated guarantor/reference assignment; request-scoped access, expiry/revocation and employee status-only visibility. Verify text-only responses independently first. Required attachments/signatures must continue to block final submission until real scanner acceptance is verified. External email delivery requires its own explicit test-recipient approval; the earlier employee invitation approval does not authorise guarantor emails.
+
+## Guarantor/reference requests - in progress (15 October 2026)
+
+- [x] Verify employee recipient-detail preparation from screen through typed API to database/audit. Real Supabase login/MFA browser journey passed on 15 October (1.7 minutes), including save/reopen, six viewport widths, stale/self-nomination rejection, cross-employee denial and employee proxy-response denial. Saved details are explicitly Not sent.
+- [x] Pass isolated PostgreSQL checks for contact ownership, employee-form/self-nomination rejection, concurrent edits, immutable assignment binding, restricted grants and atomic audit/outbox. Existing domain regressions passed.
+- [x] Apply additive migration 011 to approved hosted development Supabase; all 11 checksums, restricted TLS, schema/RLS/grants and immutable-form checks passed. All 27 unit/security checks and API/frontend builds passed. Browser testing uncovered and verified a bounded sign-in flow storage timeout fix; no authentication/MFA bypass added.
+- [ ] Implement actual secure request delivery, recipient-scoped access, text-only drafts/submission and HR review with independent respondent evidence.
+- [x] Implement and pass isolated database checks for request snapshots/idempotency, competing creation/delivery claims, respondent revisions, exactly-once immutable text submission and session-scope integrity. Email transport fixtures are explicitly isolated; no real delivery is inferred.
+- [x] Pass 32 unit/security checks, including expired/revoked links rejected before provider proof, strict request/proof validation, rejection of scoped cookies by legacy APIs, and safe form-storage failure handling.
+- [x] Historical MFA prototype: pass real-auth request creation, recipient email proof/MFA, replacement of an open request, text draft/reopen/submission and locked submitted fields. Final focused journey passed in 4.3 minutes on 15 October; six viewport widths, 200% CSS zoom, keyboard focus and mobile evidence checked. Supabase-generated verification links were used without sending emails to QA addresses; real inbox acceptance remains separate.
+- [x] Apply migrations 012/013; verify all 13 hosted checksums, restricted TLS, RLS/grants and immutable-form checks. The AuthFlow constraint omission found in the first browser run is fixed in migration 013, preserving migration 012 unchanged.
+- [x] Pass contact-preparation browser regression (2.5 minutes). The subsequent recipient journey exposed the submitted-control UI issue and a default transaction-acquisition timeout; fixes and final passing evidence are recorded in the test report.
+- [x] Supabase accepted the single approved test email to exceldistrings@gmail.com (SENT, one attempt), and the owner confirmed receipt. The owner rejected staff-style MFA for guarantors; activation/submission is not accepted. D25 supersedes that experience; revised verification remains pending.
+- [ ] Deliver independent HR review/corrections and configurable multiple guarantor/reference slots.
+- [ ] Verify real delivery to an explicitly approved test recipient; no external-request emails sent by contact preparation.
+
+Scope and limits: [external requests](development/EXTERNAL_REQUESTS.md). Full third-party completion remains unchecked.
 
 ## Foundation setup and first HR form slice — complete (local development)
 

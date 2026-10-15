@@ -1,4 +1,15 @@
+import { ExternalSessions, ExternalSessionGuard } from "./external-sessions.js";
+import { QueueWorkerService } from "./queue-worker.js";
 import "reflect-metadata";
+import {
+  ExternalRequestsController,
+  ExternalWorkspaceController,
+  ExternalRequestsService,
+} from "./external-requests.js";
+import {
+  ExternalContactsController,
+  ExternalContactsService,
+} from "./external-contacts.js";
 import {
   Controller,
   Get,
@@ -62,6 +73,9 @@ class HealthController {
     InvitationsController,
     InvitationActivationController,
     FilesController,
+    ExternalContactsController,
+    ExternalRequestsController,
+    ExternalWorkspaceController,
   ],
   providers: [
     Database,
@@ -77,6 +91,11 @@ class HealthController {
     InvitationsService,
     FilesService,
     FilesStorage,
+    ExternalContactsService,
+    ExternalRequestsService,
+    ExternalSessions,
+    ExternalSessionGuard,
+    QueueWorkerService,
   ],
 })
 export class AppModule {}

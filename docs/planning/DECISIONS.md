@@ -35,6 +35,10 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 
 ## Approval record
 
+External-request development, 15 October 2026: owner approved proceeding with independently completed guarantor/reference requests and one real delivery test to `exceldistrings@gmail.com`; owner confirmed adding the local and canonical `/external/accept**` redirect entries. Implementation reuses Supabase verification emails and mandatory MFA, then issues an opaque one-request application session with no ordinary workspace permissions. Verification tokens/hashes remain provider-managed. Request expiry is provisionally 60 minutes for development. This does not approve production policy, real employee imports, paid worker provisioning or external file/signature acceptance.
+
+Scanner/testing amendment, 15 October 2026: owner selected "Keep ClamAV; defer upload testing" after reviewing the free managed-scanner alternative and Railway memory constraints. Retain the existing fail-closed ClamAV integration; do not connect Cloudmersive or treat upload/signature acceptance as complete. Independent guarantor/reference request development can proceed within the approved scope; file-dependent submissions remain blocked until scanner verification.
+
 Frontend hosting amendment, 15 October 2026: owner deleted Railway @nolt/web and requested Vercel to preserve Railway credit. After Vercel Hobby's personal/non-commercial restriction was explained, owner selected Hobby for now. Prepare Vercel configuration and guide, keep API on Railway, and make no paid upgrades. This records preference rather than commercial-use eligibility or production release approval.
 
 
@@ -58,6 +62,27 @@ Production deployment authorised: no.
 
 When the user approves, record the exact approved scope here before implementation. Approval of local implementation does not resolve undecided HR/legal rules or authorise production purchases/data import.
 
+## D25 — Simple external form invitations (15 October 2026)
+
+The owner confirmed receipt of the guarantor test email but
+rejected staff-style signup and authenticator setup for
+external recipients.
+
+Guarantors and referees must open a private, expiring
+invitation and complete their assigned forms directly,
+without passwords or MFA.
+
+Staff and employee Supabase authentication and MFA
+remain mandatory.
+
+External invitations must enforce recipient ownership,
+expiry, revocation, scoped sessions and employee
+proxy-submission denial.
+
+The external form workflow uses the approved direct
+invitation approach.
+
+The earlier external MFA prototype is superseded for new invitations. Custom invitation emails use direct Resend; the owner confirmed saving its sender configuration locally. Updated implementation, real-proof direct-form acceptance and staff MFA regression passed locally against hosted Supabase; actual revised invitation inbox acceptance remains pending. No additional real email is authorised by the earlier single-message test.
 
 ## Owner-approved lifecycle redesign — 15 October 2026
 
@@ -68,3 +93,4 @@ When the user approves, record the exact approved scope here before implementati
 - D30: All screens must be exceptionally responsive and professional, with fast perceived loading, bounded/paginated APIs and measured performance budgets. Use shadcn-style notifications (not browser-native alerts); accessible loading, error, empty and success states are required. Performance claims require measured testing.
 
 These decisions update design scope only. Their presence here does not indicate completed implementation or authorise production data use.
+

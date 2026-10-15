@@ -1,3 +1,5 @@
+import { digest } from "../apps/api/dist/security.js";
+import { ExternalSessions } from "../apps/api/dist/external-sessions.js";
 // Domain/database verification only. This never starts an Auth provider or creates a login shortcut.
 import "reflect-metadata";
 import assert from "node:assert/strict";
@@ -16,6 +18,9 @@ import { InvitationsService } from "../apps/api/dist/invitations.js";
 import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { ResponsesService } from "../apps/api/dist/responses.js";
+import { ExternalContactsService } from "../apps/api/dist/external-contacts.js";
+import { ExternalRequestsService } from "../apps/api/dist/external-requests.js";
+import { createField } from "@nolt/form-schemas";
 import { FilesService, FilesStorage } from "../apps/api/dist/files.js";
 const directory = resolve(".local/onboarding-db-qa", randomUUID());
 mkdirSync(directory, { recursive: true });
@@ -62,6 +67,31 @@ try {
   process.env.DATABASE_URL =
     "postgresql://nolt_app:isolated-qa-app@127.0.0.1:54331/postgres";
   runtime = new Database();
+  // Exercise the actual encrypted flow creation, including its database kind constraint.
+  const flowAuth = new SupabaseAuth(runtime);
+  const priorEncryptionKey = process.env.AUTH_ENCRYPTION_KEY;
+  const priorFlowLocal = process.env.LOCAL_DEVELOPMENT;
+  process.env.LOCAL_DEVELOPMENT = "true";
+  process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+  const flowCookies = [];
+  await flowAuth.start(
+    "EXTERNAL",
+    { externalRequestId: randomUUID() },
+    { headers: {} },
+    { cookie: (...values) => flowCookies.push(values) },
+  );
+  assert.equal(flowCookies.length, 1);
+  assert.equal(
+    await runtime.authFlow.count({ where: { kind: "EXTERNAL" } }),
+    1,
+  );
+  if (priorEncryptionKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+  else process.env.AUTH_ENCRYPTION_KEY = priorEncryptionKey;
+  if (priorFlowLocal === undefined) delete process.env.LOCAL_DEVELOPMENT;
+  else process.env.LOCAL_DEVELOPMENT = priorFlowLocal;
+  console.log(
+    "PASS: real encrypted EXTERNAL AuthFlow persistence satisfies the database constraint and issues a cookie only after commit (domain boundary; no authenticated session).",
+  );
   const service = new EmployeesService(runtime);
   const hr = randomUUID(),
     employee = randomUUID(),
@@ -135,9 +165,14 @@ try {
     'INSERT INTO "Form"(id,"createdBy") VALUES($1,$2),($3,$2)',
     [form, hr, thirdForm],
   );
+  const externalQuestion = {
+    ...createField("text", randomUUID()),
+    label: "Guarantor statement",
+    required: true,
+  };
   await owner.query(
-    `INSERT INTO "FormVersion"(id,"formId",version,status,title,recipient,"publishedAt") VALUES($1,$2,1,'PUBLISHED','Details v1','EMPLOYEE',now()),($3,$2,2,'DRAFT','Details v2','EMPLOYEE',NULL),($4,$5,1,'PUBLISHED','Guarantor','GUARANTOR',now())`,
-    [v1, form, v2, thirdVersion, thirdForm],
+    `INSERT INTO "FormVersion"(id,"formId",version,status,title,recipient,"publishedAt",fields) VALUES($1,$2,1,'PUBLISHED','Details v1','EMPLOYEE',now(),'[]'),($3,$2,2,'DRAFT','Details v2','EMPLOYEE',NULL,'[]'),($4,$5,1,'PUBLISHED','Guarantor','GUARANTOR',now(),$6::jsonb)`,
+    [v1, form, v2, thirdVersion, thirdForm, JSON.stringify([externalQuestion])],
   );
   await assert.rejects(
     service.assign(hr, caseId, {
@@ -171,6 +206,108 @@ try {
   );
   assert.equal((await service.own(outsider)).employee, null);
   assert.equal((await service.ownForm(employee, c.assignments[0].id)).id, v1);
+  const contacts = new ExternalContactsService(runtime);
+  const contactAssignment = c.assignments[1].id;
+  const contactInput = {
+    fullName: "Independent Recipient",
+    email: "Recipient@example.invalid",
+    expectedRevision: 0,
+  };
+  assert.equal((await contacts.get(employee, contactAssignment)).revision, 0);
+  await assert.rejects(
+    contacts.get(outsider, contactAssignment),
+    (e) => e.getStatus() === 404,
+  );
+  await assert.rejects(
+    contacts.save(outsider, contactAssignment, contactInput),
+    (e) => e.getStatus() === 404,
+  );
+  await assert.rejects(
+    contacts.save(employee, c.assignments[0].id, contactInput),
+    (e) => e.getStatus() === 403,
+  );
+  await assert.rejects(
+    contacts.save(employee, contactAssignment, {
+      ...contactInput,
+      email: profile.email,
+    }),
+    (e) => e.getStatus() === 400,
+  );
+  await assert.rejects(
+    contacts.save(employee, contactAssignment, {
+      ...contactInput,
+      respondentId: employee,
+    }),
+    (e) => e.getStatus() === 400,
+  );
+  const contactWrites = await Promise.allSettled(
+    [1, 2].map(() => contacts.save(employee, contactAssignment, contactInput)),
+  );
+  assert.equal(contactWrites.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(
+    contactWrites.find((r) => r.status === "rejected").reason.getStatus(),
+    409,
+  );
+  const contactSaved = await contacts.get(employee, contactAssignment);
+  assert.equal(contactSaved.revision, 1);
+  assert.equal(contactSaved.email, "recipient@example.invalid");
+  assert.equal(contactSaved.status, "NOT_SENT");
+  const contactUpdated = await contacts.save(employee, contactAssignment, {
+    ...contactInput,
+    fullName: "Revised Recipient",
+    expectedRevision: 1,
+  });
+  assert.equal(contactUpdated.revision, 2);
+  assert.equal(
+    await runtime.auditEvent.count({
+      where: { action: "EXTERNAL_CONTACT_SAVED", targetId: contactAssignment },
+    }),
+    2,
+  );
+  assert.equal(
+    await runtime.outboxEvent.count({
+      where: { type: "EXTERNAL_CONTACT_SAVED", targetId: contactAssignment },
+    }),
+    2,
+  );
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalContactDraft" SET "assignmentId"=$1, revision=revision+1 WHERE "assignmentId"=$2',
+      [c.assignments[0].id, contactAssignment],
+    ),
+  );
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalContactDraft" SET "updatedBy"=$1, revision=revision+1 WHERE "assignmentId"=$2',
+      [outsider, contactAssignment],
+    ),
+  );
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalContactDraft" SET email=$1, revision=revision+1 WHERE "assignmentId"=$2',
+      [profile.email.toLowerCase(), contactAssignment],
+    ),
+  );
+  await assert.rejects(
+    owner.query(
+      'DELETE FROM public."ExternalContactDraft" WHERE "assignmentId"=$1',
+      [contactAssignment],
+    ),
+  );
+  for (const role of ["anon", "authenticated", "service_role"]) {
+    assert.equal(
+      (
+        await owner.query(
+          "SELECT has_table_privilege($1, 'public.\"ExternalContactDraft\"', 'SELECT') AS allowed",
+          [role],
+        )
+      ).rows[0].allowed,
+      false,
+    );
+  }
+  console.log(
+    "PASS: external contact ownership, recipient restrictions, competing edits, database guards and atomic audit/outbox; details remain NOT_SENT.",
+  );
   const responses = new ResponsesService(runtime),
     assigned = c.assignments[0].id;
   assert.equal((await responses.get(employee, assigned)).revision, 0);
@@ -462,7 +599,7 @@ try {
   );
   assert.equal(reviewEvidence.rows.length, 2);
   const outbox = await owner.query(
-    'SELECT count(*)::int AS count FROM "OutboxEvent"',
+    `SELECT count(*)::int AS count FROM "OutboxEvent" WHERE type<>'EXTERNAL_CONTACT_SAVED'`,
   );
   assert.equal(outbox.rows[0].count, 14); // Seven onboarding events, two saves, two submissions, two reviews and explicit reviewer assignment.
   const grants = await owner.query(
@@ -735,14 +872,30 @@ try {
   })
     .png()
     .toBuffer();
-  await assert.rejects(files.captureSignature(employee, uploadAssignmentId, {
-    fieldId: sigFieldId, signingMethod: "TYPED", consentVersion: "development-confirmation-v1",
-    consentConfirmed: true, expectedRevision: 1, signatureImageBase64: fakePngSig.toString("base64"), requestKey: randomUUID(),
-  }), e => e.getStatus() === 400);
-  await assert.rejects(files.captureSignature(employee, uploadAssignmentId, {
-    fieldId: sigFieldId, signingMethod: "DRAWN", consentVersion: "unapproved-client-version",
-    consentConfirmed: true, expectedRevision: 1, signatureImageBase64: fakePngSig.toString("base64"), requestKey: randomUUID(),
-  }), e => e.getStatus() === 400);
+  await assert.rejects(
+    files.captureSignature(employee, uploadAssignmentId, {
+      fieldId: sigFieldId,
+      signingMethod: "TYPED",
+      consentVersion: "development-confirmation-v1",
+      consentConfirmed: true,
+      expectedRevision: 1,
+      signatureImageBase64: fakePngSig.toString("base64"),
+      requestKey: randomUUID(),
+    }),
+    (e) => e.getStatus() === 400,
+  );
+  await assert.rejects(
+    files.captureSignature(employee, uploadAssignmentId, {
+      fieldId: sigFieldId,
+      signingMethod: "DRAWN",
+      consentVersion: "unapproved-client-version",
+      consentConfirmed: true,
+      expectedRevision: 1,
+      signatureImageBase64: fakePngSig.toString("base64"),
+      requestKey: randomUUID(),
+    }),
+    (e) => e.getStatus() === 400,
+  );
   const signatureRequestKey = randomUUID();
   const sigRes = await files.captureSignature(employee, uploadAssignmentId, {
     fieldId: sigFieldId,
@@ -756,10 +909,19 @@ try {
   assert.ok(sigRes.signatureId);
   assert.ok(sigRes.contentDigest);
 
-  const signatureReplay = await files.captureSignature(employee, uploadAssignmentId, {
-    fieldId: sigFieldId, signingMethod: "DRAWN", consentVersion: "development-confirmation-v1",
-    consentConfirmed: true, expectedRevision: 1, signatureImageBase64: fakePngSig.toString("base64"), requestKey: signatureRequestKey,
-  });
+  const signatureReplay = await files.captureSignature(
+    employee,
+    uploadAssignmentId,
+    {
+      fieldId: sigFieldId,
+      signingMethod: "DRAWN",
+      consentVersion: "development-confirmation-v1",
+      consentConfirmed: true,
+      expectedRevision: 1,
+      signatureImageBase64: fakePngSig.toString("base64"),
+      requestKey: signatureRequestKey,
+    },
+  );
   assert.equal(signatureReplay.signatureId, sigRes.signatureId);
   // SignatureEvidence immutability trigger test
   await assert.rejects(
@@ -863,6 +1025,232 @@ try {
       auth,
       new Sessions(runtime, auth),
     );
+  const recipient = randomUUID();
+  await owner.query(
+    "INSERT INTO auth.users(id,email,email_confirmed_at) VALUES($1,$2,now())",
+    [recipient, "recipient@example.invalid"],
+  );
+  const priorExternalEnv = {};
+  for (const key of [
+    "EXTERNAL_TEST_RECIPIENTS",
+    "LOCAL_DEVELOPMENT",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+  ])
+    priorExternalEnv[key] = process.env[key];
+  process.env.EXTERNAL_TEST_RECIPIENTS = "recipient@example.invalid";
+  process.env.LOCAL_DEVELOPMENT = "true";
+  process.env.SUPABASE_SECRET_KEY ??= "isolated-transport-only";
+  process.env.SUPABASE_PUBLISHABLE_KEY ??= "isolated-transport-only";
+  class DomainExternalRequests extends ExternalRequestsService {
+    sent = 0;
+    async sendEmail() {
+      this.sent++;
+      return null;
+    }
+  }
+  const external = new DomainExternalRequests(
+    runtime,
+    auth,
+    new ExternalSessions(runtime),
+  );
+  const extInput = { expectedContactRevision: 2, requestKey: randomUUID() };
+  await assert.rejects(
+    external.create(outsider, contactAssignment, extInput),
+    (e) => e.getStatus() === 404,
+  );
+  await assert.rejects(
+    external.create(employee, assigned, extInput),
+    (e) => e.getStatus() === 403,
+  );
+  await assert.rejects(
+    external.create(employee, contactAssignment, {
+      ...extInput,
+      expectedContactRevision: 1,
+    }),
+    (e) => e.getStatus() === 409,
+  );
+  const firstExternal = await external.create(
+    employee,
+    contactAssignment,
+    extInput,
+  );
+  assert.equal(
+    (await external.create(employee, contactAssignment, extInput)).id,
+    firstExternal.id,
+  );
+  await assert.rejects(
+    external.create(employee, contactAssignment, {
+      ...extInput,
+      replaceRequestId: randomUUID(),
+    }),
+    (e) => e.getStatus() === 409,
+  );
+  await external.revoke(employee, contactAssignment, firstExternal.id);
+  const extCreateRaces = await Promise.allSettled(
+    [1, 2].map(() =>
+      external.create(employee, contactAssignment, {
+        expectedContactRevision: 2,
+        requestKey: randomUUID(),
+      }),
+    ),
+  );
+  assert.equal(
+    extCreateRaces.filter((r) => r.status === "fulfilled").length,
+    1,
+  );
+  const secondExternal = extCreateRaces.find(
+    (r) => r.status === "fulfilled",
+  ).value;
+  assert.equal(
+    (
+      await Promise.all([external.deliverNext(), external.deliverNext()])
+    ).filter(Boolean).length,
+    1,
+  );
+  assert.equal(external.sent, 1);
+  assert.equal(
+    (
+      await runtime.externalRequest.findUniqueOrThrow({
+        where: { id: secondExternal.id },
+      })
+    ).state,
+    "SENT",
+  );
+  await owner.query(
+    'UPDATE public."ExternalRequest" SET state=\'ACTIVE\',"respondentId"=$1,"updatedBy"=$1 WHERE id=$2',
+    [recipient, secondExternal.id],
+  );
+  const externalEmailSessions = new ExternalSessions(runtime);
+  const guest = await runtime.$transaction(async (tx) =>
+    externalEmailSessions.issue(
+      tx,
+      await tx.user.findUniqueOrThrow({ where: { id: recipient } }),
+      secondExternal.id,
+      new Date(secondExternal.expiresAt),
+    ),
+  );
+  const guestRow = await runtime.externalEmailSession.findUniqueOrThrow({
+    where: { tokenHash: digest(guest.token) },
+  });
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalEmailSession" SET "requestId"=$1 WHERE id=$2',
+      [firstExternal.id, guestRow.id],
+    ),
+    /immutable/,
+  );
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalEmailSession" SET "expiresAt"="expiresAt"+interval \'1 hour\' WHERE id=$1',
+      [guestRow.id],
+    ),
+    /immutable/,
+  );
+  console.log(
+    "PASS: isolated email-session scope and expiry cannot be reassigned or extended; provider proof verified separately in the real-Auth browser test.",
+  );
+  const scoped = {
+    actor: { id: recipient, email: "recipient@example.invalid" },
+    externalRequestId: secondExternal.id,
+  };
+  await assert.rejects(
+    external.get({ actor: { id: employee, email: profile.email } }),
+    (e) => e.getStatus() === 403,
+  );
+  await assert.rejects(
+    external.get({
+      ...scoped,
+      actor: { id: outsider, email: "other@example.invalid" },
+    }),
+    (e) => e.getStatus() === 403,
+  );
+  await assert.rejects(
+    external.submit(scoped, { expectedRevision: 0, requestKey: randomUUID() }),
+    (e) => e.getStatus() === 400,
+  );
+  const extSaves = await Promise.allSettled(
+    [1, 2].map(() =>
+      external.save(scoped, {
+        expectedRevision: 0,
+        answers: { [externalQuestion.id]: "Independent response" },
+      }),
+    ),
+  );
+  assert.equal(extSaves.filter((r) => r.status === "fulfilled").length, 1);
+  const extSubmit = { expectedRevision: 1, requestKey: randomUUID() };
+  const extSubmits = await Promise.all([
+    external.submit(scoped, extSubmit),
+    external.submit(scoped, extSubmit),
+  ]);
+  assert.ok(extSubmits.every((r) => r.state === "SUBMITTED"));
+  assert.equal(
+    await runtime.externalSubmission.count({
+      where: { requestId: secondExternal.id },
+    }),
+    1,
+  );
+  await assert.rejects(
+    external.save(scoped, { expectedRevision: 2, answers: {} }),
+    (e) => e.getStatus() === 409,
+  );
+  await assert.rejects(
+    external.revoke(employee, contactAssignment, secondExternal.id),
+    (e) => e.getStatus() === 409,
+  );
+  const statusOnly = (await external.list(employee, contactAssignment))
+    .items[0];
+  assert.equal("answers" in statusOnly, false);
+  assert.equal("respondentId" in statusOnly, false);
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."ExternalSubmission" SET answers=\'{}\' WHERE "requestId"=$1',
+      [secondExternal.id],
+    ),
+    /immutable/,
+  );
+  await assert.rejects(
+    owner.query(
+      "UPDATE public.\"ExternalRequest\" SET email='different@example.invalid' WHERE id=$1",
+      [secondExternal.id],
+    ),
+    /immutable/,
+  );
+  const scopedSession = randomUUID();
+  await owner.query(
+    'INSERT INTO public."Session"(id,"tokenHash","csrfHash","userId","expiresAt") VALUES($1,$2,$3,$4,now()+interval \'1 hour\')',
+    [scopedSession, randomUUID(), randomUUID(), recipient],
+  );
+  await assert.rejects(
+    owner.query(
+      'UPDATE public."Session" SET "externalRequestId"=$1 WHERE id=$2',
+      [secondExternal.id, scopedSession],
+    ),
+    /scope is immutable/,
+  );
+  for (const role of ["anon", "authenticated", "service_role"])
+    for (const table of [
+      "ExternalRequest",
+      "ExternalDelivery",
+      "ExternalSubmission",
+      "ExternalEmailSession",
+    ])
+      assert.equal(
+        (
+          await owner.query(
+            "SELECT has_table_privilege($1,$2,'SELECT') AS allowed",
+            [role, `public."${table}"`],
+          )
+        ).rows[0].allowed,
+        false,
+      );
+  for (const [key, value] of Object.entries(priorExternalEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  console.log(
+    "PASS: external request snapshots, replay/concurrency, exclusive delivery claims, scoped text responses, exactly-once immutable submission, employee status privacy and session-scope guards (explicit email transport fixture; no Auth shortcut).",
+  );
   const request = { expectedRevision: 2, requestKey: randomUUID() };
   const first = await invites.enqueue(hr, detail.employee.id, request);
   assert.equal(

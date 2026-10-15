@@ -166,7 +166,7 @@ export class InvitationsService {
   async enqueue(actorId: string, employeeId: string, input: unknown) {
     const p = parse(enqueueSchema, input),
       requestHash = digest(JSON.stringify(p));
-    return this.transaction(
+    const result = await this.transaction(
       async (tx) => {
         await tx.$queryRaw`SELECT id FROM public."Employee" WHERE id=${employeeId}::uuid FOR UPDATE`;
         const employee = await tx.employee.findUnique({
@@ -280,6 +280,10 @@ export class InvitationsService {
       },
       { timeout: 15000 },
     );
+    setImmediate(() => {
+      void this.deliverNext(result.id).catch(() => {});
+    });
+    return result;
   }
   async revoke(actorId: string, id: string) {
     return this.transaction(async (tx) => {
@@ -473,7 +477,7 @@ export class InvitationsService {
     return { next: "workspace" };
   }
   // Claim briefly; never hold a database transaction open during the provider email call.
-  async deliverNext() {
+  async deliverNext(onlyInvitationId?: string) {
     const expired = await this.db.invitationDelivery.findMany({
       where: { state: "SENDING", leaseUntil: { lt: new Date() } },
       take: 20,
@@ -512,7 +516,7 @@ export class InvitationsService {
     const job = await this.transaction(async (tx) => {
       const ids = await tx.$queryRaw<
         { id: string }[]
-      >`SELECT j.id FROM public."InvitationDelivery" j JOIN public."EmployeeInvitation" i ON i.id=j."invitationId" WHERE j.state='PENDING' AND j."availableAt"<=now() ORDER BY j."availableAt",j.id FOR UPDATE OF i SKIP LOCKED LIMIT 1`;
+      >`SELECT j.id FROM public."InvitationDelivery" j JOIN public."EmployeeInvitation" i ON i.id=j."invitationId" WHERE j.state='PENDING' AND j."availableAt"<=now() AND (${onlyInvitationId ?? null}::uuid IS NULL OR i.id=${onlyInvitationId ?? null}::uuid) ORDER BY j."availableAt",j.id FOR UPDATE OF i SKIP LOCKED LIMIT 1`;
       if (!ids.length) return null;
       const j = await tx.invitationDelivery.findUniqueOrThrow({
         where: { id: ids[0].id },
@@ -549,15 +553,20 @@ export class InvitationsService {
       return j;
     });
     if (!job) return false;
-    const allowed = (process.env.INVITATION_TEST_RECIPIENTS ?? "")
-      .split(",")
-      .map((v) => v.trim().toLowerCase());
+    const filter = process.env.INVITATION_TEST_RECIPIENTS;
+    const allowed =
+      filter !== undefined
+        ? filter
+            .split(",")
+            .map((v) => v.trim().toLowerCase())
+            .filter(Boolean)
+        : null;
     let code: string | null = null,
       uncertain = false,
       retry = false;
     if (
-      process.env.LOCAL_DEVELOPMENT !== "true" ||
-      !allowed.includes(job.invitation.employee.email)
+      allowed &&
+      !allowed.includes(job.invitation.employee.email.toLowerCase())
     )
       code = "RECIPIENT_NOT_APPROVED";
     else if (!process.env.SUPABASE_SECRET_KEY) code = "SENDER_NOT_CONFIGURED";

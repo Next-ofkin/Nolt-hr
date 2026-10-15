@@ -12,6 +12,7 @@ import {
 } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { Database } from "./database.js";
 import { seal, unseal } from "./auth-crypto.js";
 import {
@@ -24,6 +25,7 @@ import {
 
 type Tokens = { access_token: string; refresh_token: string };
 type FlowState = {
+  externalRequestId?: string;
   invitationId?: string;
   tokens?: Tokens;
   storage?: Record<string, string>;
@@ -100,25 +102,39 @@ export class SupabaseAuth {
   ) {
     const token = randomBytes(32).toString("hex");
     const old = cookie(req, "flow");
-    await this.db.$transaction(async (tx) => {
-      await tx.authFlow.deleteMany({
-        where: {
-          OR: [
-            { expiresAt: { lt: new Date() } },
-            ...(old ? [{ tokenHash: digest(old) }] : []),
-          ],
+    await this.db
+      .$transaction(
+        async (tx) => {
+          await tx.authFlow.deleteMany({
+            where: {
+              OR: [
+                { expiresAt: { lt: new Date() } },
+                ...(old ? [{ tokenHash: digest(old) }] : []),
+              ],
+            },
+          });
+          await tx.authFlow.create({
+            data: {
+              tokenHash: digest(token),
+              csrfHash: digest(digest("flow:" + token)),
+              kind,
+              encryptedState: seal(state),
+              expiresAt: new Date(Date.now() + ttl),
+            },
+          });
         },
+        { timeout: 15000, maxWait: 10000 },
+      )
+      .catch((error: unknown) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          ["P2028", "P2024"].includes(error.code)
+        )
+          throw new ServiceUnavailableException(
+            "Sign-in storage is temporarily unavailable. Please try again.",
+          );
+        throw error;
       });
-      await tx.authFlow.create({
-        data: {
-          tokenHash: digest(token),
-          csrfHash: digest(digest("flow:" + token)),
-          kind,
-          encryptedState: seal(state),
-          expiresAt: new Date(Date.now() + ttl),
-        },
-      });
-    });
     setCookie(res, "flow", token, ttl);
     return { next: kind.startsWith("EMAIL_") ? "email" : "mfa" };
   }
@@ -305,13 +321,15 @@ export class SupabaseAuth {
     });
     return {
       stage:
-        row.kind === "INVITATION" && assurance.data?.currentLevel === "aal2"
-          ? "invitation"
-          : row.kind === "RECOVERY" && assurance.data?.currentLevel === "aal2"
-            ? "password"
-            : factor
-              ? "challenge"
-              : "enroll",
+        row.kind === "EXTERNAL" && assurance.data?.currentLevel === "aal2"
+          ? "external"
+          : row.kind === "INVITATION" && assurance.data?.currentLevel === "aal2"
+            ? "invitation"
+            : row.kind === "RECOVERY" && assurance.data?.currentLevel === "aal2"
+              ? "password"
+              : factor
+                ? "challenge"
+                : "enroll",
       csrfToken,
       factorId: factor?.id ?? state.factorId ?? "",
       qrCode: factor ? "" : (state.qrCode ?? ""),
@@ -320,7 +338,7 @@ export class SupabaseAuth {
   }
   async enroll(req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
       throw new ForbiddenException("Sign in before setting up MFA.");
     const { client, session } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -369,7 +387,7 @@ export class SupabaseAuth {
   }
   async verify(factorId: string, code: string, req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
       throw new ForbiddenException("Sign in before verifying MFA.");
     const { client } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -391,7 +409,7 @@ export class SupabaseAuth {
     const { data } = await client.auth.getSession();
     if (!data.session) throw new UnauthorizedException("Sign in again.");
     const checked = await this.validate(seal(this.tokens(data.session)));
-    if (row.kind === "INVITATION") {
+    if (row.kind === "INVITATION" || row.kind === "EXTERNAL") {
       await this.db.authFlow.update({
         where: { id: row.id },
         data: {
@@ -399,7 +417,8 @@ export class SupabaseAuth {
         },
       });
       return {
-        invitation: true as const,
+        invitation: row.kind === "INVITATION",
+        external: row.kind === "EXTERNAL",
         recovery: false as const,
         user: checked.user,
         encrypted: checked.encrypted,
@@ -494,6 +513,10 @@ export class SupabaseAuth {
     await this.db.$transaction(async (tx) => {
       await tx.session.updateMany({
         where: { userId: checked.user.id },
+        data: { revokedAt: new Date() },
+      });
+      await tx.externalEmailSession.updateMany({
+        where: { userId: checked.user.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
       await tx.authFlow.deleteMany({ where: { id: row.id } });

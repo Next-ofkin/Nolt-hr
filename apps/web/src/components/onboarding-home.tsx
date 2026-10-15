@@ -13,8 +13,14 @@ import { WorkspaceAccess } from "./workspace-access";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
 import { EmployeeResponse } from "./employee-response";
+import { ExternalContact } from "./external-contact";
 export function HomeWorkspace() {
   const { session } = useAuth();
+  useEffect(() => {
+    if (session?.externalRequestId) window.location.replace("/external");
+  }, [session?.externalRequestId]);
+  if (session?.externalRequestId)
+    return <p role="status">Opening your requested form…</p>;
   if (session?.permissions.includes("profile.own"))
     return (
       <WorkspaceAccess permission="profile.own">
@@ -187,11 +193,10 @@ function EmployeeHome() {
                         </Button>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Your {a.recipient.toLowerCase()} must complete and sign
-                        this form themselves. Sending their request will be
-                        available in the next delivery slice.
-                      </p>
+                      <ExternalContact
+                        assignmentId={a.id}
+                        recipient={a.recipient}
+                      />
                     )}
                   </li>
                 ))}
