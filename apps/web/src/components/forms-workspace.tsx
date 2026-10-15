@@ -58,6 +58,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FormPreview } from "./form-preview";
+import { toast } from "sonner";
 
 const recipients = {
   EMPLOYEE: "Employee",
@@ -136,6 +137,12 @@ export function FormsWorkspace() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    if (!notice) return;
+    if (notice.kind === "error") toast.error(notice.text);
+    else toast.success(notice.text);
+    setNotice(null);
+  }, [notice]);
   async function create(values: {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
@@ -189,20 +196,6 @@ export function FormsWorkspace() {
   );
   return (
     <>
-      {notice && (
-        <div
-          role={notice.kind === "error" ? "alert" : "status"}
-          className={`mb-5 flex items-start justify-between gap-4 rounded-lg border px-4 py-3 text-sm ${notice.kind === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}
-        >
-          {notice.text}
-          <button
-            onClick={() => setNotice(null)}
-            aria-label="Dismiss notification"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
       {active ? (
         <FormEditor
           key={active.id}
