@@ -4048,6 +4048,109 @@
           "File uploads and signatures"
         ]
       }
+    },
+    "/api/v1/form-versions/{id}/unpublish": {
+      "post": {
+        "operationId": "FormsController_unpublish",
+        "parameters": [
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "description": "Required for mutations; obtained from the authenticated session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "expectedRevision"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR forms"
+        ]
+      }
+    },
+    "/api/v1/forms/{id}/draft": {
+      "delete": {
+        "operationId": "FormsController_deleteDraft",
+        "parameters": [
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "description": "Required for mutations; obtained from the authenticated session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR forms"
+        ]
+      }
     }
   },
   "info": {
@@ -4145,7 +4248,8 @@
             "type": "string",
             "enum": [
               "DRAFT",
-              "PUBLISHED"
+              "PUBLISHED",
+              "UNPUBLISHED"
             ]
           },
           "version": {
