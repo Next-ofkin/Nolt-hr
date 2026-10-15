@@ -1031,8 +1031,16 @@ try {
     "PASS: file/signature domain rules, rejected headers, MIME detection, content binding, invalidation, immutability and download scoping (explicit storage/scanner test doubles; no hosted scanning claim).",
   );
 
+  // Suppress only the automatic background kick in isolated domain QA.
+  // Explicit deliverNext() calls still exercise the real invitation worker.
+  class DomainInvitations extends InvitationsService {
+    async deliverNext(onlyInvitationId) {
+      if (onlyInvitationId) return false;
+      return super.deliverNext();
+    }
+  }
   const auth = new SupabaseAuth(runtime),
-    invites = new InvitationsService(
+    invites = new DomainInvitations(
       runtime,
       auth,
       new Sessions(runtime, auth),
