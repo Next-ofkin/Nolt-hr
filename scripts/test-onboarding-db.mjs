@@ -1056,6 +1056,13 @@ try {
   process.env.SUPABASE_PUBLISHABLE_KEY ??= "isolated-transport-only";
   class DomainExternalRequests extends ExternalRequestsService {
     sent = 0;
+    // Suppress the production fire-and-forget kick for deterministic isolated QA.
+    // Explicit deliverNext() calls below still exercise the real queue, leases,
+    // locking, sending, audit and state-transition implementation.
+    async deliverNext(onlyRequestId) {
+      if (onlyRequestId) return false;
+      return super.deliverNext();
+    }
     async sendEmail() {
       this.sent++;
       return null;
