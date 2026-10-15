@@ -4,6 +4,13 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        source: "/external/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
+      {
         source: "/auth/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

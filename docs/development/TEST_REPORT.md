@@ -1,3 +1,43 @@
+# Simple external form invitation ? D25, 15 October 2026
+
+Owner confirmed receipt of the single Supabase/Resend SMTP guarantor test email (SENT, one attempt) but rejected staff-style signup/MFA for external respondents. That receipt does not establish completed activation/submission. D25 replaces the prototype with direct, verified-email form access and a custom Resend invitation. Staff password/TOTP requirements remain in place.
+
+Implemented: real Supabase email-proof exchange without MFA, separate hashed one-request email sessions and HttpOnly cookie, recipient/expiry/revocation/access-version/CSRF checks, direct-form frontend, simple escaped HTML/plain-text email and external-only close action. Global staff logout and password recovery also revoke this user's external sessions. Required external attachments/signatures remain blocked.
+
+Verification currently recorded:
+
+- Isolated PostgreSQL regression passed, including immutable external email-session scope/expiry, request snapshots and exactly-once submission, restricted provider-role grants, audit/outbox and existing lifecycle/file/review/invitation regressions. Provider proof is verified separately in the browser; email transport/scanner fixtures do not establish real delivery/scanning.
+- 36 unit/security checks passed after the global-logout safeguard, including separate-cookie/recipient/expiry/CSRF denial and actual Supabase SDK generate-link parsing through an explicit transport fixture. The fixture verifies that only the custom Resend email endpoint sends a message, with no generic staff invitation call.
+- API/generated OpenAPI client and frontend production build passed. An initial frontend type check caught the stale generated proof-type union; regeneration resolved it before the passing build.
+- Migration 014 applied to the approved hosted development project. All 14 migration checksums, restricted verified TLS, RLS/backend grants and immutable-form checks passed. Applied migrations 001?013 remain unchanged.
+- Revised real-provider browser journey passed (3.0 minutes): new email-only recipient, no signup/password/MFA screens or authenticator factors, real provider proof, separate HttpOnly external cookie, denied employee APIs/proxy writes, replaced open session blocked, private draft/reload/stale rejection, immutable submission and one audit entry. Six widths, 200% CSS zoom, keyboard focus and reviewed mobile screenshot passed. Test transport remains an explicit fixture: no email to QA addresses.
+- Separate real staff password/TOTP/global-logout browser regression passed (32.5 seconds), including verified MFA account state and another tab denied after global logout.
+- Publishable-file secret scan passed. No Git push or Railway/Vercel feature deployment performed.
+
+The direct sender configuration is present locally (presence checked without displaying values). No second real invitation has been sent. Updated inbox delivery requires separate approval because the earlier approved single-message test is already used. Hosted worker operation, HR external review/corrections, multiple recipient slots and live external files/signatures remain incomplete.
+
+# External recipient contact preparation - 15 October 2026
+
+Passed: API compilation/generated OpenAPI types, frontend production build, all 27 unit/security checks, full isolated PostgreSQL domain regressions, and the real Supabase Auth/MFA recipient-preparation browser journey (1.7 minutes). The browser verified save/reload, stale-save 409, self-email 400, cross-employee 404 and employee proxy-answer 403, database persistence and exactly one matching audit/outbox event. Layout checks passed at 320, 375, 768, 1024, 1440 and 1920 pixels. No external email was sent. Disposable real-provider QA accounts were cleaned up; historical domain evidence remains.
+
+Migration 011 applied to approved hosted development Supabase. All 11 migration checksums, restricted verified TLS and rolled-back schema/RLS/grants/immutable-form verification passed. The verification inventory was updated from 10 to 11 migrations and from 20 to 21 backend policies. Isolated tests also verified database assignment/actor/revision guards and denied public-role table grants.
+
+Earlier failures: the first isolated regression hit the pre-existing outbox-total assertion after two new contact events; contact events now have separate assertions. The first browser run stopped at login because the encrypted AuthFlow transaction expired under the default five-second limit (P2028). Flow creation now has bounded 15-second execution/10-second acquisition limits and maps transaction/pool expiry to a sanitised 503 without issuing a cookie. Its unit regression and subsequent real-auth browser rerun passed. An initial preview launch found the prior NOLT preview occupying port 3000; only the identified project preview processes were restarted.
+
+Limits: this delivers **unsent recipient details**, not secure invitation delivery or recipient submissions/reviews. No staging code deployment is claimed for this increment. Zoom, broader keyboard/touch acceptance and production policy remain pending. ClamAV/live upload testing stays deferred by owner decision. See [external request scope](EXTERNAL_REQUESTS.md).
+
+# Hosted identity owner acceptance - 15 October 2026
+
+Owner confirmed completing the Railway frontend-origin/Supabase redirect configuration and hosted login/MFA checks at https://nolt-hr.vercel.app. Record this as owner acceptance; no passwords, authenticator codes or provider credentials were requested. Prior public login/tracker/proxy health checks were independently verified. This does not close scanner or upload/signature browser acceptance.
+
+# Canonical Vercel frontend verified - 15 October 2026
+
+Independent HTTPS requests to https://nolt-hr.vercel.app returned HTTP 200 for /login (login markup), /tracker (tracker markup) and /api/v1/health/ready (status ready). Redirects were disabled during the check: none of these requests redirected to Vercel authentication, and no protection bypass was used. The earlier protected alias and other connected-chat test failures do not describe the canonical domain's observed public responses. Hosted real login/MFA still requires the API frontend-origin and Supabase redirect configuration followed by acceptance testing.
+
+# Vercel deployment protection check - 15 October 2026
+
+Owner supplied Vercel-connected deployment confirmation for project nolt-hr, commit 4310543, READY. Independent read-only requests to https://nolt-hr-excel-shogbolas-projects.vercel.app/login, /tracker and /api/v1/health/ready each returned HTTP 302 to Vercel authentication. No protection bypass was attempted. This establishes the access blocker, not successful application-page/proxy acceptance. Railway PUBLIC_APP_URL and Supabase redirect changes were reported pending. Confirm the project's actual production domain and intended deployment protection before changing the allowlisted frontend origin.
+
 # Vercel preparation - 15 October 2026
 
 Next.js production compilation/type checks passed with staging API_ORIGIN set to the live Railway API. Compiled local smoke checks returned HTTP 200 for /login, /tracker and /api/v1/health/ready through the frontend proxy. The tracker now bundles a build-time snapshot in production to avoid runtime reads outside the deployed frontend; development retains its live file read. Snapshot generation runs before build/dev/typecheck, and generated JSON is ignored by Git. Vercel install/build configuration and import/redirect instructions were prepared.

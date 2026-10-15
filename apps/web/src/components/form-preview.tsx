@@ -57,6 +57,7 @@ export function FormPreview({
             </Label>
             {field.type === "textarea" ? (
               <Textarea
+                disabled={disabled}
                 id={`preview-${field.id}`}
                 maxLength={10000}
                 {...(answers
@@ -74,6 +75,7 @@ export function FormPreview({
               />
             ) : field.type === "select" ? (
               <select
+                disabled={disabled}
                 id={`preview-${field.id}`}
                 className="native-select"
                 {...(answers
@@ -96,6 +98,7 @@ export function FormPreview({
             ) : field.type === "checkbox" ? (
               <div className="flex items-start gap-2">
                 <input
+                  disabled={disabled}
                   id={`preview-${field.id}`}
                   type="checkbox"
                   {...(answers
@@ -171,6 +174,7 @@ export function FormPreview({
               )
             ) : (
               <Input
+                disabled={disabled}
                 id={`preview-${field.id}`}
                 maxLength={10000}
                 {...(answers

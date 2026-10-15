@@ -32,6 +32,8 @@ import { SupabaseAuth } from "./supabase-auth.js";
 import { assertOrigin, clearCookie, digest, LoginLimiter } from "./security.js";
 export type { AuthRequest, Actor } from "./sessions.js";
 export class SessionDto {
+  @ApiProperty({ type: String, nullable: true }) externalRequestId!:
+    string | null;
   @ApiProperty({ type: String }) id!: string;
   @ApiProperty({ type: String }) name!: string;
   @ApiProperty({ type: String }) email!: string;
@@ -278,6 +280,7 @@ export class AuthController {
       value,
     );
     const result = await this.auth.verify(p.factorId, p.code, req);
+    if ("external" in result && result.external) return { next: "external" };
     if ("invitation" in result && result.invitation)
       return { next: "invitation" };
     if (result.recovery) return { next: "password" };

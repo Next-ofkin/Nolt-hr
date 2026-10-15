@@ -54,9 +54,12 @@ export function appOrigin() {
     );
   return url.origin;
 }
-export const cookieName = (kind: "session" | "oidc" | "flow") =>
+export const cookieName = (kind: "session" | "oidc" | "flow" | "external") =>
   `${process.env.NODE_ENV === "production" ? "__Host-" : ""}nolt_${kind}`;
-export function cookie(req: Request, kind: "session" | "oidc" | "flow") {
+export function cookie(
+  req: Request,
+  kind: "session" | "oidc" | "flow" | "external",
+) {
   const key = cookieName(kind) + "=";
   return req.headers.cookie
     ?.split(";")
@@ -66,7 +69,7 @@ export function cookie(req: Request, kind: "session" | "oidc" | "flow") {
 }
 export function setCookie(
   res: Response,
-  kind: "session" | "oidc" | "flow",
+  kind: "session" | "oidc" | "flow" | "external",
   token: string,
   maxAge: number,
 ) {
@@ -78,7 +81,10 @@ export function setCookie(
     path: "/",
   });
 }
-export function clearCookie(res: Response, kind: "session" | "oidc" | "flow") {
+export function clearCookie(
+  res: Response,
+  kind: "session" | "oidc" | "flow" | "external",
+) {
   res.clearCookie(cookieName(kind), {
     httpOnly: true,
     secure: new URL(appOrigin()).protocol === "https:",

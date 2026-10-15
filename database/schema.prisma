@@ -13,12 +13,18 @@ model User {
   authVersion Int @default(1)
   permissions String[] @default([])
   identities Identity[]
+  emailSessions ExternalEmailSession[]
   sessions Session[]
   employee Employee?
   assignedReviews AssignmentReviewAccess[] @relation("ReviewAssignee")
   grantedReviews AssignmentReviewAccess[] @relation("ReviewGrantor")
   reviewDecisions SubmissionReview[] @relation("ReviewActor")
   uploadedFiles StoredFile[]
+  externalContacts ExternalContactDraft[]
+  externalRequestsCreated ExternalRequest[] @relation("ExternalCreator")
+  externalRequestsAnswered ExternalRequest[] @relation("ExternalRespondent")
+  externalSubmissions ExternalSubmission[]
+  externalRequestsUpdated ExternalRequest[] @relation("ExternalUpdater")
   signatures SignatureEvidence[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
@@ -36,6 +42,9 @@ model Session {
   authMethod String @default("LOCAL")
   mfaVerified Boolean @default(false)
   providerSession String?
+  externalRequestId String? @db.Uuid
+  externalRequest ExternalRequest? @relation(fields:[externalRequestId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([externalRequestId])
   @@index([userId])
   @@index([expiresAt])
 }
@@ -146,9 +155,76 @@ model FormAssignment {
   files StoredFile[]
   signatures SignatureEvidence[]
   @@unique([id,formVersionId])
+  externalContact ExternalContactDraft?
+  externalRequests ExternalRequest[]
   @@unique([caseId,formId])
   @@index([formVersionId,formId])
   @@index([formId])
+}
+model ExternalContactDraft {
+  assignmentId String @id @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  fullName String @db.VarChar(160)
+  email String @db.VarChar(254)
+  revision Int @default(1)
+  updatedBy String @db.Uuid
+  updater User @relation(fields:[updatedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  @@index([updatedBy])
+}
+model ExternalRequest {
+  id String @id @default(uuid()) @db.Uuid
+  assignmentId String @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  requestKey String @db.Uuid
+  requestHash String
+  contactRevision Int
+  fullName String @db.VarChar(160)
+  email String @db.VarChar(254)
+  createdBy String @db.Uuid
+  creator User @relation("ExternalCreator",fields:[createdBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  updatedBy String @db.Uuid
+  updater User @relation("ExternalUpdater",fields:[updatedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  respondentId String? @db.Uuid
+  respondent User? @relation("ExternalRespondent",fields:[respondentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  state String @default("QUEUED")
+  revision Int @default(0)
+  answers Json @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  sentAt DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  submittedAt DateTime? @db.Timestamptz(3)
+  delivery ExternalDelivery?
+  submission ExternalSubmission?
+  emailSessions ExternalEmailSession[]
+  sessions Session[]
+  @@unique([assignmentId,requestKey])
+  @@index([assignmentId,createdAt])
+  @@index([createdBy])
+  @@index([updatedBy])
+  @@index([respondentId])
+}
+model ExternalDelivery {
+  requestId String @id @db.Uuid
+  request ExternalRequest @relation(fields:[requestId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  state String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now()) @db.Timestamptz(3)
+  leaseUntil DateTime? @db.Timestamptz(3)
+  errorCode String?
+  @@index([state,availableAt])
+}
+model ExternalSubmission {
+  requestId String @id @db.Uuid
+  request ExternalRequest @relation(fields:[requestId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  sourceRevision Int
+  requestKey String @db.Uuid
+  answers Json
+  submittedBy String @db.Uuid
+  submitter User @relation(fields:[submittedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  submittedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([submittedBy])
 }
 model AssignmentReviewAccess {
   assignmentId String @id @db.Uuid
@@ -294,4 +370,20 @@ model SignatureEvidence {
   signedAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([assignmentId,fieldId])
   @@index([signerId,signedAt])
+}
+
+model ExternalEmailSession {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  requestId String @db.Uuid
+  request ExternalRequest @relation(fields:[requestId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  userId String @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  authVersion Int
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  @@index([requestId])
+  @@index([userId])
+  @@index([expiresAt])
 }

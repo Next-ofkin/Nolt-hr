@@ -24,6 +24,10 @@ export default function MfaPage() {
       window.location.replace("/invitations/complete");
       return;
     }
+    if (r.data.stage === "external") {
+      window.location.replace("/external/complete");
+      return;
+    }
     setFlow(r.data);
   }
   useEffect(() => {
@@ -65,6 +69,8 @@ export default function MfaPage() {
       if (r.data.next === "password") {
         setCode("");
         await load();
+      } else if (r.data.next === "external") {
+        window.location.assign("/external/complete");
       } else if (r.data.next === "invitation") {
         window.location.assign("/invitations/complete");
       } else if (r.data.next === "login") {

@@ -22,7 +22,21 @@ import {
 } from "./security.js";
 export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
+// Older deployed APIs accept only 64 hex characters. They must reject scoped tokens.
+export function newSessionToken(externalRequestId?: string) {
+  return `${externalRequestId ? "external_" : ""}${randomBytes(32).toString("hex")}`;
+}
+export function sessionTokenMatchesScope(
+  token: string,
+  externalRequestId?: string | null,
+) {
+  return (
+    /^(?:external_)?[a-f0-9]{64}$/.test(token) &&
+    token.startsWith("external_") === Boolean(externalRequestId)
+  );
+}
 export type Actor = {
+  externalRequestId: string | null;
   id: string;
   email: string;
   name: string;
@@ -36,6 +50,7 @@ export type AuthRequest = Request & {
   actor: Actor;
   sessionId: string;
   sessionToken: string;
+  externalRequestId?: string | null;
 };
 @Injectable()
 export class Sessions {
@@ -51,8 +66,9 @@ export class Sessions {
     res: Response,
     providerSession: string,
     transaction?: Prisma.TransactionClient,
+    externalRequestId?: string,
   ) {
-    const token = randomBytes(32).toString("hex"),
+    const token = newSessionToken(externalRequestId),
       csrfToken = digest("csrf:" + token),
       expiresAt = new Date(Date.now() + SESSION_ABSOLUTE_MS);
     const work = async (tx: Prisma.TransactionClient) => {
@@ -76,6 +92,7 @@ export class Sessions {
           authVersion: user.authVersion,
           mfaVerified,
           providerSession,
+          externalRequestId,
           expiresAt,
         },
       });
@@ -95,11 +112,12 @@ export class Sessions {
     else await this.db.$transaction(work);
     setCookie(res, "session", token, SESSION_ABSOLUTE_MS);
     return {
+      externalRequestId: externalRequestId ?? null,
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      permissions: permissionsFor(user),
+      permissions: externalRequestId ? [] : permissionsFor(user),
       authMethod: method,
       mfaVerified,
       expiresAt: expiresAt.toISOString(),
@@ -108,7 +126,7 @@ export class Sessions {
   }
   async authenticate(req: AuthRequest) {
     const token = cookie(req, "session");
-    if (!token || !/^[a-f0-9]{64}$/.test(token))
+    if (!token || !/^(?:external_)?[a-f0-9]{64}$/.test(token))
       throw new UnauthorizedException("Sign in to continue.");
     const session = await this.db.session.findUnique({
       where: { tokenHash: digest(token) },
@@ -117,6 +135,7 @@ export class Sessions {
     const now = new Date();
     if (
       !session ||
+      !sessionTokenMatchesScope(token, session.externalRequestId) ||
       session.revokedAt ||
       session.expiresAt <= now ||
       now.getTime() - session.lastSeenAt.getTime() > SESSION_IDLE_MS ||
@@ -179,16 +198,20 @@ export class Sessions {
         throw error;
       });
     req.actor = {
+      externalRequestId: session.externalRequestId,
       id: session.user.id,
       name: session.user.name,
       email: session.user.email,
       role: session.user.role,
-      permissions: permissionsFor(session.user),
+      permissions: session.externalRequestId
+        ? []
+        : permissionsFor(session.user),
       authMethod: session.authMethod,
       mfaVerified: session.mfaVerified,
       expiresAt: session.expiresAt.toISOString(),
     };
     req.sessionId = session.id;
+    req.externalRequestId = session.externalRequestId;
     req.sessionToken = token;
   }
   async revoke(req: AuthRequest, res: Response, all = false) {
@@ -202,6 +225,11 @@ export class Sessions {
           : { id: req.sessionId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      if (all)
+        await tx.externalEmailSession.updateMany({
+          where: { userId: req.actor.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
       await tx.outboxEvent.create({
         data: {
           type: all ? "ALL_SESSIONS_REVOKED" : "SESSION_REVOKED",
@@ -217,6 +245,7 @@ export class Sessions {
       });
     });
     clearCookie(res, "session");
+    if (all) clearCookie(res, "external");
     if (current?.providerSession)
       await this.provider.signOut(current.providerSession, all);
     return { signedOut: true };

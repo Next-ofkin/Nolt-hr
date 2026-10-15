@@ -200,6 +200,40 @@ import {
 } from "../apps/api/dist/file-security.js";
 import { createServer } from "node:net";
 
+test("scanner rejects malware, scanner errors and truncated responses", async () => {
+  const oldHost = process.env.CLAMAV_HOST;
+  const oldPort = process.env.CLAMAV_PORT;
+  try {
+    for (const [reply, expected] of [
+      ["stream: Eicar-Test-Signature FOUND\0", /rejected by malware scanner/],
+      ["stream: size limit exceeded ERROR\0", /scanner unavailable/],
+      ["stream: OK", /scanner unavailable/],
+      ["unexpected: OK\0", /scanner unavailable/],
+    ] as const) {
+      const server = createServer((socket) => {
+        socket.once("data", () => socket.end(reply));
+      });
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+      );
+      process.env.CLAMAV_HOST = "127.0.0.1";
+      process.env.CLAMAV_PORT = String(
+        (server.address() as { port: number }).port,
+      );
+      try {
+        await assert.rejects(scanBytes(Buffer.from("test")), expected);
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    }
+  } finally {
+    if (oldHost === undefined) delete process.env.CLAMAV_HOST;
+    else process.env.CLAMAV_HOST = oldHost;
+    if (oldPort === undefined) delete process.env.CLAMAV_PORT;
+    else process.env.CLAMAV_PORT = oldPort;
+  }
+});
+
 test("normalisation rejects forged image headers and re-encodes actual image pixels", async () => {
   await assert.rejects(
     normaliseImage(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
