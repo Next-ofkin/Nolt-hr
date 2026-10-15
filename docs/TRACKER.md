@@ -231,3 +231,12 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [ ] Generate OpenAPI client, run typecheck/build/unit/browser/database/security checks and record results before PR merge.
 
 **Checkpoint:** Form authoring backend API and editor confirmation controls have been committed on this branch; their integration and automated verification are not yet complete. Existing published evidence is never eligible for deletion. Production deployment and real employee imports remain out of scope.
+
+
+### Checkpoint — 15 October 2026, after draft PR #3
+- [x] Added Sonner UI provider and replaced Form Library inline banner with toast events (code committed, browser verification pending).
+- [x] Added narrow migration to permit published→unpublished transition without content changes and allow guarded deletion of never-published drafts (migration NOT applied).
+- [x] Added unit-test cases for never-published draft deletion policy and isolated DEVELOPER permissions (tests NOT executed successfully yet).
+- [x] Added DEVELOPER role grants and DeveloperGuard only; no provisioning endpoints or role migration.
+- [ ] CI: latest observed workflow concluded `startup_failure` with zero jobs. Build, npm ci, generated OpenAPI drift, migrations, unit/domain/e2e all remain unverified.
+- [ ] Do not merge PR #3; verify actual Supabase/PostgreSQL integration and account migration with synthetic users first.
