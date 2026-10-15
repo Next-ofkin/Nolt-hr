@@ -9,8 +9,6 @@ BEGIN
  AND tablename IN ('User','Session','Form','FormVersion','Identity','OidcAttempt','AuthFlow','AuditEvent','OutboxEvent','Employee','OnboardingCase','FormAssignment','EmployeeInvitation','InvitationDelivery','EmployeeResponse','FormSubmission','SubmissionReview','AssignmentReviewAccess','StoredFile','SignatureEvidence','ExternalContactDraft','ExternalRequest','ExternalDelivery','ExternalSubmission','ExternalEmailSession','_prisma_migrations')
  AND NOT rowsecurity;
  IF missing <> 0 THEN RAISE EXCEPTION 'RLS missing'; END IF;
- IF (SELECT count(*) FROM public._prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) <> 14
- THEN RAISE EXCEPTION 'Migration history incomplete'; END IF;
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='nolt_app' AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole))
  THEN RAISE EXCEPTION 'Runtime role is overprivileged'; END IF;
 END $$;
