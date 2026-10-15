@@ -180,7 +180,18 @@ try {
       formVersionId: v2,
       required: true,
     }),
-    (e) => e.getStatus() === 400,
+    (e) => {
+      if (typeof e?.getStatus !== "function")
+        throw new Error(
+          "Expected a 400 rejection for a draft form assignment, but received " +
+            (e?.constructor?.name ?? typeof e) +
+            ": " +
+            (e?.message ?? "no error message"),
+          { cause: e },
+        );
+      assert.equal(e.getStatus(), 400);
+      return true;
+    },
   );
   const assignments = await Promise.allSettled(
     [1, 2].map(() =>
