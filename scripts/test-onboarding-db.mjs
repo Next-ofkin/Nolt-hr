@@ -1429,6 +1429,78 @@ try {
   console.log(
     "PASS: a verified, already-linked invitee who lacks a password must still finish password setup after resend.",
   );
+
+  // Developer migration must protect the one-owner slot without touching
+  // existing HR or employee accounts. Everything below is isolated PostgreSQL.
+  const developerQa = randomUUID(),
+    competingDeveloperQa = randomUUID();
+  await owner.query(
+    "INSERT INTO auth.users(id,email,email_confirmed_at) VALUES ($1,'developer-owner-qa@example.invalid',now()),($2,'developer-second-qa@example.invalid',now())",
+    [developerQa, competingDeveloperQa],
+  );
+  const developerBaseline = await owner.query(
+    'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+    [developerQa],
+  );
+  assert.equal(developerBaseline.rows[0].role, "EMPLOYEE");
+  assert.equal(developerBaseline.rows[0].authVersion, 1);
+  const privileges = await owner.query(
+    "SELECT has_table_privilege('nolt_app','nolt_private.developer_bootstrap','SELECT') AS runtime_read, has_table_privilege('authenticated','nolt_private.developer_bootstrap','SELECT') AS auth_read",
+  );
+  assert.equal(privileges.rows[0].runtime_read, false);
+  assert.equal(privileges.rows[0].auth_read, false);
+
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO nolt_private.developer_bootstrap ("userId","providerSubject","approvedEmail") VALUES($1,$1,$2)',
+      [developerQa, "developer-owner-qa@example.invalid"],
+    );
+    await owner.query(
+      'UPDATE public."User" SET role=\'DEVELOPER\', permissions=ARRAY[]::text[] WHERE id=$1',
+      [developerQa],
+    );
+    const checked = await owner.query(
+      'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+      [developerQa],
+    );
+    assert.equal(checked.rows[0].role, "DEVELOPER");
+    assert.equal(checked.rows[0].authVersion, 2);
+    await owner.query("SAVEPOINT second_developer");
+    await assert.rejects(
+      owner.query(
+        'UPDATE public."User" SET role=\'DEVELOPER\' WHERE id=$1',
+        [competingDeveloperQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT second_developer");
+    await owner.query("SAVEPOINT second_bootstrap");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO nolt_private.developer_bootstrap ("userId","providerSubject","approvedEmail") VALUES($1,$1,$2)',
+        [competingDeveloperQa, "developer-second-qa@example.invalid"],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT second_bootstrap");
+  } finally {
+    // Verify a failed/rejected bootstrap leaves no Developer role or claim.
+    await owner.query("ROLLBACK");
+  }
+  const postRollback = await owner.query(
+    'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+    [developerQa],
+  );
+  assert.equal(postRollback.rows[0].role, "EMPLOYEE");
+  assert.equal(postRollback.rows[0].authVersion, 1);
+  assert.equal(
+    (await owner.query("SELECT count(*)::integer AS n FROM nolt_private.developer_bootstrap")).rows[0].n,
+    0,
+  );
+  console.log(
+    "PASS: Developer bootstrap single-role and one-time ledger uniqueness, protected runtime privileges, access-version trigger and complete transactional rollback (isolated PostgreSQL).",
+  );
 } finally {
   await runtime?.$disconnect();
   await owner?.end();
