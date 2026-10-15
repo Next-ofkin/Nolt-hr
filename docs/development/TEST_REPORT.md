@@ -1,3 +1,15 @@
+# Railway frontend preparation - 15 October 2026
+
+Frontend production build passed with API_ORIGIN=https://noltapi-production.up.railway.app and DEPLOYMENT_ENV=staging. The new start:web command bound to the supplied test PORT=3001. Read-only smoke checks returned HTTP 200 for /login (login markup) and /api/v1/health/ready (ready) through the external API rewrite. API_ORIGIN is normalised and staging requires HTTPS with no credentials, paths or query parameters. Existing local start behaviour remains available separately.
+
+This is build/proxy preparation, not hosted frontend or login/MFA acceptance. A generated HTTPS web domain, API PUBLIC_APP_URL update, Supabase redirect configuration and real authenticated browser checks remain pending. See RAILWAY_WEB.md.
+
+# Railway API readiness accepted - 15 October 2026
+
+Owner supplied an inspection from the Railway-connected chat: commit 3c2c947, deployment 37513388-ce4a-4e83-8dfa-a4df6c305e28, service @nolt/api, reached SUCCESS at 06:58:27 UTC (07:58:27 Africa/Lagos). The inspected logs reported healthcheck success, successful application startup and no DATABASE_READINESS_FAILED entries. This confirms the reported staging deployment/database readiness gate; it does not establish full browser Auth/MFA, scanner readiness or production approval. Railway calls its environment production; the application is explicitly configured for staging.
+
+Independent HTTPS checks from the current workspace on 15 October 2026 passed against https://noltapi-production.up.railway.app: liveness returned HTTP 200 with status ok/service nolt-api, readiness returned HTTP 200 with status ready, and /api/docs returned HTTP 200 with Swagger HTML. These read-only checks did not create accounts or mutate application records. Earlier failed-deployment results below remain historical evidence.
+
 # Staging CA asset packaging - 15 October 2026
 
 Owner-supplied Railway diagnostics reported ENOENT during readiness. The CA is tracked and not ignored, so container omission was not established. API builds now fingerprint-check and copy the public trust anchor into dist/certs; staging overrides only sslrootcert with a path anchored to the compiled module. Credentials/host/port and sslmode=verify-full remain unchanged. Missing bundled assets fail explicitly rather than disabling TLS. Local non-staging connection strings are preserved.

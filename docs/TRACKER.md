@@ -71,8 +71,10 @@ The delivered HR workflow uses an explicit initial reviewer assignment and trust
 
 - [x] Add an explicit staging startup gate, Railway port binding, API-only build/start commands and deployment guide; configuration security tests passed.
 - [x] Add and test sanitised database-readiness error logging on 15 October after hosted readiness returned 503 without a visible cause. API compilation/generated contracts and all 24 unit/security checks passed; the endpoint remains fail-closed.
-- [x] Bundle the fingerprint-verified public database CA with the compiled API and resolve it relative to the staging runtime, avoiding manually configured certificate paths. All 25 unit checks and a read-only verified-TLS Supabase query using the bundle passed on 15 October. Hosted readiness after this fix remains unverified.
-- [ ] Deploy API to Railway and verify online liveness/readiness. Owner created a Railway API service. Build/startup now succeed per supplied deployment logs, but readiness still returns 503; successful hosted database access is not verified.
+- [x] Bundle the fingerprint-verified public database CA with the compiled API and resolve it relative to the staging runtime, avoiding manually configured certificate paths. All 25 unit checks and a read-only verified-TLS Supabase query using the bundle passed on 15 October. Hosted readiness after this fix passed, per the owner-supplied Railway inspection below.
+- [x] Deploy staging API to Railway and pass its database-readiness deployment gate. Owner supplied Railway-connected inspection: commit 3c2c947, deployment 37513388-ce4a-4e83-8dfa-a4df6c305e28 reached SUCCESS on 15 October 2026 at 07:58:27 Africa/Lagos; healthcheck succeeded and no database-readiness failure entries were found in the inspected logs.
+- [x] Independently verify public API endpoints on 15 October 2026: https://noltapi-production.up.railway.app returned HTTP 200 for /api/v1/health/live (ok), /api/v1/health/ready (ready) and /api/docs (Swagger HTML).
+- [x] Prepare Railway frontend build/start commands, platform port binding, HTTPS upstream validation and manual service guide on 15 October. Production build passed; compiled login page and same-origin proxy to the live API both returned HTTP 200 in local smoke checks.
 - [ ] Connect an HTTPS frontend and verify real hosted login/MFA through the same-origin API proxy. Frontend is currently local.
 
 ## Next delivery - private files and signatures

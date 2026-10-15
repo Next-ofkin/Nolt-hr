@@ -40,7 +40,9 @@
     "scanner:status": "powershell -NoProfile -File scripts/clamav-local.ps1 status",
     "scanner:test": "node scripts/test-clamav.mjs",
     "build:api": "npm run db:generate && npm run contracts:build && npm run build -w @nolt/api",
-    "start:api": "node apps/api/dist/main.js"
+    "start:api": "node apps/api/dist/main.js",
+    "build:web": "npm run contracts:build && npm run build -w @nolt/web",
+    "start:web": "npm run start:railway -w @nolt/web"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

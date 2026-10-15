@@ -35,6 +35,9 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 
 ## Approval record
 
+Railway frontend staging preparation, 15 October 2026: after the API's public health checks passed, the owner approved proceeding with HTTPS frontend connection and subsequent real login/MFA verification. Prepare and push the web service configuration/guide; continue using Free/Trial resources. Production release, paid upgrades and real employee imports remain unapproved.
+
+
 Railway staging preparation, 14 October 2026: owner requested a reviewed GitHub checkpoint and guidance for deploying the API to Railway's free/trial environment. Prepare an explicit staging startup/configuration and deployment guide. This authorises repository preparation and the requested GitHub push, not production release, paid services or real employee imports. No Railway resource is provisioned by this checkpoint.
 
 
