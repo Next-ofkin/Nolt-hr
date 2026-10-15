@@ -1,3 +1,9 @@
+# Vercel preparation - 15 October 2026
+
+Next.js production compilation/type checks passed with staging API_ORIGIN set to the live Railway API. Compiled local smoke checks returned HTTP 200 for /login, /tracker and /api/v1/health/ready through the frontend proxy. The tracker now bundles a build-time snapshot in production to avoid runtime reads outside the deployed frontend; development retains its live file read. Snapshot generation runs before build/dev/typecheck, and generated JSON is ignored by Git. Vercel install/build configuration and import/redirect instructions were prepared.
+
+No Vercel service was deployed or paid upgrade purchased. Full hosted browser login/MFA remains pending. Owner selected Hobby after the documented non-commercial restriction was explained; this is not confirmation of company-use eligibility.
+
 # Railway frontend preparation - 15 October 2026
 
 Frontend production build passed with API_ORIGIN=https://noltapi-production.up.railway.app and DEPLOYMENT_ENV=staging. The new start:web command bound to the supplied test PORT=3001. Read-only smoke checks returned HTTP 200 for /login (login markup) and /api/v1/health/ready (ready) through the external API rewrite. API_ORIGIN is normalised and staging requires HTTPS with no credentials, paths or query parameters. Existing local start behaviour remains available separately.

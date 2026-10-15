@@ -35,6 +35,9 @@ Prepared 13 October 2026. Local implementation and the architecture baseline are
 
 ## Approval record
 
+Frontend hosting amendment, 15 October 2026: owner deleted Railway @nolt/web and requested Vercel to preserve Railway credit. After Vercel Hobby's personal/non-commercial restriction was explained, owner selected Hobby for now. Prepare Vercel configuration and guide, keep API on Railway, and make no paid upgrades. This records preference rather than commercial-use eligibility or production release approval.
+
+
 Railway frontend staging preparation, 15 October 2026: after the API's public health checks passed, the owner approved proceeding with HTTPS frontend connection and subsequent real login/MFA verification. Prepare and push the web service configuration/guide; continue using Free/Trial resources. Production release, paid upgrades and real employee imports remain unapproved.
 
 

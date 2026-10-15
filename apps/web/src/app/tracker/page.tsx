@@ -2,12 +2,13 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CheckCircle2, Circle } from "lucide-react";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import trackerSnapshot from "../../../.generated/tracker.json";
 export const dynamic = "force-dynamic";
 export default async function TrackerPage() {
-  const markdown = await readFile(
-    resolve(process.cwd(), "../../docs/TRACKER.md"),
-    "utf8",
-  );
+  const markdown =
+    process.env.NODE_ENV === "production"
+      ? trackerSnapshot
+      : await readFile(resolve(process.cwd(), "../../docs/TRACKER.md"), "utf8");
   const lines = markdown.split("\n");
   const tasks = lines.filter((line) => /^- \[[ x]\]/.test(line));
   const done = tasks.filter((line) => line.startsWith("- [x]")).length;
