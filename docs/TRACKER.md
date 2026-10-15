@@ -213,3 +213,21 @@ Real Auth update (13 October 2026): migration 004 applied through Prisma; fake l
 Current real Auth browser acceptance: 4 Chromium checks passed for actual password/TOTP login and global logout, HR authoring/versioning, responsive builder/preview and login/signup/recovery screens across six widths. All 11 backend/unit/security checks passed. See [current test report](development/TEST_REPORT.md). Signup/email delivery and MFA are now owner-verified; first HR bootstrap was subsequently verified on 14 October; password recovery remains separately unchecked.
 
 Latest acceptance, 14 October 2026: migration 005 and private verified-account linking installed; all five hosted checksums match. All 11 backend/unit/security checks and five Chromium journeys passed (onboarding focused run plus four regression journeys). RLS/runtime grants, denied public API access and the approved HR bootstrap were verified. Disposable provider test accounts retired; synthetic application/audit histories retained. No production release or real employee imports. See [onboarding evidence](development/ONBOARDING_SLICE.md).
+
+
+## Owner redesign workstream — 15 October 2026 (branch: feat/secure-hr-lifecycle-packs-20261015)
+
+- [x] Create an isolated feature branch (main untouched).
+- [ ] Verify draft-form deletion against a real database, UI flow, revision/race checks and authorisation.
+- [ ] Verify unpublish against active historical assignments; no new assignments allowed.
+- [ ] Replace hardcoded/email-derived HR and employee provisioning with one-time developer bootstrap and invitation-based role activation.
+- [ ] Maintain mandatory TOTP AAL2, secure recovery, revocation and audited permissions.
+- [ ] Build reusable, permanent pack templates, pack versioning, individual employee assignments and approval-based progress.
+- [ ] Implement default five-calendar-day pack/form assignment deadlines, override, lock on expiry, audited extension/reopening and reminders.
+- [ ] Build employee-sent guarantor/referee form links and external-only responses; enforce confidentiality at the API and storage layers.
+- [ ] Implement mandatory HR review comments, resends and immutable evidence across external correction cycles.
+- [ ] Standardise shadcn-style toast notifications; accessible mobile-first layouts and keyboard support.
+- [ ] Profile API/session/database latency, avoid redundant requests, introduce pagination and test loading/performance targets.
+- [ ] Generate OpenAPI client, run typecheck/build/unit/browser/database/security checks and record results before PR merge.
+
+**Checkpoint:** Form authoring backend API and editor confirmation controls have been committed on this branch; their integration and automated verification are not yet complete. Existing published evidence is never eligible for deletion. Production deployment and real employee imports remain out of scope.
