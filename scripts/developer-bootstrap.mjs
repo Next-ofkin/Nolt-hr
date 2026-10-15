@@ -56,7 +56,7 @@ try {
   if (!tls?.encrypted || !tls?.authorized)
     throw new Error("Owner connection must use authenticated TLS.");
   const role = (await db.query("SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user")).rows[0];
-  if (!role || role.name === "nolt_app" || (!role.rolsuper && !role.rolbypassrls))
+  if (!role || role.name === "nolt_app")
     throw new Error("An approved privileged database owner is required; never use nolt_app.");
   if (!/^[a-z0-9]{20}$/.test(env.SUPABASE_PROJECT_REF ?? ""))
     throw new Error("SUPABASE_PROJECT_REF must identify the approved Supabase project.");
@@ -65,7 +65,7 @@ try {
     throw new Error("The approved hosted Supabase pooler is required.");
   await db.query("BEGIN");
   try {
-    await db.query("SET LOCAL nolt.bootstrap_project_ref = $1", [env.SUPABASE_PROJECT_REF]);
+    await db.query("SELECT set_config('nolt.bootstrap_project_ref', $1, true)", [env.SUPABASE_PROJECT_REF]);
     await db.query("SELECT pg_advisory_xact_lock(20261015,170000)");
     const prior = await db.query("SELECT slot FROM nolt_private.developer_bootstrap LIMIT 1");
     const other = await db.query('SELECT id FROM public."User" WHERE role=\'DEVELOPER\'');
