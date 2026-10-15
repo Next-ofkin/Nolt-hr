@@ -178,6 +178,10 @@ export class FormsService {
   async publish(actorId: string, id: string, input: unknown) {
     const { expectedRevision } = parse(revisionSchema, input);
     return this.db.$transaction(async (tx) => {
+      const initial = await tx.formVersion.findUnique({ where: { id } });
+      if (!initial) throw new NotFoundException();
+      // Draft deletion and version creation acquire the same parent lock.
+      await tx.$queryRaw`SELECT id FROM "Form" WHERE id=${initial.formId}::uuid FOR UPDATE`;
       const row = await tx.formVersion.findUnique({ where: { id } });
       if (!row) throw new NotFoundException();
       parse(publishContentSchema, {
