@@ -1,3 +1,9 @@
+# Railway readiness diagnostics - 15 October 2026
+
+API compilation and contract generation passed; all 24 unit/security checks passed. New diagnostics extract only allowlisted codes and adapter categories from nested Prisma/pg errors, discard messages/stacks/SQL/URLs/arbitrary metadata, handle cyclic causes and retain the original public 503 response. A successful query still returns ready without failure logging. The API contract is unchanged.
+
+Owner-provided Railway results confirm the API starts and URL parsing no longer fails, but database readiness still returns 503. The underlying hosted error is not confirmed yet. This diagnostic patch must be observed in Railway runtime logs before selecting a connection fix. No TLS, database credential, scanner or healthcheck policy changes were made.
+
 # GitHub checkpoint and Railway staging preparation - 14 October 2026
 
 Final checks passed: 22 unit/security checks, workspace type checks, the exact API-only Railway build command including Prisma generation, generated OpenAPI/client, isolated PostgreSQL workflow/concurrency acceptance and the final Next.js production build. Hosted Supabase verification reconfirmed all ten exact migration checksums, restricted runtime verified TLS, denied audit deletion and rollback-only RLS/grant/immutable-form checks. The first frontend build was interrupted by a concurrent dev server rewriting generated type files; the identified project dev tree was stopped and the final build passed.

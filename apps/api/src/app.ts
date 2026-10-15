@@ -3,11 +3,13 @@ import {
   Controller,
   Get,
   Inject,
+  Logger,
   Module,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Database } from "./database.js";
+import { databaseReadiness } from "./database-diagnostics.js";
 import {
   ResponsesController,
   ResponsesService,
@@ -33,17 +35,19 @@ import { FilesController, FilesService, FilesStorage } from "./files.js";
 @Controller("health")
 @ApiTags("Health")
 class HealthController {
+  private readonly logger = new Logger("DatabaseReadiness");
   constructor(@Inject(Database) private readonly db: Database) {}
   @Get("live") live() {
     return { status: "ok", service: "nolt-api" };
   }
   @Get("ready") async ready() {
-    try {
-      await this.db.$queryRaw`SELECT 1`;
-      return { status: "ready" };
-    } catch {
-      throw new ServiceUnavailableException("Database is unavailable.");
-    }
+    return databaseReadiness(
+      () => this.db.$queryRaw`SELECT 1`,
+      (summary) =>
+        this.logger.error(
+          `DATABASE_READINESS_FAILED ${JSON.stringify(summary)}`,
+        ),
+    );
   }
 }
 @Module({
