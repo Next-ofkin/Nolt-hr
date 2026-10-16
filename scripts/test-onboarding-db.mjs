@@ -16,6 +16,7 @@ import {
 } from "../apps/api/dist/employees.js";
 import { InvitationsService } from "../apps/api/dist/invitations.js";
 import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
+import { HrInvitationDeliveryLedger } from "../apps/api/dist/hr-invitation-ledger.js";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { ResponsesService } from "../apps/api/dist/responses.js";
 import { ExternalContactsService } from "../apps/api/dist/external-contacts.js";
@@ -1574,6 +1575,35 @@ try {
     await owner.query("ROLLBACK");
   }
   console.log("PASS: HR invitation queued-email uniqueness, terminal-state protection and zero account role changes (isolated PostgreSQL rollback).");
+
+  // Delivery ledger receives a fabricated provider response only. No email or Auth call.
+  await owner.query("BEGIN");
+  try {
+    const id = randomUUID(), subject = randomUUID();
+    await owner.query(
+      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
+      [id, "ledger-hr-qa@example.invalid", "Ledger QA", developerQa],
+    );
+    const ledger = new HrInvitationDeliveryLedger(runtime);
+    assert.equal(await ledger.record(id,{status:"SENT",providerSubject:subject}),true);
+    assert.equal(await ledger.record(id,{status:"SENT",providerSubject:subject}),false);
+    const recorded = await owner.query(
+      'SELECT state,"providerSubject","sentAt" FROM public."HrInvitation" WHERE id=$1',
+      [id],
+    );
+    assert.equal(recorded.rows[0].state,"SENT");
+    assert.equal(recorded.rows[0].providerSubject,subject);
+    assert.ok(recorded.rows[0].sentAt);
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
+    assert.equal(
+      (await owner.query("SELECT count(*)::int AS n FROM public.\"AuditEvent\" WHERE \"targetId\"=$1 AND action='HR_INVITATION_SENT'",[id])).rows[0].n,
+      1,
+    );
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  console.log("PASS: HR invitation delivery ledger accepts one provider subject exactly once, audits outcome, preserves account roles and rolls back (no mail).");
+
 
 
 } finally {
