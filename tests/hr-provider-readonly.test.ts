@@ -7,9 +7,8 @@ const sessionId = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
 const email = "disposable-hr@example.invalid";
 const configuration = {
   HR_PROVIDER_TEST_ENABLED: "true",
-  SUPABASE_URL: "https://llslubzdkdnvhbatmfug.supabase.co",
-  SUPABASE_PROJECT_REF: "llslubzdkdnvhbatmfug",
-  SUPABASE_PUBLISHABLE_KEY: "synthetic",
+  HR_PROVIDER_SANDBOX_REF: "abcdefghijklmnopqrst",
+  HR_PROVIDER_SANDBOX_PUBLISHABLE_KEY: "synthetic",
   HR_PROVIDER_TEST_SUBJECT: subject,
   HR_PROVIDER_TEST_EMAIL: email,
   HR_PROVIDER_TEST_ACCESS_TOKEN: "synthetic",
@@ -24,8 +23,9 @@ test("provider test is disabled by default and requires a separately named subje
   assert.throws(() => validateHrProviderTestConfig({}));
   assert.throws(() => validateHrProviderTestConfig({ ...configuration, HR_PROVIDER_TEST_ENABLED: "false" }));
   assert.throws(() => validateHrProviderTestConfig({ ...configuration, HR_PROVIDER_TEST_SUBJECT: undefined }));
+  assert.throws(() => validateHrProviderTestConfig({ ...configuration, HR_PROVIDER_SANDBOX_REF: "llslubzdkdnvhbatmfug" }));
   assert.deepEqual(validateHrProviderTestConfig(configuration), {
-    subject, email, token: "synthetic",
+    subject, email, token: "synthetic", url: "https://abcdefghijklmnopqrst.supabase.co", key: "synthetic",
   });
 });
 test("read-only provider proof never permits activation or issues sessions", async () => {
