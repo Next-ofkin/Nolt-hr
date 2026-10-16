@@ -9,6 +9,7 @@ import { Database } from "./database.js";
 import { SupabaseAuth } from "./supabase-auth.js";
 import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import { assertOrigin, LoginLimiter } from "./security.js";
+import { seal } from "./auth-crypto.js";
 
 const token = z.string().min(1).max(16000);
 const payload = z.object({
@@ -22,6 +23,10 @@ const payload = z.object({
 export class HrVerificationDto {
   @ApiProperty({ type: Boolean }) verified!: boolean;
   @ApiProperty({ type: Boolean }) activationAllowed!: boolean;
+}
+
+export class HrPasswordResultDto {
+  @ApiProperty({ enum: ["awaiting_activation"] }) next!: "awaiting_activation";
 }
 
 export class HrExchangeResultDto {
@@ -49,6 +54,35 @@ export class HrInvitationExchangeService {
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
     await this.proof.verify(invitation, flow.state.tokens);
     return { verified: true, activationAllowed: false };
+  }
+
+  async setPassword(input: unknown, req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation activation is not available yet.");
+    const parsed = z.object({ password: z.string().min(12).max(128) }).strict().safeParse(input);
+    if (!parsed.success) throw new BadRequestException("Choose a password of 12 to 128 characters.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId || !flow.state.tokens ||
+        flow.state.hrPasswordSet === true)
+      throw new ForbiddenException("This HR password setup cannot be used.");
+    const invitation = await this.db.hrInvitation.findUnique({ where: { id: flow.state.invitationId } });
+    if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
+    const proof = await this.proof.verify(invitation, flow.state.tokens);
+    const authenticated = await this.auth.authenticated(flow.state.tokens, AbortSignal.timeout(12000));
+    if (authenticated.user.id !== proof.subject)
+      throw new ForbiddenException("The verified account has changed.");
+    const updated = await authenticated.client.auth.updateUser({ password: parsed.data.password });
+    if (updated.error) throw new BadRequestException("Could not set this password. Try another strong password.");
+    const session = await authenticated.client.auth.getSession();
+    if (!session.data.session) throw new ForbiddenException("Sign in again to continue.");
+    const fresh = this.auth.tokens(session.data.session);
+    await this.proof.verify(invitation, fresh);
+    const changed = await this.db.authFlow.updateMany({
+      where: { id: flow.row.id, encryptedState: flow.row.encryptedState, expiresAt: { gt: new Date() } },
+      data: { encryptedState: seal({ ...flow.state, tokens: fresh, hrPasswordSet: true }) },
+    });
+    if (changed.count !== 1) throw new ForbiddenException("This verification was already used.");
+    return { next: "awaiting_activation" };
   }
 
   async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
@@ -108,6 +142,13 @@ export class HrInvitationExchangeController {
   verification(@Req() req: Request) {
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
     return this.service.verification(req);
+  }
+  @Post("password")
+  @ApiCreatedResponse({ type: HrPasswordResultDto })
+  password(@Body() value: unknown, @Req() req: Request) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.setPassword(value, req);
   }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
