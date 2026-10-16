@@ -291,3 +291,38 @@ test("HR MFA storage uses compare-and-swap instead of unconditional updates", as
     else process.env.AUTH_ENCRYPTION_KEY = old;
   }
 });
+
+test("HR proof requires the expected Supabase identity issuer", async () => {
+  const { HrInvitationProofService } = await import("../apps/api/src/hr-invitation-proof.js");
+  const before = process.env.SUPABASE_URL;
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email = "new-hr@example.invalid";
+  let issuerChecked = "";
+  const db = {
+    $queryRaw: async () => [{ active: true }],
+    user: { findUnique: async () => ({ id: subject, role: "EMPLOYEE", active: true }) },
+    employee: { findUnique: async () => null },
+    identity: { findFirst: async (query: { where: { issuer: string } }) => {
+      issuerChecked = query.where.issuer;
+      return null;
+    } },
+  };
+  const auth = { authenticated: async () => ({
+    user: { id: subject, email, email_confirmed_at: new Date().toISOString(), factors: [{ factor_type: "totp", status: "verified" }] },
+    session: { access_token: "synthetic" },
+    client: { auth: { getClaims: async () => ({ data: { claims: { sub: subject, aal: "aal2", session_id: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a" } } }) } },
+  }) };
+  try {
+    const service = new HrInvitationProofService(auth as never, db as never);
+    await assert.rejects(service.verify({
+      state: "SENT", email, expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null, creationSubject: subject, providerSubject: subject,
+    }, { access_token: "a", refresh_token: "b" }), (error: unknown) =>
+      Boolean(error && typeof error === "object" && "status" in error && error.status === 403));
+    assert.equal(issuerChecked, "https://example.supabase.co/auth/v1");
+  } finally {
+    if (before === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = before;
+  }
+});
