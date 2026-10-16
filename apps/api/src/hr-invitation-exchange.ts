@@ -63,7 +63,7 @@ export class HrInvitationExchangeService {
     if (!parsed.success) throw new BadRequestException("Choose a password of 12 to 128 characters.");
     const flow = await this.auth.flow(req, true);
     if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId || !flow.state.tokens ||
-        flow.state.hrPasswordSet === true)
+        flow.state.hrPasswordSet === true || flow.state.hrPasswordStatus !== undefined)
       throw new ForbiddenException("This HR password setup cannot be used.");
     const invitation = await this.db.hrInvitation.findUnique({ where: { id: flow.state.invitationId } });
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
@@ -73,9 +73,10 @@ export class HrInvitationExchangeService {
       throw new ForbiddenException("The verified account has changed.");
     // Claim the flow before the irreversible external password update.
     // Competing requests must never perform two provider-side changes.
+    const claimedState = seal({ ...flow.state, hrPasswordStatus: "CLAIMED" as const });
     const claim = await this.db.authFlow.updateMany({
       where: { id: flow.row.id, encryptedState: flow.row.encryptedState, expiresAt: { gt: new Date() } },
-      data: { encryptedState: seal({ ...flow.state, hrPasswordSet: true }) },
+      data: { encryptedState: claimedState },
     });
     if (claim.count !== 1) throw new ForbiddenException("This verification was already used.");
     const updated = await authenticated.client.auth.updateUser({ password: parsed.data.password });
@@ -85,6 +86,11 @@ export class HrInvitationExchangeService {
     await this.proof.verify(invitation, this.auth.tokens(session.data.session));
     // The claimed flow cannot be replayed. Do not store refreshed tokens or
     // allow further password changes; activation remains separately disabled.
+    const confirmed = await this.db.authFlow.updateMany({
+      where: { id: flow.row.id, encryptedState: claimedState, expiresAt: { gt: new Date() } },
+      data: { encryptedState: seal({ ...flow.state, hrPasswordStatus: "CONFIRMED" as const }) },
+    });
+    if (confirmed.count !== 1) throw new ForbiddenException("Password confirmation failed.");
     return { next: "awaiting_activation" };
   }
 
