@@ -1592,6 +1592,14 @@ try {
   assert.equal(recorded.rows[0].state,"SENT");
   assert.equal(recorded.rows[0].providerSubject,ledgerSubject);
   assert.ok(recorded.rows[0].sentAt);
+  await owner.query("SAVEPOINT premature_acceptance");
+  await assert.rejects(
+    owner.query('UPDATE public."HrInvitation" SET state=\'ACCEPTED\' WHERE id=$1',[ledgerId]),
+    (e) => e.code === "23514",
+  );
+  await owner.query("ROLLBACK TO SAVEPOINT premature_acceptance");
+  assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"SENT");
+
   assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
   assert.equal(
     (await owner.query("SELECT count(*)::int AS n FROM public.\"AuditEvent\" WHERE \"targetId\"=$1 AND action='HR_INVITATION_SENT'",[ledgerId])).rows[0].n,
