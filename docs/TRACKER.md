@@ -91,6 +91,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Set repository branch protection / rulesets and required checks for `main` and `develop` where permissions and CI permit.
 - [ ] Adopt flow `feature branch → develop → reviewed release PR → main → separately approved Production deployment`; preserve environment-specific data and require explicit approval for Production migrations.
 
+### Verification gate checkpoint — 16 October 2026
+
+- [x] PR #6 head `551fdfa7` checked for CI status: Vercel and CodeRabbit contexts report success, but the GitHub Actions workflow-run list is **empty**. Neither is evidence of passing NOLT unit, domain or browser suites.
+- [x] Created [Issue #7](https://github.com/Next-ofkin/Nolt-hr/issues/7) to define CI requirements and re-enable them safely after investigating the prior CI workflow removal.
+- [ ] Run the new pack unit tests and full typecheck/build/domain/browser test suite. **Do not merge PR #6 based on the current status checks alone.**
+- [ ] Hosted production migration checksum query was not completed because the connection required access not granted; no further attempt was made. Migration parity remains unverified.
+- [ ] Review sandbox migrations through an authorised workflow; no schema/data changes were made in either Supabase project.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
