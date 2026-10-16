@@ -5,6 +5,8 @@ ALTER TABLE public."AuthFlow" DROP CONSTRAINT "AuthFlow_kind_check";
 ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_kind_check"
  CHECK(kind IN ('EMAIL_SIGNUP','EMAIL_RECOVERY','MFA','RECOVERY','INVITATION','EXTERNAL','HR_INVITATION'));
 ALTER TABLE public."AuthFlow" ADD COLUMN "hrPasswordConfirmedAt" TIMESTAMPTZ(3), ADD COLUMN "hrInvitationId" UUID, ADD COLUMN "hrSubject" UUID;
+ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_hr_password_binding_check"
+ CHECK ("hrPasswordConfirmedAt" IS NULL OR (kind = 'HR_INVITATION' AND "hrInvitationId" IS NOT NULL AND "hrSubject" IS NOT NULL));
 ALTER TABLE public."HrInvitation"
   ADD COLUMN "requestKey" UUID,
   ADD COLUMN "expiresAt" TIMESTAMPTZ(3),
