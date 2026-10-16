@@ -103,6 +103,7 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 
 - [x] Inspected commit `4a5d229`: it removed the prior `.github/workflows/checks.yml`, which included synthetic PostgreSQL and browser tests; the commit message alone does not establish the rationale for removal.
 - [x] Added `.github/workflows/pr-checks.yml` to `feat/developer-hr-employee-auth` (commit `33ec38d`): `npm ci`, Prisma client generation, typecheck, unit/security tests including Packs, and production build. Triggers on PRs to `develop`/`main`, pushes to `develop`, and manual dispatch. No hosted credentials, deployments, or migrations.
+- [ ] **CI startup blocker discovered:** GitHub Actions recorded two `startup_failure` runs for head `33ec38d` (run IDs `38959500319`, `38959492070`); each had **zero jobs**. This is not a failing test result. Inspect GitHub Actions workflow validation, repository Actions permissions/billing and startup event logs before adjusting code. No test-pass claim.
 - [ ] Confirm a successful actual GitHub Actions run; immediately after commit no workflow run was returned. Do not label tests as passed without run evidence.
 - [ ] Add vetted isolated PostgreSQL/domain and browser test jobs; prior workflow used local synthetic services, and must not acquire real Supabase secrets.
 - [ ] Protect `develop`/`main` using required checks only after workflow reliability is proven.
