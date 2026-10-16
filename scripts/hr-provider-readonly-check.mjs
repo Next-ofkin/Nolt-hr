@@ -4,7 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { pathToFileURL } from "node:url";
 
-const PROJECT_URL = "https://llslubzdkdnvhbatmfug.supabase.co";
+const PRODUCTION_REF = "llslubzdkdnvhbatmfug";
+const REF = /^[a-z0-9]{20}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateHrProviderTestConfig(env) {
@@ -12,18 +13,18 @@ export function validateHrProviderTestConfig(env) {
     throw new Error("Read-only provider diagnostic must run on an operator workstation.");
   if (env.HR_PROVIDER_TEST_ENABLED !== "true")
     throw new Error("Dedicated HR provider diagnostic is disabled.");
-  if (env.SUPABASE_URL !== PROJECT_URL ||
-      env.SUPABASE_PROJECT_REF !== "llslubzdkdnvhbatmfug")
-    throw new Error("Unexpected Supabase project.");
-  if (!env.SUPABASE_PUBLISHABLE_KEY)
-    throw new Error("SUPABASE_PUBLISHABLE_KEY is required.");
+  const ref = env.HR_PROVIDER_SANDBOX_REF;
+  if (!REF.test(ref ?? "") || ref === PRODUCTION_REF)
+    throw new Error("An isolated Supabase sandbox is required.");
+  if (!env.HR_PROVIDER_SANDBOX_PUBLISHABLE_KEY)
+    throw new Error("Sandbox publishable key is required.");
   const subject = env.HR_PROVIDER_TEST_SUBJECT;
   const email = env.HR_PROVIDER_TEST_EMAIL?.trim().toLowerCase();
   if (!UUID.test(subject ?? "") || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     throw new Error("Set the exact disposable HR_PROVIDER_TEST_SUBJECT and HR_PROVIDER_TEST_EMAIL.");
   if (!env.HR_PROVIDER_TEST_ACCESS_TOKEN)
     throw new Error("Provide a disposable identity access token through an ephemeral environment variable.");
-  return { subject, email, token: env.HR_PROVIDER_TEST_ACCESS_TOKEN };
+  return { subject, email, token: env.HR_PROVIDER_TEST_ACCESS_TOKEN, url: `https://${ref}.supabase.co`, key: env.HR_PROVIDER_SANDBOX_PUBLISHABLE_KEY };
 }
 
 export async function verifyHrProviderReadOnly(auth, { subject, email, token }) {
@@ -52,7 +53,7 @@ export async function verifyHrProviderReadOnly(auth, { subject, email, token }) 
 async function main() {
   config({ quiet: true });
   const input = validateHrProviderTestConfig(process.env);
-  const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+  const client = createClient(input.url, input.key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
   const result = await verifyHrProviderReadOnly(client.auth, input);
