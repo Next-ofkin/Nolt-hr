@@ -1,7 +1,7 @@
 import { Injectable, Inject, ForbiddenException, UnauthorizedException, ServiceUnavailableException } from "@nestjs/common";
 import { SupabaseAuth } from "./supabase-auth.js";
 import { Database } from "./database.js";
-import { canAcceptHrInvitation, type HrInvitationStatus } from "./hr-invitation-rules.js";
+import { canVerifyHrInvitationIdentity, type HrInvitationStatus } from "./hr-invitation-rules.js";
 
 export type HrProviderTokens = { access_token: string; refresh_token: string };
 
@@ -52,7 +52,7 @@ export class HrInvitationProofService {
       throw new ForbiddenException("This HR invitation cannot be linked to the verified account.");
     if (existing.role !== "EMPLOYEE" || !existing.active || assignedEmployee)
       throw new ForbiddenException("An existing account or employee profile cannot be promoted.");
-    const allowed = canAcceptHrInvitation({
+    const allowed = canVerifyHrInvitationIdentity({
       state: invitation.state as HrInvitationStatus,
       inviteEmail: invitation.email,
       confirmedEmail: email,
