@@ -7,14 +7,20 @@ export default function HrInvitationCompletePage() {
   const [message, setMessage] = useState("Checking authenticator verification…");
   useEffect(() => {
     void (async () => {
-      const response = await fetch("/api/v1/auth/flow", { credentials: "same-origin" });
-      if (!response.ok) throw Error("This verification has expired. Please contact your administrator.");
-      const flow: unknown = await response.json();
-      if (!flow || typeof flow !== "object" || !("stage" in flow) ||
-          flow.stage !== "hr_invitation") {
-        location.replace("/auth/mfa");
-        return;
-      }
+      const response = await fetch("/api/v1/hr-invitations/verification", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw Error(
+        response.status === 503
+          ? "HR invitation verification is not available yet. Contact your administrator."
+          : "Your HR invitation or authenticator verification could not be confirmed.",
+      );
+      const proof: unknown = await response.json();
+      if (!proof || typeof proof !== "object" || !("verified" in proof) ||
+          proof.verified !== true || !("activationAllowed" in proof) ||
+          proof.activationAllowed !== false)
+        throw Error("HR invitation verification could not be confirmed.");
       setMessage("Your email and authenticator have been verified. HR account activation is not available yet. Please contact your administrator.");
     })().catch(e => setMessage(e instanceof Error ? e.message : "Verification unavailable."));
   }, []);
