@@ -61,6 +61,7 @@ try {
     CREATE TABLE auth.sessions(id uuid,user_id uuid,not_after timestamptz);
     REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO nolt_app;
     GRANT SELECT ON public."User",public."Identity" TO nolt_app;
+    GRANT SELECT,INSERT,UPDATE ON public."Session" TO nolt_app;
     GRANT SELECT,INSERT ON public."AuditEvent",public."OutboxEvent" TO nolt_app;
     GRANT SELECT ON public."Form" TO nolt_app;
     GRANT SELECT,UPDATE ON public."FormVersion" TO nolt_app;`);
