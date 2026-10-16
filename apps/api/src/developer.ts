@@ -27,29 +27,21 @@ class DeveloperOverviewDto {
 export class DeveloperOverviewService {
   constructor(@Inject(Database) private readonly db: Database) {}
   async overview(): Promise<DeveloperOverviewDto> {
-    const [groups, hrAccounts] = await this.db.$transaction([
-      this.db.user.groupBy({
-        by: ["role"],
-        orderBy: { role: "asc" },
-        where: { active: true },
-        _count: { _all: true },
-      }),
-      this.db.user.findMany({
-        where: { role: "HR" },
-        select: { id: true, name: true, email: true, active: true, createdAt: true },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 50,
-      }),
-    ]);
-    const count = (role: string) =>
-      groups.find((g) => g.role === role)?._count._all ?? 0;
+    const [developers, hr, employees, totalActive, hrAccounts] =
+      await this.db.$transaction([
+        this.db.user.count({ where: { active: true, role: "DEVELOPER" } }),
+        this.db.user.count({ where: { active: true, role: "HR" } }),
+        this.db.user.count({ where: { active: true, role: "EMPLOYEE" } }),
+        this.db.user.count({ where: { active: true } }),
+        this.db.user.findMany({
+          where: { role: "HR" },
+          select: { id: true, name: true, email: true, active: true, createdAt: true },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+        }),
+      ]);
     return {
-      summary: {
-        developers: count("DEVELOPER"),
-        hr: count("HR"),
-        employees: count("EMPLOYEE"),
-        totalActive: groups.reduce((sum, g) => sum + g._count._all, 0),
-      },
+      summary: { developers, hr, employees, totalActive },
       hrAccounts: hrAccounts.map((a) => ({
         ...a,
         createdAt: a.createdAt.toISOString(),
