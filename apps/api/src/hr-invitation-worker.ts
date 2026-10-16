@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Database } from "./database.js";
 import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
-import { deliverHrInvitationEmail, hrRecipientAllowed } from "./hr-invitation-delivery.js";
+import { deliverHrInvitationEmail, hrRecipientAllowed, type HrDeliveryResult } from "./hr-invitation-delivery.js";
 
 /** Separate worker: no external provider call is made with the feature gate off. */
 @Injectable()
@@ -10,6 +10,10 @@ export class HrInvitationWorker {
     @Inject(Database) private readonly db: Database,
     @Inject(HrInvitationDeliveryLedger) private readonly ledger: HrInvitationDeliveryLedger,
   ) {}
+
+  protected send(invitation: { id: string; email: string; name: string }): Promise<HrDeliveryResult> {
+    return deliverHrInvitationEmail(invitation);
+  }
 
   async deliverNext(): Promise<boolean> {
     if (process.env.HR_INVITATION_DELIVERY_ENABLED !== "true") return false;
@@ -47,7 +51,7 @@ export class HrInvitationWorker {
     if (job.skipped) return true;
     // External side effect takes place only AFTER the exclusive claim has committed.
     // Failure or network ambiguity never retries automatically.
-    const result = await deliverHrInvitationEmail(job.invitation);
+    const result = await this.send(job.invitation);
     await this.ledger.record(job.invitation.id, result);
     return true;
   }
