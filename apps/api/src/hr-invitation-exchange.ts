@@ -135,7 +135,7 @@ export class HrInvitationExchangeService {
     // Encrypted, short-lived HR-only flow. Never issue an application session here.
     await this.auth.start(
       "HR_INVITATION",
-      { invitationId: invitation.id, tokens: this.auth.tokens(verified.session) },
+      { invitationId: invitation.id, hrSubject: verified.user.id, tokens: this.auth.tokens(verified.session) },
       req, res, Math.min(600000, invitation.expiresAt.getTime() - Date.now()),
     );
     return { next: "mfa" };
