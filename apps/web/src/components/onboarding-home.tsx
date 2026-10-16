@@ -8,6 +8,7 @@ import {
 } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
+import { DeveloperWorkspace } from "./developer-workspace";
 import { FormsWorkspace } from "./forms-workspace";
 import { WorkspaceAccess } from "./workspace-access";
 import { FormPreview } from "./form-preview";
@@ -21,6 +22,7 @@ export function HomeWorkspace() {
   }, [session?.externalRequestId]);
   if (session?.externalRequestId)
     return <p role="status">Opening your requested form…</p>;
+  if (session?.role === "DEVELOPER") return <DeveloperWorkspace />;
   if (session?.permissions.includes("profile.own"))
     return (
       <WorkspaceAccess permission="profile.own">

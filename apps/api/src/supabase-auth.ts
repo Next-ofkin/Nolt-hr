@@ -27,6 +27,9 @@ type Tokens = { access_token: string; refresh_token: string };
 type FlowState = {
   externalRequestId?: string;
   invitationId?: string;
+  hrPasswordSet?: boolean;
+  hrPasswordStatus?: "CLAIMED" | "CONFIRMED";
+  hrSubject?: string;
   tokens?: Tokens;
   storage?: Record<string, string>;
   factorId?: string;
@@ -118,6 +121,8 @@ export class SupabaseAuth {
               tokenHash: digest(token),
               csrfHash: digest(digest("flow:" + token)),
               kind,
+              hrInvitationId: kind === "HR_INVITATION" ? state.invitationId : undefined,
+              hrSubject: kind === "HR_INVITATION" ? state.hrSubject : undefined,
               encryptedState: seal(state),
               expiresAt: new Date(Date.now() + ttl),
             },
@@ -294,6 +299,14 @@ export class SupabaseAuth {
       );
     return identity.user;
   }
+  private async replaceHrFlowSnapshot(row: { id: string; encryptedState: string; kind: string }, next: unknown) {
+    const changed = await this.db.authFlow.updateMany({
+      where: { id: row.id, kind: "HR_INVITATION", encryptedState: row.encryptedState, expiresAt: { gt: new Date() }, hrPasswordConfirmedAt: null },
+      data: { encryptedState: seal(next) },
+    });
+    if (changed.count !== 1)
+      throw new ForbiddenException("HR verification changed. Restart the invitation verification.");
+  }
   async status(req: Request) {
     const { row, state, csrfToken } = await this.flow(req);
     if (row.kind.startsWith("EMAIL_"))
@@ -313,15 +326,25 @@ export class SupabaseAuth {
     const factor = data.totp[0];
     const assurance =
       await auth.client.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (row.kind === "HR_INVITATION") {
+      if (state.hrPasswordStatus || state.hrPasswordSet) {
+        // The completed/claimed flow must not be overwritten by a stale MFA GET.
+      } else {
+        await this.replaceHrFlowSnapshot(row, { ...state, tokens: this.tokens(auth.session) });
+      }
+    } else {
     await this.db.authFlow.update({
       where: { id: row.id },
       data: {
         encryptedState: seal({ ...state, tokens: this.tokens(auth.session) }),
       },
     });
+    }
     return {
       stage:
-        row.kind === "EXTERNAL" && assurance.data?.currentLevel === "aal2"
+        row.kind === "HR_INVITATION" && assurance.data?.currentLevel === "aal2"
+          ? "hr_invitation"
+          : row.kind === "EXTERNAL" && assurance.data?.currentLevel === "aal2"
           ? "external"
           : row.kind === "INVITATION" && assurance.data?.currentLevel === "aal2"
             ? "invitation"
@@ -338,7 +361,7 @@ export class SupabaseAuth {
   }
   async enroll(req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL", "HR_INVITATION"].includes(row.kind))
       throw new ForbiddenException("Sign in before setting up MFA.");
     const { client, session } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -375,10 +398,16 @@ export class SupabaseAuth {
       qrCode: data.totp.qr_code,
       secret: data.totp.secret,
     };
+    if (row.kind === "HR_INVITATION") {
+      if (state.hrPasswordStatus || state.hrPasswordSet)
+        throw new ForbiddenException("HR password setup already started.");
+      await this.replaceHrFlowSnapshot(row, next);
+    } else {
     await this.db.authFlow.update({
       where: { id: row.id },
       data: { encryptedState: seal(next) },
     });
+    }
     return {
       factorId: data.id,
       qrCode: data.totp.qr_code,
@@ -387,7 +416,7 @@ export class SupabaseAuth {
   }
   async verify(factorId: string, code: string, req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL", "HR_INVITATION"].includes(row.kind))
       throw new ForbiddenException("Sign in before verifying MFA.");
     const { client } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -409,15 +438,22 @@ export class SupabaseAuth {
     const { data } = await client.auth.getSession();
     if (!data.session) throw new UnauthorizedException("Sign in again.");
     const checked = await this.validate(seal(this.tokens(data.session)));
-    if (row.kind === "INVITATION" || row.kind === "EXTERNAL") {
+    if (row.kind === "INVITATION" || row.kind === "EXTERNAL" || row.kind === "HR_INVITATION") {
+      if (row.kind === "HR_INVITATION") {
+        if (state.hrPasswordStatus || state.hrPasswordSet)
+          throw new ForbiddenException("HR password setup already started.");
+        await this.replaceHrFlowSnapshot(row, { ...state, tokens: this.tokens(data.session) });
+      } else {
       await this.db.authFlow.update({
         where: { id: row.id },
         data: {
           encryptedState: seal({ ...state, tokens: this.tokens(data.session) }),
         },
       });
+      }
       return {
         invitation: row.kind === "INVITATION",
+        hrInvitation: row.kind === "HR_INVITATION",
         external: row.kind === "EXTERNAL",
         recovery: false as const,
         user: checked.user,

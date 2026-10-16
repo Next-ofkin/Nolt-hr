@@ -2,6 +2,14 @@ import { test, expect } from "@playwright/test";
 test("real Auth screens fit all target widths and expose no synthetic shortcut", async ({
   page,
 }) => {
+  // Prevent Next.js from proxying unauthenticated test pages to a non-running API.
+  await page.route("**/api/v1/**", route => route.fulfill({
+    status: route.request().url().endsWith("/auth/config") ? 200 : 401,
+    contentType: "application/json",
+    body: route.request().url().endsWith("/auth/config")
+      ? '{"enabled":false,"provider":"supabase","mfaRequired":true}'
+      : '{"message":"Not signed in"}',
+  }));
   for (const width of [320, 375, 768, 1024, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of ["/login", "/signup", "/recovery"]) {

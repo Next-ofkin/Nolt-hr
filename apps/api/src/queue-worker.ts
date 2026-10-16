@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { InvitationsService } from "./invitations.js";
 import { ExternalRequestsService } from "./external-requests.js";
+import { HrInvitationWorker } from "./hr-invitation-worker.js";
 
 @Injectable()
 export class QueueWorkerService
@@ -17,6 +18,7 @@ export class QueueWorkerService
   constructor(
     private readonly invitations: InvitationsService,
     private readonly external: ExternalRequestsService,
+    private readonly hrInvitations: HrInvitationWorker,
   ) {}
 
   onApplicationBootstrap() {
@@ -53,7 +55,8 @@ export class QueueWorkerService
       while (!this.stopped) {
         const staff = await this.invitations.deliverNext();
         const external = await this.external.deliverNext();
-        if (!staff && !external) break;
+        const hr = await this.hrInvitations.deliverNext();
+        if (!staff && !external && !hr) break;
       }
     } catch {
       // Safe non-blocking sweep handler

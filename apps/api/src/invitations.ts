@@ -226,7 +226,7 @@ export class InvitationsService {
           const replaced = await tx.employeeInvitation.findFirst({
             where: { id: p.replaceInvitationId, employeeId },
           });
-          if (!replaced || replaced.state === "ACCEPTED")
+          if (!replaced || ![...current, "FAILED"].includes(replaced.state))
             throw new ConflictException("This invitation cannot be replaced.");
         }
         const old = await tx.employeeInvitation.findMany({

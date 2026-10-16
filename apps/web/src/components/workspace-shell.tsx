@@ -6,7 +6,7 @@ import {
   ArrowUpRight,
   ClipboardList,
   FileStack,
-  ShieldCheck,
+  LayoutDashboard,
 } from "lucide-react";
 export function WorkspaceShell({
   children,
@@ -36,6 +36,9 @@ export function WorkspaceShell({
             </span>
           </Link>
           <nav aria-label="Main navigation" className="flex gap-1 text-sm">
+            {session?.permissions.includes("hr.accounts.manage") && (
+              <Link href="/" aria-current={active === "forms" ? "page" : undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "forms" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}><LayoutDashboard size={16}/> Developer overview</Link>
+            )}
             {session?.permissions.includes("employees.manage") && (
               <Link
                 href="/employees"
@@ -44,7 +47,7 @@ export function WorkspaceShell({
                 Employees
               </Link>
             )}
-            <Link
+            {!session?.permissions.includes("hr.accounts.manage") && <Link
               href="/"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "forms" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
             >
@@ -52,19 +55,19 @@ export function WorkspaceShell({
               {session?.permissions.includes("profile.own")
                 ? "My onboarding"
                 : "Forms"}
-            </Link>
-            <Link
+            </Link>}
+            {!session?.permissions.includes("hr.accounts.manage") && <Link
               href="/tracker"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "tracker" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
             >
               <ClipboardList size={16} />
               Build tracker
-            </Link>
+            </Link>}
           </nav>
           <AccountMenu />
         </div>
       </header>
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
+      {!session?.permissions.includes("hr.accounts.manage") && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
         Development workspace · HR review, signing and third-party requests are
         being built{" "}
         <Link
@@ -74,7 +77,7 @@ export function WorkspaceShell({
           View progress
           <ArrowUpRight size={12} />
         </Link>
-      </div>
+      </div>}
       <main className="mx-auto max-w-[1600px] px-4 py-7 sm:px-8 sm:py-9 lg:px-10">
         {children}
       </main>

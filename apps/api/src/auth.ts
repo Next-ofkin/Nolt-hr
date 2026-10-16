@@ -280,6 +280,7 @@ export class AuthController {
       value,
     );
     const result = await this.auth.verify(p.factorId, p.code, req);
+    if ("hrInvitation" in result && result.hrInvitation) return { next: "hr_invitation" };
     if ("external" in result && result.external) return { next: "external" };
     if ("invitation" in result && result.invitation)
       return { next: "invitation" };
