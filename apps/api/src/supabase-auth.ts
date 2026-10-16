@@ -29,6 +29,7 @@ type FlowState = {
   invitationId?: string;
   hrPasswordSet?: boolean;
   hrPasswordStatus?: "CLAIMED" | "CONFIRMED";
+  hrSubject?: string;
   tokens?: Tokens;
   storage?: Record<string, string>;
   factorId?: string;
@@ -120,6 +121,8 @@ export class SupabaseAuth {
               tokenHash: digest(token),
               csrfHash: digest(digest("flow:" + token)),
               kind,
+              hrInvitationId: kind === "HR_INVITATION" ? state.invitationId : undefined,
+              hrSubject: kind === "HR_INVITATION" ? state.hrSubject : undefined,
               encryptedState: seal(state),
               expiresAt: new Date(Date.now() + ttl),
             },
