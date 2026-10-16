@@ -26,6 +26,8 @@ ALTER TABLE public."HrInvitation"
 ALTER TABLE public."HrInvitation"
   ADD CONSTRAINT "HrInvitation_send_requires_expiry"
     CHECK ("state" IN ('DRAFT','REVOKED') OR "expiresAt" IS NOT NULL);
+DROP INDEX public."HrInvitation_one_active_draft_per_email";
+CREATE UNIQUE INDEX "HrInvitation_one_active_pending_per_email" ON public."HrInvitation"(email) WHERE state IN ('DRAFT','QUEUED','SENDING','SENT','UNCERTAIN');
 CREATE UNIQUE INDEX "HrInvitation_requestKey_unique" ON public."HrInvitation"("requestKey") WHERE "requestKey" IS NOT NULL;
 CREATE UNIQUE INDEX "HrInvitation_providerSubject_accepted_unique" ON public."HrInvitation"("providerSubject") WHERE "state"='ACCEPTED';
 CREATE INDEX "HrInvitation_state_expiresAt_idx" ON public."HrInvitation"("state","expiresAt");
