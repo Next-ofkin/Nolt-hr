@@ -6,7 +6,6 @@ import { AuthFrame } from "@/components/auth-form";
 export default function HrInvitationAcceptPage() {
   const started = useRef(false);
   const [error, setError] = useState("");
-  const [checked, setChecked] = useState(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -36,7 +35,10 @@ export default function HrInvitationAcceptPage() {
           : "This invitation could not be verified. Please contact your administrator.",
       );
       // A successful exchange is an identity check only. No HR role/session yet.
-      setChecked(true);
+      const result: unknown = await response.json();
+      if (!result || typeof result !== "object" || !("next" in result) || result.next !== "mfa")
+        throw Error("HR identity verification did not start.");
+      location.replace("/auth/mfa");
     })().catch((reason: unknown) =>
       setError(reason instanceof Error ? reason.message : "Unable to verify the invitation."),
     );
@@ -48,10 +50,6 @@ export default function HrInvitationAcceptPage() {
           <p role="alert" className="text-sm text-destructive">{error}</p>
           <Link href="/login" className="text-sm text-primary underline">Back to sign in</Link>
         </div>
-      ) : checked ? (
-        <p role="status" className="mt-6 text-sm">
-          Your invitation link was verified. HR account activation is not available yet; contact your administrator.
-        </p>
       ) : (
         <p role="status" className="mt-6 text-sm">Checking your secure invitation…</p>
       )}
