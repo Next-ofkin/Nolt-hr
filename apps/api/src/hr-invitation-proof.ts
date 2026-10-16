@@ -57,6 +57,7 @@ export class HrInvitationProofService {
       inviteEmail: invitation.email,
       confirmedEmail: email,
       providerSubject: subject ?? null,
+      invitedSubject: invitation.providerSubject,
       hasExistingAccount: false,
       emailVerified: Boolean(user.email_confirmed_at),
       mfaVerified: user.factors?.some(f => f.factor_type === "totp" && f.status === "verified") ?? false,
