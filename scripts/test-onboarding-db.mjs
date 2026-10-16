@@ -1615,6 +1615,19 @@ try {
   );
   console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
 
+  // A fabricated successful provider response without a fresh INSERT claim is unsafe.
+  const forgedId = randomUUID(), forgedSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
+    [forgedId,"forged-hr-qa@example.invalid","Forged QA",developerQa],
+  );
+  assert.equal(await ledger.record(forgedId,{status:"SENT",providerSubject:forgedSubject}),true);
+  const denied = await owner.query('SELECT state,"providerSubject","creationSubject" FROM public."HrInvitation" WHERE id=$1',[forgedId]);
+  assert.equal(denied.rows[0].state,"UNCERTAIN");
+  assert.equal(denied.rows[0].providerSubject,null);
+  assert.equal(denied.rows[0].creationSubject,null);
+  console.log("PASS: HR ledger rejects fabricated provider success without new-account creation provenance (isolated PostgreSQL).");
+
   // Two workers contend on real PostgreSQL locks. The test transport cannot send email.
   const workerId = randomUUID(), workerSubject = randomUUID();
   await owner.query(
