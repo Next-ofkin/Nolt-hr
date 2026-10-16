@@ -1749,6 +1749,35 @@ try {
     assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
     assert.ok((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt);
     assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session" WHERE "userId"=$1 AND "revokedAt" IS NULL',[ledgerSubject])).rows[0].n,0);
+
+    // A session issued after activation is distinct from the revoked provisional session.
+    // Exercise the actual Sessions.issue implementation against isolated PostgreSQL.
+    const hrUser = await runtime.user.findUniqueOrThrow({ where: { id: ledgerSubject } });
+    assert.equal(hrUser.role,"HR");
+    const cookieWrites = [];
+    const newSession = await new Sessions(runtime, flowAuth).issue(
+      hrUser, "SUPABASE", true, { headers: {} },
+      { cookie: (...args) => cookieWrites.push(args) },
+      seal({ tokens: { access_token: "new-hr-login", refresh_token: "new-hr-refresh" } }),
+    );
+    assert.equal(newSession.role,"HR");
+    assert.equal(newSession.mfaVerified,true);
+    assert.ok(newSession.permissions.includes("forms.manage"));
+    assert.ok(newSession.permissions.includes("employees.manage"));
+    assert.ok(!newSession.permissions.includes("hr.accounts.manage"));
+    assert.equal(cookieWrites.length,1);
+    const newCookie = cookieWrites[0][1];
+    const persistedHrSession = await runtime.session.findUniqueOrThrow({
+      where: { tokenHash: digest(newCookie) },
+    });
+    assert.equal(persistedHrSession.userId,ledgerSubject);
+    assert.equal(persistedHrSession.authMethod,"SUPABASE");
+    assert.equal(persistedHrSession.mfaVerified,true);
+    assert.equal(persistedHrSession.revokedAt,null);
+    assert.notEqual(persistedHrSession.id,provisionalSessionId);
+    assert.equal((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt !== null,true);
+    console.log("PASS: fresh HR workspace session is issued separately with AAL2-backed role permissions; provisional session remains revoked (isolated PostgreSQL, synthetic provider session).");
+
     await assert.rejects(runHrActivation({
       db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
       flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
