@@ -10,7 +10,7 @@ const sessionId = "357f37cc-63f3-4c73-ae45-84ac74d1c58d";
 const email = "new-hr@example.invalid";
 const key = Buffer.alloc(32, 13).toString("base64");
 const env = {
-  DIRECT_DATABASE_URL: "postgres://operator:example@localhost:5432/test",
+  DIRECT_DATABASE_URL: "postgres://postgres.llslubzdkdnvhbatmfug:example@operator.pooler.supabase.com:5432/postgres",
   SUPABASE_PROJECT_REF: "llslubzdkdnvhbatmfug",
   SUPABASE_URL: "https://llslubzdkdnvhbatmfug.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "synthetic", AUTH_ENCRYPTION_KEY: key,
