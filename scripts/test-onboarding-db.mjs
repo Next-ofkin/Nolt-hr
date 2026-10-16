@@ -1501,6 +1501,51 @@ try {
   console.log(
     "PASS: Developer bootstrap single-role and one-time ledger uniqueness, protected runtime privileges, access-version trigger and complete transactional rollback (isolated PostgreSQL).",
   );
+  // HR draft constraints are tested in the same temporary database.
+  const hrDraftId = randomUUID();
+  const hrDraftPrivileges = await owner.query(
+    "SELECT has_table_privilege('nolt_app','public.\"HrInvitation\"','DELETE') AS can_delete, has_table_privilege('anon','public.\"HrInvitation\"','SELECT') AS anon_read, has_table_privilege('nolt_app','public.\"HrInvitation\"','INSERT') AS can_insert",
+  );
+  assert.equal(hrDraftPrivileges.rows[0].can_delete, false);
+  assert.equal(hrDraftPrivileges.rows[0].anon_read, false);
+  assert.equal(hrDraftPrivileges.rows[0].can_insert, true);
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy") VALUES($1,$2,$3,$4)',
+      [hrDraftId, "new-hr-qa@example.invalid", "Temporary HR invitee", developerQa],
+    );
+    await owner.query("SAVEPOINT duplicate_hr_draft");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO public."HrInvitation"(email,name,"createdBy") VALUES($1,$2,$3)',
+        ["new-hr-qa@example.invalid", "Duplicate HR invitee", developerQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT duplicate_hr_draft");
+    const account = await owner.query(
+      'SELECT role FROM public."User" WHERE id=$1',
+      [developerQa],
+    );
+    assert.equal(account.rows[0].role, "EMPLOYEE");
+    await owner.query(
+      'UPDATE public."HrInvitation" SET state=\'REVOKED\',"revokedAt"=now() WHERE id=$1',
+      [hrDraftId],
+    );
+    assert.equal(
+      (await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[hrDraftId])).rows[0].state,
+      "REVOKED",
+    );
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  assert.equal(
+    (await owner.query('SELECT count(*)::int AS n FROM public."HrInvitation"')).rows[0].n,
+    0,
+  );
+  console.log("PASS: HR invitation drafts enforce unique pending email, restricted database privileges, revocation and full rollback without role changes (isolated PostgreSQL).");
+
 } finally {
   await runtime?.$disconnect();
   await owner?.end();
