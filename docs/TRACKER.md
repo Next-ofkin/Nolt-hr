@@ -73,6 +73,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Ensure deployment respects the selected hosting services and their commercial-plan conditions; independently verify deployment URL, login, core Forms/Packs journeys and all approval gates.
 - [ ] Require owner acceptance and explicit production release approval for each launch milestone. A successful sandbox test is **not** permission to migrate data or enable a production workflow.
 
+### Build progress — 16 October 2026 (pack foundation)
+
+- [x] Located missing Production migration files `20261015170000_one_time_developer_bootstrap` and `20261016100000_hr_invitation_drafts` on `feat/developer-hr-employee-auth`, together with an additional unapplied `20261016120000_hr_invitation_lifecycle`. **Finding the files is not checksum verification nor permission to deploy them.**
+- [x] Added `apps/api/src/pack-rules.ts` on the feature branch: strict pack-template input contract, unique immutable form/version references and ordered entries, plus an explicit UTC calendar-day helper. Added `tests/pack-rules.test.ts` with six tests covering acceptance, duplicate rejection and date boundaries.
+- [ ] Run new pack tests and typecheck on checkout/CI; static GitHub commit alone is not a passing test.
+- [ ] Integrate the pack contract into the authenticated API, Prisma schema/migration and HR screens; no pack database tables exist yet.
+- [ ] Confirm the exact five-day deadline policy (calendar/business days, timezone, due-time and start trigger) before wiring reminders or access locks.
+- [ ] Compare all 17 Production migration checksums to the feature branch and reconcile `main`; no Production or Sandbox migration applied during this step.
+- [ ] Maintain the prior cleanup stop gate: six active users preserved; deletion only after impact report, recovery backup and separate explicit approval.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
