@@ -44,6 +44,7 @@
     "build:web": "npm run contracts:build && npm run build -w @nolt/web",
     "start:web": "npm run start:railway -w @nolt/web",
     "auth:hr:preflight": "node scripts/hr-activation-preflight.mjs",
+    "auth:hr:activate": "node scripts/hr-activation-runner.mjs",
     "auth:developer:preflight": "node scripts/developer-bootstrap.mjs",
     "auth:developer:apply": "node scripts/developer-bootstrap.mjs --apply"
   },
