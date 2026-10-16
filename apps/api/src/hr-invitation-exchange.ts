@@ -113,7 +113,7 @@ export class HrInvitationExchangeService {
     // allow further password changes; activation remains separately disabled.
     const confirmed = await this.db.authFlow.updateMany({
       where: { id: flow.row.id, encryptedState: claimedState, expiresAt: { gt: new Date() } },
-      data: { encryptedState: seal({ ...flow.state, hrPasswordStatus: "CONFIRMED" as const }), hrPasswordConfirmedAt: new Date() },
+      data: { encryptedState: seal({ ...flow.state, tokens: this.auth.tokens(session.data.session), hrPasswordStatus: "CONFIRMED" as const }), hrPasswordConfirmedAt: new Date() },
     });
     if (confirmed.count !== 1) throw new ForbiddenException("Password confirmation failed.");
     return { next: "awaiting_activation" };
