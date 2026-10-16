@@ -54,6 +54,7 @@ model AuthFlow {
   csrfHash String
   kind String
   encryptedState String
+  hrPasswordConfirmedAt DateTime? @db.Timestamptz(3)
   expiresAt DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([expiresAt])
