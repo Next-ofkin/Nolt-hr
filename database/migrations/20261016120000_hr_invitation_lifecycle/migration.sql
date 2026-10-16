@@ -1,6 +1,9 @@
 -- Prepare delivery and one-time MFA-verified acceptance without enabling either action.
 -- Additive migration. Existing drafts and all User roles are left unchanged.
 BEGIN;
+ALTER TABLE public."AuthFlow" DROP CONSTRAINT "AuthFlow_kind_check";
+ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_kind_check"
+ CHECK(kind IN ('EMAIL_SIGNUP','EMAIL_RECOVERY','MFA','RECOVERY','INVITATION','EXTERNAL','HR_INVITATION'));
 ALTER TABLE public."HrInvitation"
   ADD COLUMN "requestKey" UUID,
   ADD COLUMN "expiresAt" TIMESTAMPTZ(3),
