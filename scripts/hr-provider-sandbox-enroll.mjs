@@ -7,8 +7,8 @@ import { config } from "dotenv";
 import { pathToFileURL } from "node:url";
 import { validateInteractiveProviderEnvironment } from "./hr-provider-interactive-check.mjs";
 
-export async function enrollSandboxTotp(auth, identity, password, code, showQr) {
-  if (!password || !/^[0-9]{6}$/.test(code)) throw Error("Password and six-digit TOTP required.");
+export async function enrollSandboxTotp(auth, identity, password, getCode, showQr) {
+  if (!password || typeof getCode !== "function") throw Error("Password and local code prompt required.");
   const signed = await auth.signInWithPassword({ email: identity.email, password });
   if (signed.error || signed.data?.user?.id !== identity.subject ||
       !signed.data?.user?.email_confirmed_at || !signed.data?.session)
@@ -22,6 +22,8 @@ export async function enrollSandboxTotp(auth, identity, password, code, showQr) 
   const factorId = enrolled.data.id;
   try {
     await showQr(enrolled.data.totp.qr_code);
+    const code = await getCode();
+    if (!/^[0-9]{6}$/.test(code)) throw Error("A six-digit authenticator code is required.");
     const checked = await auth.mfa.challengeAndVerify({ factorId, code });
     if (checked.error) throw Error("Authenticator verification failed.");
     const session = await auth.getSession();
@@ -73,11 +75,11 @@ async function main() {
       throw Error("Cancelled.");
     // Read credentials only on the operator's workstation, never in flags or repository files.
     const password = await reader.question("Disposable account password (local terminal only): ");
-    const code = await reader.question("Authenticator code AFTER scanning QR (six digits): ");
-    const result = await enrollSandboxTotp(client.auth, identity, password, code,
+    const result = await enrollSandboxTotp(client.auth, identity, password,
+      () => reader.question("Enter the current six-digit authenticator code: "),
       async qr => showSandboxQr(qr, async url => {
         stdout.write("Open locally on this computer and scan the QR: " + url + "\n");
-        await reader.question("Press ENTER after scanning; verification will use the six-digit code provided above: ");
+        await reader.question("Press ENTER after scanning the QR code: ");
       }));
     stdout.write(JSON.stringify(result)+"\n");
   } finally {
