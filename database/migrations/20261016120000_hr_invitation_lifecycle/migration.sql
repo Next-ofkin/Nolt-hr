@@ -8,6 +8,8 @@ ALTER TABLE public."HrInvitation"
   ADD COLUMN "acceptedAt" TIMESTAMPTZ(3),
   ADD COLUMN "acceptedBy" UUID REFERENCES public."User"(id) ON DELETE RESTRICT,
   ADD COLUMN "providerSubject" UUID,
+  ADD COLUMN "creationSecretHash" TEXT,
+  ADD COLUMN "creationSubject" UUID,
   ADD COLUMN "deliveryAttempts" INTEGER NOT NULL DEFAULT 0 CHECK ("deliveryAttempts" >= 0 AND "deliveryAttempts" <= 5),
   ADD COLUMN "deliveryError" TEXT;
 ALTER TABLE public."HrInvitation" DROP CONSTRAINT "HrInvitation_state_check";
@@ -29,7 +31,10 @@ ALTER TABLE public."HrInvitation"
 DROP INDEX public."HrInvitation_one_active_draft_per_email";
 CREATE UNIQUE INDEX "HrInvitation_one_active_pending_per_email" ON public."HrInvitation"(email) WHERE state IN ('DRAFT','QUEUED','SENDING','SENT','UNCERTAIN');
 CREATE UNIQUE INDEX "HrInvitation_requestKey_unique" ON public."HrInvitation"("requestKey") WHERE "requestKey" IS NOT NULL;
+CREATE UNIQUE INDEX "HrInvitation_creationSubject_unique" ON public."HrInvitation"("creationSubject") WHERE "creationSubject" IS NOT NULL;
 CREATE UNIQUE INDEX "HrInvitation_providerSubject_unique" ON public."HrInvitation"("providerSubject") WHERE "providerSubject" IS NOT NULL;
+ALTER TABLE public."HrInvitation" ADD CONSTRAINT "HrInvitation_creation_proof_consistency"
+  CHECK ("creationSubject" IS NULL OR "creationSecretHash" IS NOT NULL);
 CREATE INDEX "HrInvitation_state_expiresAt_idx" ON public."HrInvitation"("state","expiresAt");
 -- Revoked and accepted invitations may never be reactivated.
 CREATE OR REPLACE FUNCTION nolt_private.prevent_hr_invitation_reactivation() RETURNS trigger
