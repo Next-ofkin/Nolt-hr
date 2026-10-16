@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Database } from "./database.js";
 import type { HrDeliveryResult } from "./hr-invitation-delivery.js";
 
