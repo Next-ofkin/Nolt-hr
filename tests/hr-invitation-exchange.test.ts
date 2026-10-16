@@ -131,3 +131,39 @@ test("HR password setup refuses already completed flow before contacting provide
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
   }
 });
+
+test("competing HR password requests claim one flow before touching Supabase", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  const id = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const state = { invitationId: id, tokens: { access_token: "a", refresh_token: "b" } };
+  let claims = 0, updates = 0;
+  const db = {
+    hrInvitation: { findUnique: async () => ({ id }) },
+    authFlow: { updateMany: async () => ({ count: ++claims === 1 ? 1 : 0 }) },
+  };
+  const client = { auth: {
+    updateUser: async () => { updates++; return { error: null }; },
+    getSession: async () => ({ data: { session: { access_token: "a", refresh_token: "b" } } }),
+  } };
+  const auth = {
+    flow: async () => ({ row: { id, kind: "HR_INVITATION", encryptedState: "old" }, state }),
+    authenticated: async () => ({ user: { id: subject }, client }),
+    tokens: (session: unknown) => session,
+  };
+  const proof = { verify: async () => ({ subject }) };
+  const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
+  try {
+    const request = { password: "safe-test-password-123" };
+    const a = await service.setPassword(request, {} as never);
+    assert.deepEqual(a, { next: "awaiting_activation" });
+    await assert.rejects(service.setPassword(request, {} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 403));
+    assert.equal(claims, 2);
+    assert.equal(updates, 1);
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
+  }
+});
