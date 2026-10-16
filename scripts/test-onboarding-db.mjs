@@ -17,6 +17,7 @@ import {
 import { InvitationsService } from "../apps/api/dist/invitations.js";
 import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
 import { HrInvitationDeliveryLedger } from "../apps/api/dist/hr-invitation-ledger.js";
+import { HrInvitationWorker } from "../apps/api/dist/hr-invitation-worker.js";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { ResponsesService } from "../apps/api/dist/responses.js";
 import { ExternalContactsService } from "../apps/api/dist/external-contacts.js";
@@ -1608,6 +1609,48 @@ try {
     1,
   );
   console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
+
+  // Two workers contend on real PostgreSQL locks. The test transport cannot send email.
+  const workerId = randomUUID(), workerSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'QUEUED\',now()+interval \'45 minutes\')',
+    [workerId, "worker-hr-qa@example.invalid", "Worker QA", developerQa],
+  );
+  let sendCalls = 0;
+  class FakeHrWorker extends HrInvitationWorker {
+    async send(invitation) {
+      assert.equal(invitation.email,"worker-hr-qa@example.invalid");
+      sendCalls++;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return {status:"SENT",providerSubject:workerSubject};
+    }
+  }
+  const gateBefore = process.env.HR_INVITATION_DELIVERY_ENABLED;
+  const recipientsBefore = process.env.HR_INVITATION_TEST_RECIPIENTS;
+  process.env.HR_INVITATION_DELIVERY_ENABLED = "true";
+  process.env.HR_INVITATION_TEST_RECIPIENTS = "worker-hr-qa@example.invalid";
+  try {
+    const workerA = new FakeHrWorker(runtime,ledger), workerB = new FakeHrWorker(runtime,ledger);
+    const results = await Promise.all([workerA.deliverNext(),workerB.deliverNext()]);
+    assert.equal(results.filter(Boolean).length,1);
+    assert.equal(sendCalls,1);
+    const stored = await owner.query(
+      'SELECT state,"providerSubject","deliveryAttempts" FROM public."HrInvitation" WHERE id=$1',
+      [workerId],
+    );
+    assert.deepEqual(
+      [stored.rows[0].state,stored.rows[0].providerSubject,stored.rows[0].deliveryAttempts],
+      ["SENT",workerSubject,1],
+    );
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
+  } finally {
+    if (gateBefore === undefined) delete process.env.HR_INVITATION_DELIVERY_ENABLED;
+    else process.env.HR_INVITATION_DELIVERY_ENABLED = gateBefore;
+    if (recipientsBefore === undefined) delete process.env.HR_INVITATION_TEST_RECIPIENTS;
+    else process.env.HR_INVITATION_TEST_RECIPIENTS = recipientsBefore;
+  }
+  console.log("PASS: concurrent HR workers exclusively claim one queued invite, call synthetic transport once, bind subject and preserve roles (no email or Auth call).");
+
 
 } finally {
   await runtime?.$disconnect();
