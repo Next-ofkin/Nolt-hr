@@ -27,6 +27,7 @@ type Tokens = { access_token: string; refresh_token: string };
 type FlowState = {
   externalRequestId?: string;
   invitationId?: string;
+  hrPasswordSet?: boolean;
   tokens?: Tokens;
   storage?: Record<string, string>;
   factorId?: string;
