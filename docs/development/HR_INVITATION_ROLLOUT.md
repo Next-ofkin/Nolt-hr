@@ -43,3 +43,6 @@ The NestJS queue worker now invokes `HrInvitationWorker.deliverNext()`, which **
 
 ## Concurrent worker integration test
 The isolated domain suite now launches two `HrInvitationWorker` instances concurrently against disposable PostgreSQL. A test-only subclass replaces the external email call with a synthetic result and verifies exactly one sender invocation, a single claimed attempt, persisted provider-subject binding, and unchanged User role. No Supabase request or email occurs. This provides claim/concurrency coverage **only**; it does not test provider-delivery races with signups or complete MFA activation, and does not authorise enabling the delivery flag.
+
+## Atomic revocation hardening
+The Developer revoke action now locks the invitation row before inspecting its state. Already accepted invitations return a conflict instead of allowing a role-irrelevant revocation. Repeated revoke of an already revoked draft is a no-op, with no duplicate audit. A new disposable PostgreSQL regression test checks these properties. This prevents a race with delivery and is a prerequisite for the future locked, one-time acceptance implementation. It does not enable acceptance, provider sending, or hosted migration.
