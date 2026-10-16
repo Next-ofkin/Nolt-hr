@@ -22,7 +22,7 @@ ALTER TABLE public."HrInvitation"
   ADD CONSTRAINT "HrInvitation_acceptance_consistency"
     CHECK (("state"='ACCEPTED') = ("acceptedAt" IS NOT NULL)
       AND ("state"='ACCEPTED') = ("acceptedBy" IS NOT NULL)
-      AND ("state"='ACCEPTED') = ("providerSubject" IS NOT NULL));
+      AND ("state"<>'ACCEPTED' OR "providerSubject" IS NOT NULL));
 ALTER TABLE public."HrInvitation"
   ADD CONSTRAINT "HrInvitation_send_requires_expiry"
     CHECK ("state" IN ('DRAFT','REVOKED') OR "expiresAt" IS NOT NULL);
