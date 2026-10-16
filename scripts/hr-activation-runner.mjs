@@ -80,13 +80,18 @@ export async function runHrActivation({ db, auth, invitationId, subjectId, flowI
     );
     if (stored.rowCount !== 1) throw new Error("Confirmed HR authentication flow is unavailable.");
     const flow = decodeHrFlow(stored.rows[0].encryptedState, encryptionKey);
-    await verifyLiveHrProvider(auth, db, invitationId, subjectId, flowId, flow);
+    const initialProof = await verifyLiveHrProvider(auth, db, invitationId, subjectId, flowId, flow);
     if (!apply) {
       await db.query("ROLLBACK");
       return { databasePrerequisitesMet: true, providerAal2Verified: true, activated: false };
     }
     if (typeof approve !== "function" || await approve() !== true)
       throw new Error("Operator approval was not granted.");
+    // Operator interaction can take time: independently revalidate the live
+    // provider identity and session before executing any role change.
+    const renewed = await verifyLiveHrProvider(auth, db, invitationId, subjectId, flowId, flow);
+    if (renewed.sessionId !== initialProof.sessionId)
+      throw new Error("Supabase session changed during operator approval.");
     const accepted = await db.query(
       "SELECT nolt_private.accept_hr_invitation($1::uuid,$2::uuid,$3::uuid) AS accepted",
       [invitationId, subjectId, flowId],
