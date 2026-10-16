@@ -82,8 +82,7 @@ export class HrInvitationExchangeService {
     if (updated.error) throw new BadRequestException("Could not set this password. Try another strong password.");
     const session = await authenticated.client.auth.getSession();
     if (!session.data.session) throw new ForbiddenException("Sign in again to continue.");
-    const fresh = this.auth.tokens(session.data.session);
-    await this.proof.verify(invitation, fresh);
+    await this.proof.verify(invitation, this.auth.tokens(session.data.session));
     // The claimed flow cannot be replayed. Do not store refreshed tokens or
     // allow further password changes; activation remains separately disabled.
     return { next: "awaiting_activation" };
