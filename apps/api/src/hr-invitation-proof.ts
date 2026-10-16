@@ -45,7 +45,7 @@ export class HrInvitationProofService {
     const [existing, assignedEmployee, identity] = await Promise.all([
       this.db.user.findUnique({ where: { email: invitation.email }, select: { id: true, role: true, active: true } }),
       this.db.employee.findUnique({ where: { email: invitation.email }, select: { id: true } }),
-      this.db.identity.findFirst({ where: { subject: user.id }, select: { userId: true } }),
+      this.db.identity.findFirst({ where: { issuer: process.env.SUPABASE_URL! + "/auth/v1", subject: user.id }, select: { userId: true } }),
     ]);
     // The auth trigger currently creates a provisional EMPLOYEE user for newly
     // invited identities; reject any preexisting identity not equal to this subject.
