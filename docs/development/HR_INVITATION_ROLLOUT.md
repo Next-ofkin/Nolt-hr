@@ -114,3 +114,6 @@ The offline activation preflight now retrieves `clock_timestamp()` in the same P
 
 ## Post-approval MFA revalidation
 The offline runner performs a second, independent Supabase getUser/getClaims/TOTP and live-session check after the interactive operator approval, immediately before the restricted owner-only activation call. If the session is revoked, changed or loses AAL2 while the approval prompt is pending, the transaction rolls back without calling the role-promotion function. Unit regression cases cover revocation and a changed session. Real-provider integration and approval of the hosted migration remain outstanding; the apply gate stays disabled.
+
+## Activation invalidates provisional app sessions
+The disposable PostgreSQL runner test now creates a pre-activation application session for the invited provisional account. It asserts that dry-run leaves this session intact, successful activation revokes it, and no unrevoked application session remains for that subject. Activation does not issue a new workspace session: the recipient must complete a fresh, MFA-verified HR login after activation. Real-provider integrated login testing is still outstanding; hosted migration and invitation flags stay off.
