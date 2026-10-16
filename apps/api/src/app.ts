@@ -2,6 +2,7 @@ import { ExternalSessions, ExternalSessionGuard } from "./external-sessions.js";
 import { QueueWorkerService } from "./queue-worker.js";
 import { HrInvitationWorker } from "./hr-invitation-worker.js";
 import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
+import { HrInvitationExchangeController, HrInvitationExchangeService } from "./hr-invitation-exchange.js";
 import "reflect-metadata";
 import {
   ExternalRequestsController,
@@ -68,6 +69,7 @@ class HealthController {
   controllers: [
     HealthController,
     DeveloperOverviewController,
+    HrInvitationExchangeController,
     ResponsesController,
     ReviewsController,
     AuthController,
@@ -84,6 +86,7 @@ class HealthController {
   providers: [
     Database,
     DeveloperOverviewService,
+    HrInvitationExchangeService,
     DeveloperGuard,
     ResponsesService,
     ReviewGuard,
