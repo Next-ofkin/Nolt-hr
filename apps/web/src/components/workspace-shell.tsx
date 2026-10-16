@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   ClipboardList,
   FileStack,
-  ShieldCheck,
   LayoutDashboard,
 } from "lucide-react";
 export function WorkspaceShell({
@@ -68,7 +67,7 @@ export function WorkspaceShell({
           <AccountMenu />
         </div>
       </header>
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
+      {!session?.permissions.includes("hr.accounts.manage") && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
         Development workspace · HR review, signing and third-party requests are
         being built{" "}
         <Link
@@ -78,7 +77,7 @@ export function WorkspaceShell({
           View progress
           <ArrowUpRight size={12} />
         </Link>
-      </div>
+      </div>}
       <main className="mx-auto max-w-[1600px] px-4 py-7 sm:px-8 sm:py-9 lg:px-10">
         {children}
       </main>
