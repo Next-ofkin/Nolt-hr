@@ -1,10 +1,27 @@
 import {
-  Controller, Get, Inject, Injectable, Query, UseGuards,
+  BadRequestException, Body, ConflictException, Controller, Get, Inject, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, UseGuards,
 } from "@nestjs/common";
 import { ApiOkResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
+import { z } from "zod";
+import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
 
+const draftInput = z.object({
+  name: z.string().trim().min(2).max(160),
+  email: z.email().max(254).transform((v) => v.trim().toLowerCase()),
+}).strict();
+class HrDraftDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() email!: string;
+  @ApiProperty() state!: string;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty({ nullable: true, type: String }) revokedAt!: string | null;
+}
+class HrDraftListDto {
+  @ApiProperty({ type: [HrDraftDto] }) items!: HrDraftDto[];
+}
 class AccountSummaryDto {
   @ApiProperty() developers!: number;
   @ApiProperty() hr!: number;
@@ -33,6 +50,54 @@ class DeveloperOverviewDto {
 @Injectable()
 export class DeveloperOverviewService {
   constructor(@Inject(Database) private readonly db: Database) {}
+  async drafts(): Promise<HrDraftListDto> {
+    const items = await this.db.hrInvitation.findMany({
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 25,
+    });
+    return { items: items.map((i) => ({
+      id: i.id, name: i.name, email: i.email, state: i.state,
+      createdAt: i.createdAt.toISOString(),
+      revokedAt: i.revokedAt?.toISOString() ?? null,
+    })) };
+  }
+  async prepare(actorId: string, payload: unknown): Promise<HrDraftDto> {
+    const parsed = draftInput.safeParse(payload);
+    if (!parsed.success) throw new BadRequestException("Enter a valid full name and email address.");
+    const { email, name } = parsed.data;
+    try {
+      const draft = await this.db.$transaction(async (tx) => {
+        const account = await tx.user.findUnique({ where: { email }, select: { id: true } });
+        if (account) throw new ConflictException("An account with this email already exists. Existing accounts cannot be invited or promoted.");
+        const item = await tx.hrInvitation.create({ data: { email, name, createdBy: actorId } });
+        await tx.auditEvent.create({
+          data: { actorId, action: "HR_INVITATION_DRAFT_CREATED", targetId: item.id, metadata: { email } },
+        });
+        await tx.outboxEvent.create({ data: { type: "HR_INVITATION_DRAFT_CREATED", targetId: item.id } });
+        return item;
+      });
+      return { id: draft.id, name: draft.name, email: draft.email, state: draft.state, createdAt: draft.createdAt.toISOString(), revokedAt: null };
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002")
+        throw new ConflictException("A pending HR invitation draft already exists for this email.");
+      throw error;
+    }
+  }
+  async revoke(actorId: string, id: string): Promise<HrDraftDto> {
+    const item = await this.db.$transaction(async (tx) => {
+      const current = await tx.hrInvitation.findUnique({ where: { id } });
+      if (!current) throw new NotFoundException("Invitation draft not found.");
+      if (current.state === "REVOKED") return current;
+      const result = await tx.hrInvitation.update({
+        where: { id },
+        data: { state: "REVOKED", revokedAt: new Date() },
+      });
+      await tx.auditEvent.create({ data: { actorId, action: "HR_INVITATION_DRAFT_REVOKED", targetId: id } });
+      await tx.outboxEvent.create({ data: { type: "HR_INVITATION_DRAFT_REVOKED", targetId: id } });
+      return result;
+    });
+    return { id: item.id, name: item.name, email: item.email, state: item.state, createdAt: item.createdAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null };
+  }
   async overview(pageInput: number, pageSizeInput: number, searchInput: string, status: string): Promise<DeveloperOverviewDto> {
     const page = Number.isSafeInteger(pageInput) && pageInput >= 1 && pageInput <= 100000 ? pageInput : 1;
     const pageSize = [5, 10, 20].includes(pageSizeInput) ? pageSizeInput : 10;
@@ -76,6 +141,22 @@ export class DeveloperOverviewController {
   constructor(@Inject(DeveloperOverviewService) private readonly service: DeveloperOverviewService) {}
   @Get("overview")
   @ApiOkResponse({ type: DeveloperOverviewDto })
+  @Get("hr-invitation-drafts")
+  @ApiOkResponse({ type: HrDraftListDto })
+  drafts() { return this.service.drafts(); }
+
+  @Post("hr-invitation-drafts")
+  @ApiOkResponse({ type: HrDraftDto })
+  prepare(@Req() req: AuthRequest, @Body() payload: unknown) {
+    return this.service.prepare(req.actor.id, payload);
+  }
+
+  @Post("hr-invitation-drafts/:id/revoke")
+  @ApiOkResponse({ type: HrDraftDto })
+  revoke(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.service.revoke(req.actor.id, id);
+  }
+
   overview(@Query("page") page?: string, @Query("pageSize") pageSize?: string, @Query("search") search?: string, @Query("status") status?: string) {
     return this.service.overview(Number(page ?? 1), Number(pageSize ?? 10), search ?? "", status ?? "all");
   }
