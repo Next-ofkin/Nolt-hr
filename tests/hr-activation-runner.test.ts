@@ -97,3 +97,59 @@ test("operator denial rolls back; approved activation invokes owner boundary onc
     else process.env.AUTH_ENCRYPTION_KEY = previous;
   }
 });
+
+test("revoked provider session during operator approval blocks HR activation", async () => {
+  const previous = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = key;
+  let sessionChecks = 0;
+  try {
+    const { db: fixture, calls } = dbFixture();
+    const db = { query: async (sql: string, params?: unknown[]) => {
+      if (sql.includes("FROM auth.sessions")) {
+        sessionChecks++;
+        return { rows: [{ active: sessionChecks === 1 }] };
+      }
+      return fixture.query(sql, params);
+    } };
+    await assert.rejects(runHrActivation({
+      db, auth, invitationId, subjectId, flowId, encryptionKey: key,
+      apply: true, approve: async () => true,
+    }), /session is no longer active/);
+    assert.equal(sessionChecks, 2);
+    assert.ok(calls.includes("ROLLBACK"));
+    assert.equal(calls.some(sql => sql.includes("accept_hr_invitation")), false);
+    assert.equal(calls.includes("COMMIT"), false);
+  } finally {
+    if (previous === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = previous;
+  }
+});
+
+test("changed provider session during operator approval blocks HR activation", async () => {
+  const previous = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = key;
+  let claimChecks = 0;
+  try {
+    const { db, calls } = dbFixture();
+    const changingAuth = { auth: {
+      ...auth.auth,
+      getClaims: async () => {
+        claimChecks++;
+        return { data: { claims: {
+          sub: subjectId, aal: "aal2",
+          session_id: claimChecks === 1 ? sessionId : "750e1d56-3f9a-4c08-9c1a-089d0890cb42",
+        } }, error: null };
+      },
+    } };
+    await assert.rejects(runHrActivation({
+      db, auth: changingAuth, invitationId, subjectId, flowId,
+      encryptionKey: key, apply: true, approve: async () => true,
+    }), /session changed during operator approval/);
+    assert.equal(claimChecks, 2);
+    assert.ok(calls.includes("ROLLBACK"));
+    assert.equal(calls.some(sql => sql.includes("accept_hr_invitation")), false);
+  } finally {
+    if (previous === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = previous;
+  }
+});
