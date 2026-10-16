@@ -87,3 +87,6 @@ The owner-only activation function additionally rejects HR password confirmation
 
 ## Read-only activation readiness
 GET /api/v1/hr-invitations/activation-readiness is disabled unless acceptance is explicitly enabled. It requires the HR-only flow with a valid CSRF token, exact bound invitation and subject, CONFIRMED encrypted password state and a corresponding time-valid database confirmation. It then re-runs the Supabase AAL2 identity proof and verifies the invitation and user match. A successful result returns prerequisitesMet=true but activationAllowed=false; it never changes roles or creates sessions. Unit tests cover disabled, incomplete and matching flows. This is an internal security checkpoint, not a launch-ready HR activation implementation. The ordinary API remains forbidden from executing the privileged promotion function, and both invitation switches must remain disabled.
+
+## Wall-clock timestamp correction
+The activation check compares recorded HR password confirmation to PostgreSQL clock_timestamp(), not transaction-scoped now(), which is fixed at BEGIN and can predate a new confirmed flow during isolated tests. The regression fixture also records confirmation using clock_timestamp(). No execute grants, production data changes or activation endpoint are included.
