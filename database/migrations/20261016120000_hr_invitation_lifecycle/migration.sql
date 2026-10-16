@@ -4,6 +4,7 @@ BEGIN;
 ALTER TABLE public."AuthFlow" DROP CONSTRAINT "AuthFlow_kind_check";
 ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_kind_check"
  CHECK(kind IN ('EMAIL_SIGNUP','EMAIL_RECOVERY','MFA','RECOVERY','INVITATION','EXTERNAL','HR_INVITATION'));
+ALTER TABLE public."AuthFlow" ADD COLUMN "hrPasswordConfirmedAt" TIMESTAMPTZ(3);
 ALTER TABLE public."HrInvitation"
   ADD COLUMN "requestKey" UUID,
   ADD COLUMN "expiresAt" TIMESTAMPTZ(3),
@@ -61,11 +62,12 @@ EXECUTE FUNCTION nolt_private.prevent_hr_invitation_reactivation();
 -- Internal activation boundary. Do not expose as a PostgREST RPC or GRANT EXECUTE
 -- until the API acceptance handler completes independent provider MFA verification.
 CREATE OR REPLACE FUNCTION nolt_private.accept_hr_invitation(
-  p_invitation UUID, p_subject UUID
+  p_invitation UUID, p_subject UUID, p_flow UUID
 ) RETURNS BOOLEAN
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $hr_accept$
 DECLARE invited public."HrInvitation"%ROWTYPE;
 DECLARE linked_count INT;
+DECLARE flow_count INT;
 BEGIN
   SELECT * INTO invited FROM public."HrInvitation"
     WHERE id=p_invitation FOR UPDATE;
@@ -90,7 +92,15 @@ BEGIN
     AND au.email_confirmed_at IS NOT NULL AND lower(au.email)=invited.email
     AND NOT EXISTS(SELECT 1 FROM public."Employee" e WHERE e."userId"=u.id OR e.email=u.email);
   IF linked_count <> 1 THEN RETURN FALSE; END IF;
+  -- Only a database-confirmed password step for this exact unexpired HR flow
+  -- may unlock the owner-only activation operation. Browser claims are irrelevant.
+  SELECT count(*) INTO flow_count FROM public."AuthFlow" af
+    WHERE af.id=p_flow AND af.kind='HR_INVITATION'
+      AND af."expiresAt" > now() AND af."hrPasswordConfirmedAt" IS NOT NULL;
+  IF flow_count <> 1 THEN RETURN FALSE; END IF;
   -- Existing sessions for the pre-activation role must not survive promotion.
+  DELETE FROM public."AuthFlow" WHERE id=p_flow AND kind='HR_INVITATION'
+    AND "hrPasswordConfirmedAt" IS NOT NULL;
   UPDATE public."User" SET role='HR' WHERE id=p_subject AND role='EMPLOYEE';
   UPDATE public."Session" SET "revokedAt"=now()
     WHERE "userId"=p_subject AND "revokedAt" IS NULL;
@@ -103,7 +113,7 @@ BEGIN
     VALUES(gen_random_uuid(),'HR_INVITATION_ACCEPTED',p_invitation);
   RETURN TRUE;
 END $hr_accept$;
-REVOKE ALL ON FUNCTION nolt_private.accept_hr_invitation(UUID,UUID)
+REVOKE ALL ON FUNCTION nolt_private.accept_hr_invitation(UUID,UUID,UUID)
   FROM PUBLIC,anon,authenticated,service_role,nolt_app;
 -- No runtime grant yet: a public caller must never substitute unverified MFA claims.
 COMMIT;
