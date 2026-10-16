@@ -83,6 +83,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Compare all 17 Production migration checksums to the feature branch and reconcile `main`; no Production or Sandbox migration applied during this step.
 - [ ] Maintain the prior cleanup stop gate: six active users preserved; deletion only after impact report, recovery backup and separate explicit approval.
 
+### Git branching setup — 16 October 2026
+
+- [x] Created `develop` from the current `main` commit; initial contents are identical.
+- [x] Retargeted draft PR [#6](https://github.com/Next-ofkin/Nolt-hr/pull/6) (`feat/developer-hr-employee-auth`) to `develop`; GitHub currently reports a clean comparison.
+- [ ] Execute and review full tests, security/migration checks and sandbox integration before merging PR #6; clean mergeability does not establish readiness.
+- [ ] Set repository branch protection / rulesets and required checks for `main` and `develop` where permissions and CI permit.
+- [ ] Adopt flow `feature branch → develop → reviewed release PR → main → separately approved Production deployment`; preserve environment-specific data and require explicit approval for Production migrations.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
