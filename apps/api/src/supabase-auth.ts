@@ -321,7 +321,9 @@ export class SupabaseAuth {
     });
     return {
       stage:
-        row.kind === "EXTERNAL" && assurance.data?.currentLevel === "aal2"
+        row.kind === "HR_INVITATION" && assurance.data?.currentLevel === "aal2"
+          ? "hr_invitation"
+          : row.kind === "EXTERNAL" && assurance.data?.currentLevel === "aal2"
           ? "external"
           : row.kind === "INVITATION" && assurance.data?.currentLevel === "aal2"
             ? "invitation"
@@ -338,7 +340,7 @@ export class SupabaseAuth {
   }
   async enroll(req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL", "HR_INVITATION"].includes(row.kind))
       throw new ForbiddenException("Sign in before setting up MFA.");
     const { client, session } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -387,7 +389,7 @@ export class SupabaseAuth {
   }
   async verify(factorId: string, code: string, req: Request) {
     const { row, state } = await this.flow(req, true);
-    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL"].includes(row.kind))
+    if (!["MFA", "RECOVERY", "INVITATION", "EXTERNAL", "HR_INVITATION"].includes(row.kind))
       throw new ForbiddenException("Sign in before verifying MFA.");
     const { client } = await this.authenticated(state.tokens);
     const factors = await client.auth.mfa.listFactors();
@@ -409,7 +411,7 @@ export class SupabaseAuth {
     const { data } = await client.auth.getSession();
     if (!data.session) throw new UnauthorizedException("Sign in again.");
     const checked = await this.validate(seal(this.tokens(data.session)));
-    if (row.kind === "INVITATION" || row.kind === "EXTERNAL") {
+    if (row.kind === "INVITATION" || row.kind === "EXTERNAL" || row.kind === "HR_INVITATION") {
       await this.db.authFlow.update({
         where: { id: row.id },
         data: {
@@ -418,6 +420,7 @@ export class SupabaseAuth {
       });
       return {
         invitation: row.kind === "INVITATION",
+        hrInvitation: row.kind === "HR_INVITATION",
         external: row.kind === "EXTERNAL",
         recovery: false as const,
         user: checked.user,
