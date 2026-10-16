@@ -71,17 +71,21 @@ export class HrInvitationExchangeService {
     const authenticated = await this.auth.authenticated(flow.state.tokens, AbortSignal.timeout(12000));
     if (authenticated.user.id !== proof.subject)
       throw new ForbiddenException("The verified account has changed.");
+    // Claim the flow before the irreversible external password update.
+    // Competing requests must never perform two provider-side changes.
+    const claim = await this.db.authFlow.updateMany({
+      where: { id: flow.row.id, encryptedState: flow.row.encryptedState, expiresAt: { gt: new Date() } },
+      data: { encryptedState: seal({ ...flow.state, hrPasswordSet: true }) },
+    });
+    if (claim.count !== 1) throw new ForbiddenException("This verification was already used.");
     const updated = await authenticated.client.auth.updateUser({ password: parsed.data.password });
     if (updated.error) throw new BadRequestException("Could not set this password. Try another strong password.");
     const session = await authenticated.client.auth.getSession();
     if (!session.data.session) throw new ForbiddenException("Sign in again to continue.");
     const fresh = this.auth.tokens(session.data.session);
     await this.proof.verify(invitation, fresh);
-    const changed = await this.db.authFlow.updateMany({
-      where: { id: flow.row.id, encryptedState: flow.row.encryptedState, expiresAt: { gt: new Date() } },
-      data: { encryptedState: seal({ ...flow.state, tokens: fresh, hrPasswordSet: true }) },
-    });
-    if (changed.count !== 1) throw new ForbiddenException("This verification was already used.");
+    // The claimed flow cannot be replayed. Do not store refreshed tokens or
+    // allow further password changes; activation remains separately disabled.
     return { next: "awaiting_activation" };
   }
 
