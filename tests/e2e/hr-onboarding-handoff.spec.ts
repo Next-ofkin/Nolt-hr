@@ -15,6 +15,8 @@ test("HR invitation handoff requires MFA then password setup and remains activat
     const url = new URL(req.url());
     const path = url.pathname;
     // Never let a request escape to the live API.
+    if (path === "/api/v1/auth/config")
+      return route.fulfill({ status: 200, contentType: "application/json", body: '{"enabled":false,"provider":"supabase","mfaRequired":true}' });
     if (path === "/api/v1/auth/session")
       return route.fulfill({ status: 401, contentType: "application/json", body: '{"message":"Not signed in"}' });
     if (path === "/api/v1/hr-invitations/exchange") {
