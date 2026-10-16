@@ -55,4 +55,52 @@ REVOKE ALL ON FUNCTION nolt_private.prevent_hr_invitation_reactivation() FROM PU
 CREATE TRIGGER nolt_hr_invitation_terminal_state
 BEFORE UPDATE ON public."HrInvitation" FOR EACH ROW
 EXECUTE FUNCTION nolt_private.prevent_hr_invitation_reactivation();
+-- Internal activation boundary. Do not expose as a PostgREST RPC or GRANT EXECUTE
+-- until the API acceptance handler completes independent provider MFA verification.
+CREATE OR REPLACE FUNCTION nolt_private.accept_hr_invitation(
+  p_invitation UUID, p_subject UUID
+) RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE invited public."HrInvitation"%ROWTYPE;
+DECLARE linked_count INT;
+BEGIN
+  SELECT * INTO invited FROM public."HrInvitation"
+    WHERE id=p_invitation FOR UPDATE;
+  IF NOT FOUND OR invited.state NOT IN ('SENT','UNCERTAIN')
+     OR invited."expiresAt" IS NULL OR invited."expiresAt" <= now()
+     OR invited."revokedAt" IS NOT NULL
+     OR invited."creationSubject" IS DISTINCT FROM p_subject
+     OR invited."providerSubject" IS DISTINCT FROM p_subject
+     OR invited."creationSecretHash" IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  -- Auth, identity, email and employee checks are re-read inside the same transaction.
+  SELECT count(*) INTO linked_count
+  FROM public."User" u
+  JOIN public."Identity" i ON i."userId"=u.id
+  JOIN auth.users au ON au.id=u.id
+  WHERE u.id=p_subject AND u.email=invited.email AND u.role='EMPLOYEE'
+    AND u.active AND u.permissions=ARRAY[]::text[]
+    AND u."authVersion"=1
+    AND i.subject=p_subject::text
+    AND i.issuer='https://llslubzdkdnvhbatmfug.supabase.co/auth/v1'
+    AND au.email_confirmed_at IS NOT NULL AND lower(au.email)=invited.email
+    AND NOT EXISTS(SELECT 1 FROM public."Employee" e WHERE e."userId"=u.id OR e.email=u.email);
+  IF linked_count <> 1 THEN RETURN FALSE; END IF;
+  -- Existing sessions for the pre-activation role must not survive promotion.
+  UPDATE public."User" SET role='HR' WHERE id=p_subject AND role='EMPLOYEE';
+  UPDATE public."Session" SET "revokedAt"=now()
+    WHERE "userId"=p_subject AND "revokedAt" IS NULL;
+  UPDATE public."HrInvitation" SET state='ACCEPTED', "acceptedAt"=now(),
+    "acceptedBy"=p_subject WHERE id=p_invitation;
+  INSERT INTO public."AuditEvent"(id,"actorId",action,"targetId",metadata)
+    VALUES(gen_random_uuid(),p_subject,'HR_INVITATION_ACCEPTED',p_invitation,
+      jsonb_build_object('source','verified_hr_invitation'));
+  INSERT INTO public."OutboxEvent"(id,type,"targetId")
+    VALUES(gen_random_uuid(),'HR_INVITATION_ACCEPTED',p_invitation);
+  RETURN TRUE;
+END $;
+REVOKE ALL ON FUNCTION nolt_private.accept_hr_invitation(UUID,UUID)
+  FROM PUBLIC,anon,authenticated,service_role,nolt_app;
+-- No runtime grant yet: a public caller must never substitute unverified MFA claims.
 COMMIT;
