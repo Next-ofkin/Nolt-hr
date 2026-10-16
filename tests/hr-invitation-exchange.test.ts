@@ -99,3 +99,35 @@ test("HR verification requires its own flow and never invokes activation", async
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
   }
 });
+
+test("HR password setup fails closed without checking DB or provider", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  try {
+    const inaccessible = new Proxy({}, { get() { throw Error("Must not access backend"); } });
+    const service = new HrInvitationExchangeService(inaccessible as never, inaccessible as never, inaccessible as never);
+    await assert.rejects(service.setPassword({ password: "verylongpassword123" }, {} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 503));
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
+  }
+});
+
+test("HR password setup refuses already completed flow before contacting provider", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  try {
+    const inaccessible = new Proxy({}, { get() { throw Error("Must not access backend"); } });
+    const auth = { flow: async () => ({
+      row: { kind: "HR_INVITATION" },
+      state: { invitationId: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a", tokens: { access_token: "a", refresh_token: "b" }, hrPasswordSet: true },
+    }) };
+    const service = new HrInvitationExchangeService(inaccessible as never, auth as never, inaccessible as never);
+    await assert.rejects(service.setPassword({ password: "verylongpassword123" }, {} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 403));
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
+  }
+});
