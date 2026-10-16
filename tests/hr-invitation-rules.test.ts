@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   canAcceptHrInvitation,
+  canVerifyHrInvitationIdentity,
   canQueueHrInvitation,
   canRevokeHrInvitation,
   type HrInvitationVerification,
@@ -38,6 +39,14 @@ test("HR invitation activation requires confirmed matching email and MFA AAL2", 
     assert.equal(canAcceptHrInvitation({ ...valid, ...patch }), false, JSON.stringify(patch));
   }
 });
+test("read-only identity proof cannot authorize HR role without trusted creation provenance", () => {
+  const { freshInvitationIdentity: _ignored, ...identity } = valid;
+  assert.equal(canVerifyHrInvitationIdentity(identity), true);
+  assert.equal(canAcceptHrInvitation(identity), false);
+  assert.equal(canAcceptHrInvitation({ ...identity, freshInvitationIdentity: false }), false);
+  assert.equal(canAcceptHrInvitation({ ...identity, freshInvitationIdentity: true }), true);
+});
+
 test("HR invitation transitions fail closed", () => {
   assert.equal(canQueueHrInvitation("DRAFT"), true);
   assert.equal(canQueueHrInvitation("SENT"), false);
