@@ -46,3 +46,6 @@ The isolated domain suite now launches two `HrInvitationWorker` instances concur
 
 ## Atomic revocation hardening
 The Developer revoke action now locks the invitation row before inspecting its state. Already accepted invitations return a conflict instead of allowing a role-irrelevant revocation. Repeated revoke of an already revoked draft is a no-op, with no duplicate audit. A new disposable PostgreSQL regression test checks these properties. This prevents a race with delivery and is a prerequisite for the future locked, one-time acceptance implementation. It does not enable acceptance, provider sending, or hosted migration.
+
+## Fresh-account provenance gate for HR acceptance
+The activation policy now requires `freshInvitationIdentity === true` **in addition to** matching provider subject, confirmed email and MFA AAL2. Read-only identity verification has been split into `canVerifyHrInvitationIdentity` and does not imply permission to promote. No caller can currently supply trusted fresh-invitation provenance: it must be implemented as a server-controlled creation claim tied atomically to a new Supabase Auth account, rather than inferred from email or metadata alone. Tests assert identity checks may pass while activation remains denied. No activation endpoint or role mutation was added, and live delivery and the hosted migration remain disabled.
