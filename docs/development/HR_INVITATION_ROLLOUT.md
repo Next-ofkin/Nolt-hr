@@ -90,3 +90,6 @@ GET /api/v1/hr-invitations/activation-readiness is disabled unless acceptance is
 
 ## Wall-clock timestamp correction
 The activation check compares recorded HR password confirmation to PostgreSQL clock_timestamp(), not transaction-scoped now(), which is fixed at BEGIN and can predate a new confirmed flow during isolated tests. The regression fixture also records confirmation using clock_timestamp(). No execute grants, production data changes or activation endpoint are included.
+
+## Preventing stale MFA updates from erasing password evidence
+The shared Supabase MFA status, enrollment and verification code now uses a conditional encrypted-state compare-and-swap for HR_INVITATION flows instead of updating them by ID alone. If a concurrent HR password claim changes the state or the flow expires, a stale MFA request fails closed instead of reverting the claimed/confirmed password marker. Status checks deliberately avoid rewriting an already claimed or confirmed flow. Employee, recovery and external authentication flows retain their existing behaviour. This does not enable HR promotion: the privileged activation SQL remains unavailable to nolt_app and invitation delivery/acceptance remain disabled. Real-provider concurrency integration tests are still needed before rollout.
