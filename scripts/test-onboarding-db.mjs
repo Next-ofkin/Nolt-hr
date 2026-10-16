@@ -1584,6 +1584,10 @@ try {
     'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
     [ledgerId, "ledger-hr-qa@example.invalid", "Ledger QA", developerQa],
   );
+  // Only a creation-time binding permits a successful delivery result.
+  const ledgerSecret = "a".repeat(64);
+  await owner.query('UPDATE public."HrInvitation" SET "creationSecretHash"=encode(sha256(convert_to($1,\'UTF8\')),\'hex\') WHERE id=$2',[ledgerSecret,ledgerId]);
+  await owner.query('INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,$3)',[ledgerSubject,"ledger-hr-qa@example.invalid",{nolt_hr_creation_secret:ledgerSecret}]);
   const ledger = new HrInvitationDeliveryLedger(runtime);
   assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),true);
   assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),false);
@@ -1621,7 +1625,9 @@ try {
   class FakeHrWorker extends HrInvitationWorker {
     async send(invitation) {
       assert.equal(invitation.email,"worker-hr-qa@example.invalid");
+      assert.match(invitation.creationSecret,/^[a-f0-9]{64}$/);
       sendCalls++;
+      await owner.query('INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,$3)',[workerSubject,invitation.email,{nolt_hr_creation_secret:invitation.creationSecret}]);
       await new Promise((resolve) => setTimeout(resolve, 25));
       return {status:"SENT",providerSubject:workerSubject};
     }
