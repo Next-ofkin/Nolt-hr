@@ -4,7 +4,7 @@ import { Client } from "pg";
 import { config } from "dotenv";
 import { pathToFileURL } from "node:url";
 
-export function validateOfflineActivationEnvironment(env, args) {
+export function validateOfflineActivationEnvironment(env, args, allowApply = false) {
   if (env.NODE_ENV === "production") throw new Error("Run from an approved operator workstation.");
   if (!env.DIRECT_DATABASE_URL) throw new Error("Operator owner connection is required.");
   if (env.DATABASE_URL && env.DIRECT_DATABASE_URL === env.DATABASE_URL)
@@ -14,7 +14,7 @@ export function validateOfflineActivationEnvironment(env, args) {
   if (args.length !== 3 || !args.every((value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)))
     throw new Error("Usage: npm run auth:hr:preflight -- <invitation-uuid> <subject-uuid> <flow-uuid>");
-  if (process.argv.includes("--apply")) throw new Error("This utility has no apply mode.");
+  if (!allowApply && process.argv.includes("--apply")) throw new Error("This utility has no apply mode.");
   return args;
 }
 
