@@ -56,6 +56,31 @@ export class HrInvitationExchangeService {
     return { verified: true, activationAllowed: false };
   }
 
+  async activationReadiness(req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation activation is not available yet.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId ||
+        !flow.state.hrSubject || !flow.state.tokens ||
+        flow.state.hrPasswordStatus !== "CONFIRMED" ||
+        !flow.row.hrPasswordConfirmedAt ||
+        flow.row.hrInvitationId !== flow.state.invitationId ||
+        flow.row.hrSubject !== flow.state.hrSubject ||
+        flow.row.hrPasswordConfirmedAt < flow.row.createdAt ||
+        flow.row.hrPasswordConfirmedAt >= flow.row.expiresAt ||
+        flow.row.hrPasswordConfirmedAt > new Date())
+      throw new ForbiddenException("HR invitation activation prerequisites are incomplete.");
+    const invitation = await this.db.hrInvitation.findUnique({
+      where: { id: flow.state.invitationId },
+    });
+    if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
+    const verified = await this.proof.verify(invitation, flow.state.tokens);
+    if (verified.subject !== flow.state.hrSubject || verified.email !== invitation.email)
+      throw new ForbiddenException("The verified account does not match this invitation.");
+    // This is a read-only readiness report, never an authorization grant.
+    return { prerequisitesMet: true, activationAllowed: false };
+  }
+
   async setPassword(input: unknown, req: Request) {
     if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
       throw new ServiceUnavailableException("HR invitation activation is not available yet.");
@@ -151,6 +176,11 @@ export class HrInvitationExchangeController {
   verification(@Req() req: Request) {
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
     return this.service.verification(req);
+  }
+  @Get("activation-readiness")
+  activationReadiness(@Req() req: Request) {
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.activationReadiness(req);
   }
   @Post("password")
   @ApiCreatedResponse({ type: HrPasswordResultDto })
