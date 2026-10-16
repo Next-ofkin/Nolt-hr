@@ -1546,6 +1546,36 @@ try {
   );
   console.log("PASS: HR invitation drafts enforce unique pending email, restricted database privileges, revocation and full rollback without role changes (isolated PostgreSQL).");
 
+  // Simulate delivery states only in a rollback-only fixture. No Auth call or mail.
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy","expiresAt",state,"requestKey") VALUES($1,$2,$3,$4,now()+interval \'30 minutes\',\'QUEUED\',$5)',
+      [hrDraftId, "queued-hr-qa@example.invalid", "Queued HR", developerQa, randomUUID()],
+    );
+    await owner.query("SAVEPOINT duplicate_queued_hr");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO public."HrInvitation"(email,name,"createdBy") VALUES($1,$2,$3)',
+        ["queued-hr-qa@example.invalid", "Duplicate pending HR", developerQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT duplicate_queued_hr");
+    await owner.query("UPDATE public.\"HrInvitation\" SET state='REVOKED',\"revokedAt\"=now() WHERE id=$1", [hrDraftId]);
+    await owner.query("SAVEPOINT terminal_hr_state");
+    await assert.rejects(
+      owner.query("UPDATE public.\"HrInvitation\" SET state='QUEUED',\"revokedAt\"=NULL WHERE id=$1", [hrDraftId]),
+      (e) => e.code === "P0001",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT terminal_hr_state");
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1', [developerQa])).rows[0].role,"EMPLOYEE");
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  console.log("PASS: HR invitation queued-email uniqueness, terminal-state protection and zero account role changes (isolated PostgreSQL rollback).");
+
+
 } finally {
   await runtime?.$disconnect();
   await owner?.end();
