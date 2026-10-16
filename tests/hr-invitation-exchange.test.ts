@@ -171,3 +171,33 @@ test("competing HR password requests claim one flow before touching Supabase", a
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
   }
 });
+
+test("failed HR password update leaves claim unconfirmed and never activates", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const key = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString("base64");
+  const id = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  let writes = 0;
+  const auth = {
+    flow: async () => ({ row: { id, kind: "HR_INVITATION", encryptedState: "initial" },
+      state: { invitationId: id, tokens: { access_token: "a", refresh_token: "b" } } }),
+    authenticated: async () => ({ user: { id }, client: { auth: { updateUser: async () => ({ error: new Error("provider rejected") }) } } }),
+  };
+  const db = {
+    hrInvitation: { findUnique: async () => ({ id }) },
+    authFlow: { updateMany: async () => { writes++; return { count: 1 }; } },
+  };
+  const proof = { verify: async () => ({ subject: id }) };
+  try {
+    const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
+    await assert.rejects(service.setPassword({ password: "safe-test-password-123" }, {} as never),
+      (e: unknown) => Boolean(e && typeof e === "object" && "status" in e && e.status === 400));
+    assert.equal(writes, 1);
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
+    if (key === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = key;
+  }
+});
