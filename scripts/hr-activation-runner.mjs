@@ -22,7 +22,7 @@ export function decodeHrFlow(value, keyBase64) {
 }
 
 export function validateRunnerEnvironment(env, args, apply) {
-  validateOfflineActivationEnvironment(env, args);
+  validateOfflineActivationEnvironment(env, args, true);
   if (!env.SUPABASE_URL || new URL(env.SUPABASE_URL).hostname !== "llslubzdkdnvhbatmfug.supabase.co")
     throw new Error("Supabase project URL does not match the approved project.");
   if (!env.SUPABASE_PUBLISHABLE_KEY || !env.AUTH_ENCRYPTION_KEY)
