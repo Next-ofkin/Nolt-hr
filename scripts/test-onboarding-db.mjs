@@ -1627,24 +1627,34 @@ try {
   console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
 
   // A restricted owner-only activation boundary is tested with reversible role changes.
+  const activationFlowId = randomUUID();
   const activationGrants = await owner.query(
-    "SELECT has_function_privilege('nolt_app','nolt_private.accept_hr_invitation(uuid,uuid)','EXECUTE') AS runtime_execute, has_function_privilege('authenticated','nolt_private.accept_hr_invitation(uuid,uuid)','EXECUTE') AS web_execute",
+    "SELECT has_function_privilege('nolt_app','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS runtime_execute, has_function_privilege('authenticated','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS web_execute",
   );
   assert.equal(activationGrants.rows[0].runtime_execute,false);
   assert.equal(activationGrants.rows[0].web_execute,false);
   assert.equal(
-    (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+    (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
     false,
   );
   await owner.query("BEGIN");
   try {
     await owner.query("UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1",[ledgerSubject]);
+    // Confirmed email alone is insufficient without a completed HR password flow.
     assert.equal(
-      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    await owner.query(
+      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',now())',
+      [activationFlowId,"confirmed-flow-"+activationFlowId,"csrf-"+activationFlowId,"encrypted-fixture"],
+    );
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
       true,
     );
     assert.equal(
-      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
       false,
     );
     assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
