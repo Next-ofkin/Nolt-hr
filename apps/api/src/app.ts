@@ -1,5 +1,7 @@
 import { ExternalSessions, ExternalSessionGuard } from "./external-sessions.js";
 import { QueueWorkerService } from "./queue-worker.js";
+import { HrInvitationWorker } from "./hr-invitation-worker.js";
+import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
 import "reflect-metadata";
 import {
   ExternalRequestsController,
@@ -100,6 +102,8 @@ class HealthController {
     ExternalSessions,
     ExternalSessionGuard,
     QueueWorkerService,
+    HrInvitationWorker,
+    HrInvitationDeliveryLedger,
   ],
 })
 export class AppModule {}
