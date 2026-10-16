@@ -14,11 +14,8 @@ export class HrInvitationWorker {
   async deliverNext(): Promise<boolean> {
     if (process.env.HR_INVITATION_DELIVERY_ENABLED !== "true") return false;
     const job = await this.db.$transaction(async (tx) => {
-      // Previous uncertain calls MUST NOT be sent again automatically.
-      // Failed worker leases move to UNCERTAIN and need manual reconciliation.
-      await tx.$executeRaw`UPDATE public."HrInvitation" SET state='UNCERTAIN', "deliveryError"='WORKER_LEASE_EXPIRED'
-        WHERE state='SENDING' AND "sentAt" IS NULL AND "expiresAt" > now()
-          AND "deliveryAttempts" > 0`;
+      // SENDING is never reclaimed automatically: a provider call may have
+      // succeeded just before a worker crash. Manual reconciliation required.
       const ids = await tx.$queryRaw<{id:string}[]>`SELECT id FROM public."HrInvitation"
         WHERE state='QUEUED' ORDER BY "createdAt",id FOR UPDATE SKIP LOCKED LIMIT 1`;
       if (!ids.length) return null;
