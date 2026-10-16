@@ -143,7 +143,7 @@ test("competing HR password requests claim one flow before touching Supabase", a
   let claims = 0, updates = 0;
   const db = {
     hrInvitation: { findUnique: async () => ({ id }) },
-    authFlow: { updateMany: async () => ({ count: ++claims === 1 ? 1 : 0 }) },
+    authFlow: { updateMany: async () => ({ count: ++claims <= 2 ? 1 : 0 }) },
   };
   const client = { auth: {
     updateUser: async () => { updates++; return { error: null }; },
@@ -162,7 +162,7 @@ test("competing HR password requests claim one flow before touching Supabase", a
     assert.deepEqual(a, { next: "awaiting_activation" });
     await assert.rejects(service.setPassword(request, {} as never), (e: unknown) =>
       Boolean(e && typeof e === "object" && "status" in e && e.status === 403));
-    assert.equal(claims, 2);
+    assert.equal(claims, 3);
     assert.equal(updates, 1);
   } finally {
     if (oldKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
