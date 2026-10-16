@@ -1576,35 +1576,28 @@ try {
   }
   console.log("PASS: HR invitation queued-email uniqueness, terminal-state protection and zero account role changes (isolated PostgreSQL rollback).");
 
-  // Delivery ledger receives a fabricated provider response only. No email or Auth call.
-  await owner.query("BEGIN");
-  try {
-    const id = randomUUID(), subject = randomUUID();
-    await owner.query(
-      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
-      [id, "ledger-hr-qa@example.invalid", "Ledger QA", developerQa],
-    );
-    const ledger = new HrInvitationDeliveryLedger(runtime);
-    assert.equal(await ledger.record(id,{status:"SENT",providerSubject:subject}),true);
-    assert.equal(await ledger.record(id,{status:"SENT",providerSubject:subject}),false);
-    const recorded = await owner.query(
-      'SELECT state,"providerSubject","sentAt" FROM public."HrInvitation" WHERE id=$1',
-      [id],
-    );
-    assert.equal(recorded.rows[0].state,"SENT");
-    assert.equal(recorded.rows[0].providerSubject,subject);
-    assert.ok(recorded.rows[0].sentAt);
-    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
-    assert.equal(
-      (await owner.query("SELECT count(*)::int AS n FROM public.\"AuditEvent\" WHERE \"targetId\"=$1 AND action='HR_INVITATION_SENT'",[id])).rows[0].n,
-      1,
-    );
-  } finally {
-    await owner.query("ROLLBACK");
-  }
-  console.log("PASS: HR invitation delivery ledger accepts one provider subject exactly once, audits outcome, preserves account roles and rolls back (no mail).");
-
-
+  // Delivery ledger receives a fabricated provider response only. Disposable isolated DB.
+  const ledgerId = randomUUID(), ledgerSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
+    [ledgerId, "ledger-hr-qa@example.invalid", "Ledger QA", developerQa],
+  );
+  const ledger = new HrInvitationDeliveryLedger(runtime);
+  assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),true);
+  assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),false);
+  const recorded = await owner.query(
+    'SELECT state,"providerSubject","sentAt" FROM public."HrInvitation" WHERE id=$1',
+    [ledgerId],
+  );
+  assert.equal(recorded.rows[0].state,"SENT");
+  assert.equal(recorded.rows[0].providerSubject,ledgerSubject);
+  assert.ok(recorded.rows[0].sentAt);
+  assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
+  assert.equal(
+    (await owner.query("SELECT count(*)::int AS n FROM public.\"AuditEvent\" WHERE \"targetId\"=$1 AND action='HR_INVITATION_SENT'",[ledgerId])).rows[0].n,
+    1,
+  );
+  console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
 
 } finally {
   await runtime?.$disconnect();
