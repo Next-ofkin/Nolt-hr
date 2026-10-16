@@ -1680,56 +1680,10 @@ try {
       false,
     );
     await owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=clock_timestamp() WHERE id=$1',[activationFlowId]);
-    const runnerSessionId = randomUUID();
-    const runnerKey = Buffer.alloc(32, 11).toString("base64");
-    const beforeRunnerKey = process.env.AUTH_ENCRYPTION_KEY;
-    process.env.AUTH_ENCRYPTION_KEY = runnerKey;
-    try {
-      const encryptedRunnerFlow = seal({
-        invitationId: ledgerId, hrSubject: ledgerSubject, hrPasswordStatus: "CONFIRMED",
-        tokens: { access_token: "isolated-provider-token", refresh_token: "isolated-refresh-token" },
-      });
-      await owner.query('UPDATE public."AuthFlow" SET "encryptedState"=$2 WHERE id=$1',
-        [activationFlowId, encryptedRunnerFlow]);
-      await owner.query("INSERT INTO auth.sessions(id,user_id,not_after) VALUES($1,$2,now()+interval '10 minutes')",
-        [runnerSessionId, ledgerSubject]);
-      const fakeProvider = { auth: {
-        getUser: async () => ({ data: { user: {
-          id: ledgerSubject, email: "ledger-hr-qa@example.invalid",
-          email_confirmed_at: new Date().toISOString(),
-          factors: [{ factor_type: "totp", status: "verified" }],
-        } }, error: null }),
-        getClaims: async () => ({ data: { claims: {
-          sub: ledgerSubject, aal: "aal2", session_id: runnerSessionId,
-        } }, error: null }),
-      } };
-      const dryRun = await runHrActivation({
-        db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
-        flowId: activationFlowId, encryptionKey: runnerKey, apply: false,
-      });
-      assert.deepEqual(dryRun, {
-        databasePrerequisitesMet: true, providerAal2Verified: true, activated: false,
-      });
-      assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
-      const approved = await runHrActivation({
-        db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
-        flowId: activationFlowId, encryptionKey: runnerKey, apply: true,
-        approve: async () => true,
-      });
-      assert.equal(approved.activated, true);
-      assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
-      await assert.rejects(runHrActivation({
-        db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
-        flowId: activationFlowId, encryptionKey: runnerKey, apply: true,
-        approve: async () => true,
-      }), /prerequisites failed/);
-      assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"ACCEPTED");
-      console.log("PASS: actual HR activation runner verifies synthetic AAL2 against disposable PostgreSQL, dry-run never promotes, approved activation consumes once and replay fails.");
-    } finally {
-      if (beforeRunnerKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
-      else process.env.AUTH_ENCRYPTION_KEY = beforeRunnerKey;
-    }
-
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      true,
+    );
     assert.equal(
       (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
       false,
@@ -1746,6 +1700,58 @@ try {
   assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
   assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"SENT");
   console.log("PASS: restricted HR activation function rejects unconfirmed identity, atomically consumes one invitation, denies replay and rolls back role change.");
+
+  // Separate transaction scope: the actual runner owns BEGIN/COMMIT/ROLLBACK.
+  // All records exist only inside the disposable embedded PostgreSQL cluster.
+  const runnerFlowId = randomUUID(), runnerSessionId = randomUUID();
+  const runnerKey = Buffer.alloc(32, 11).toString("base64");
+  const beforeRunnerKey = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = runnerKey;
+  try {
+    await owner.query("UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1",[ledgerSubject]);
+    const encryptedRunnerFlow = seal({
+      invitationId: ledgerId, hrSubject: ledgerSubject, hrPasswordStatus: "CONFIRMED",
+      tokens: { access_token: "isolated-provider-token", refresh_token: "isolated-refresh-token" },
+    });
+    await owner.query(
+      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt","hrInvitationId","hrSubject") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',clock_timestamp(),$5,$6)',
+      [runnerFlowId,"runner-flow-"+runnerFlowId,"runner-csrf-"+runnerFlowId,encryptedRunnerFlow,ledgerId,ledgerSubject],
+    );
+    await owner.query("INSERT INTO auth.sessions(id,user_id,not_after) VALUES($1,$2,now()+interval '10 minutes')",
+      [runnerSessionId,ledgerSubject]);
+    const fakeProvider = { auth: {
+      getUser: async () => ({ data: { user: {
+        id: ledgerSubject, email: "ledger-hr-qa@example.invalid",
+        email_confirmed_at: new Date().toISOString(),
+        factors: [{ factor_type: "totp", status: "verified" }],
+      } }, error: null }),
+      getClaims: async () => ({ data: { claims: {
+        sub: ledgerSubject, aal: "aal2", session_id: runnerSessionId,
+      } }, error: null }),
+    } };
+    const dryRun = await runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: false,
+    });
+    assert.deepEqual(dryRun, { databasePrerequisitesMet: true, providerAal2Verified: true, activated: false });
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
+    const approved = await runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
+    });
+    assert.equal(approved.activated,true);
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
+    await assert.rejects(runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
+    }),/prerequisites failed/);
+    assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"ACCEPTED");
+    console.log("PASS: real HR activation runner verifies synthetic AAL2 against disposable PostgreSQL, dry-run never promotes, approved activation consumes once and replay fails.");
+  } finally {
+    if (beforeRunnerKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = beforeRunnerKey;
+  }
+
 
   // A fabricated successful provider response without a fresh INSERT claim is unsafe.
   const forgedId = randomUUID(), forgedSubject = randomUUID();
