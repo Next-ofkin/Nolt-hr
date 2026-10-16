@@ -141,13 +141,14 @@ test("competing HR password requests claim one flow before touching Supabase", a
   const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
   const state = { invitationId: id, tokens: { access_token: "a", refresh_token: "b" } };
   let claims = 0, updates = 0;
+  let confirmation: unknown;
   const db = {
     hrInvitation: { findUnique: async () => ({ id }) },
-    authFlow: { updateMany: async () => ({ count: ++claims <= 2 ? 1 : 0 }) },
+    authFlow: { updateMany: async (params: unknown) => { claims++; if (claims === 2) confirmation = params; return { count: claims <= 2 ? 1 : 0 }; } },
   };
   const client = { auth: {
     updateUser: async () => { updates++; return { error: null }; },
-    getSession: async () => ({ data: { session: { access_token: "a", refresh_token: "b" } } }),
+    getSession: async () => ({ data: { session: { access_token: "post-password-aal2", refresh_token: "refreshed" } } }),
   } };
   const auth = {
     flow: async () => ({ row: { id, kind: "HR_INVITATION", encryptedState: "old" }, state }),
@@ -164,6 +165,10 @@ test("competing HR password requests claim one flow before touching Supabase", a
       Boolean(e && typeof e === "object" && "status" in e && e.status === 403));
     assert.equal(claims, 3);
     assert.equal(updates, 1);
+    const { unseal } = await import("../apps/api/src/auth-crypto.js");
+    const confirmed = unseal<{ tokens: { access_token: string }; hrPasswordStatus: string }>((confirmation as { data: { encryptedState: string } }).data.encryptedState);
+    assert.equal(confirmed.tokens.access_token, "post-password-aal2");
+    assert.equal(confirmed.hrPasswordStatus, "CONFIRMED");
   } finally {
     if (oldKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
     else process.env.AUTH_ENCRYPTION_KEY = oldKey;
