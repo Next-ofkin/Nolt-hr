@@ -73,16 +73,7 @@ test("HR invitation MFA completion never issues a NOLT workspace session", async
     { issue: forbidden } as never,
     { verify: async () => ({ hrInvitation: true }) } as never,
   );
-  const req = { socket: { remoteAddress: "127.0.0.1" }, headers: { origin: "http://localhost:3000" } };
-  // Exercise controller with its protected origin check mocked only through legitimate configuration.
-  const before = process.env.WEB_ORIGIN;
-  process.env.WEB_ORIGIN = "http://localhost:3000";
-  try {
-    // Controller uses origin validation; a local synthetic request cannot issue session either way.
-    const result = await controller.verify({ factorId: invitationId, code: "123456" }, req as never, {} as never);
-    assert.deepEqual(result, { next: "hr_invitation" });
-  } finally {
-    if (before === undefined) delete process.env.WEB_ORIGIN;
-    else process.env.WEB_ORIGIN = before;
-  }
+  const req = { socket: { remoteAddress: "127.0.0.1" }, headers: {} };
+  const result = await controller.verify({ factorId: invitationId, code: "123456" }, req as never, {} as never);
+  assert.deepEqual(result, { next: "hr_invitation" });
 });
