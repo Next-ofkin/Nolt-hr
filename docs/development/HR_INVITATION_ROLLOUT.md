@@ -117,3 +117,6 @@ The offline runner performs a second, independent Supabase getUser/getClaims/TOT
 
 ## Activation invalidates provisional app sessions
 The disposable PostgreSQL runner test now creates a pre-activation application session for the invited provisional account. It asserts that dry-run leaves this session intact, successful activation revokes it, and no unrevoked application session remains for that subject. Activation does not issue a new workspace session: the recipient must complete a fresh, MFA-verified HR login after activation. Real-provider integrated login testing is still outstanding; hosted migration and invitation flags stay off.
+
+## Disposable fresh-HR session issuance check
+The isolated domain test now exercises the production `Sessions.issue` implementation for the activated disposable HR account, after verifying pre-activation sessions are revoked. It checks the newly persisted session has its own token, Supabase method, MFA-verified marker, active status and HR form/employee permissions, without technical developer privileges. It uses synthetic provider-session data rather than invoking Supabase; real-provider sign-in and active AAL2 validation still require separate testing. No hosted database account is altered.
