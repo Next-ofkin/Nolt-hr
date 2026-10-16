@@ -16,3 +16,6 @@ Migration `20261016120000_hr_invitation_lifecycle` introduces delivery states, e
 
 ## Release gate
 The first draft migration `20261016100000_hr_invitation_drafts` is already applied. Do NOT run `npm run db:hosted:migrate` for `20261016120000_hr_invitation_lifecycle` until fresh local tests, backup review, and explicit approval. Never test drafts against real employees or existing HR emails. Do not manually promote accounts through SQL. No real invitations are dispatched by this branch.
+
+## Verification policy checks (feature branch)
+The pure `apps/api/src/hr-invitation-rules.ts` module rejects any acceptance without verified matching email, newly eligible identity, valid SENT/UNCERTAIN invitation, and actual MFA `aal2`. Its denial cases are covered by `tests/hr-invitation-rules.test.ts`. It is **not** yet wired to account promotion, email sending, or provider callbacks; these tests do not prove an end-to-end invitation. No production or hosted changes are authorized by this policy test alone.
