@@ -60,7 +60,7 @@ EXECUTE FUNCTION nolt_private.prevent_hr_invitation_reactivation();
 CREATE OR REPLACE FUNCTION nolt_private.accept_hr_invitation(
   p_invitation UUID, p_subject UUID
 ) RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $hr_accept$
 DECLARE invited public."HrInvitation"%ROWTYPE;
 DECLARE linked_count INT;
 BEGIN
@@ -99,7 +99,7 @@ BEGIN
   INSERT INTO public."OutboxEvent"(id,type,"targetId")
     VALUES(gen_random_uuid(),'HR_INVITATION_ACCEPTED',p_invitation);
   RETURN TRUE;
-END $;
+END $hr_accept$;
 REVOKE ALL ON FUNCTION nolt_private.accept_hr_invitation(UUID,UUID)
   FROM PUBLIC,anon,authenticated,service_role,nolt_app;
 -- No runtime grant yet: a public caller must never substitute unverified MFA claims.
