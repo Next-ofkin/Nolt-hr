@@ -5,7 +5,7 @@ import { ApiOkResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
-import { canQueueHrInvitation } from "./hr-invitation-rules.js";
+import { canQueueHrInvitation, canRevokeHrInvitation } from "./hr-invitation-rules.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
 
 const draftInput = z.object({
@@ -121,9 +121,12 @@ export class DeveloperOverviewService {
   }
   async revoke(actorId: string, id: string): Promise<HrDraftDto> {
     const item = await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM public."HrInvitation" WHERE id=${id}::uuid FOR UPDATE`;
       const current = await tx.hrInvitation.findUnique({ where: { id } });
       if (!current) throw new NotFoundException("Invitation draft not found.");
       if (current.state === "REVOKED") return current;
+      if (!canRevokeHrInvitation(current.state as Parameters<typeof canRevokeHrInvitation>[0]))
+        throw new ConflictException("An accepted invitation cannot be revoked.");
       const result = await tx.hrInvitation.update({
         where: { id },
         data: { state: "REVOKED", revokedAt: new Date() },
