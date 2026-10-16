@@ -30,6 +30,7 @@ export class DeveloperOverviewService {
     const [groups, hrAccounts] = await this.db.$transaction([
       this.db.user.groupBy({
         by: ["role"],
+        orderBy: { role: "asc" },
         where: { active: true },
         _count: { _all: true },
       }),
