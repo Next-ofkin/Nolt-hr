@@ -3,6 +3,7 @@ import { QueueWorkerService } from "./queue-worker.js";
 import { HrInvitationWorker } from "./hr-invitation-worker.js";
 import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
 import { HrInvitationExchangeController, HrInvitationExchangeService } from "./hr-invitation-exchange.js";
+import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import "reflect-metadata";
 import {
   ExternalRequestsController,
@@ -87,6 +88,7 @@ class HealthController {
     Database,
     DeveloperOverviewService,
     HrInvitationExchangeService,
+    HrInvitationProofService,
     DeveloperGuard,
     ResponsesService,
     ReviewGuard,
