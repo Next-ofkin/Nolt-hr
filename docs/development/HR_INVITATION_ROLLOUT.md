@@ -81,3 +81,6 @@ The pending lifecycle migration now requires an unexpired, database-confirmed HR
 
 ## Database-bound password confirmation
 The pending lifecycle migration adds `AuthFlow_hr_password_binding_check`: the database rejects a non-null HR password confirmation timestamp unless the flow kind is HR_INVITATION and both the invitation ID and provider subject are present. The isolated PostgreSQL suite verifies that an unbound synthetic HR flow cannot be marked confirmed. This is additional defence in depth, not proof of valid MFA or authorization to activate; the owner-only activation function remains denied to runtime roles. Both HR invitation switches must stay disabled and the hosted migration pending.
+
+## Activation timestamp validation
+The owner-only activation function additionally rejects HR password confirmation timestamps before flow creation, at or beyond flow expiry, or in the future. An isolated PostgreSQL regression exercises a future-dated confirmation and then restores a valid timestamp before testing one-time activation. This is defence in depth; it does not confer runtime EXECUTE permission, replace provider MFA verification, or enable live activation.
