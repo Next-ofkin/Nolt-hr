@@ -24,9 +24,11 @@ export function hrDeliveryError(code: string | undefined, status: number | undef
 
 /** Transport only. Never changes a local role or marks an invitation accepted. */
 export async function deliverHrInvitationEmail(
-  invitation: { id: string; email: string; name: string },
+  invitation: { id: string; email: string; name: string; creationSecret?: string },
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<HrDeliveryResult> {
+  if (!invitation.creationSecret || !/^[a-f0-9]{64}$/.test(invitation.creationSecret))
+    return { status: "FAILED", errorCode: "CREATION_PROOF_MISSING", retryable: false };
   if (!hrRecipientAllowed(invitation.email, env))
     return { status: "FAILED", errorCode: "RECIPIENT_NOT_APPROVED", retryable: false };
   if (!env.SUPABASE_SECRET_KEY || !env.SUPABASE_URL)
@@ -40,7 +42,7 @@ export async function deliverHrInvitationEmail(
   try {
     const result = await client.auth.admin.inviteUserByEmail(invitation.email, {
       redirectTo: appOrigin() + "/hr-invitations/accept?id=" + encodeURIComponent(invitation.id),
-      data: { name: invitation.name },
+      data: { name: invitation.name, nolt_hr_creation_secret: invitation.creationSecret },
     });
     if (result.error) return hrDeliveryError(result.error.code, result.error.status);
     // Require Supabase to identify the exact account it created for this invitation.
