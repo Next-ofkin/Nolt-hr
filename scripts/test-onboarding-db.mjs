@@ -89,6 +89,17 @@ try {
     await runtime.authFlow.count({ where: { kind: "EXTERNAL" } }),
     1,
   );
+  const hrFlowCookie = [];
+  await flowAuth.start(
+    "HR_INVITATION",
+    { invitationId: randomUUID(), tokens: { access_token: "synthetic", refresh_token: "synthetic" } },
+    { headers: {} },
+    { cookie: (...args) => hrFlowCookie.push(args) },
+  );
+  assert.equal(hrFlowCookie.length, 1);
+  assert.equal(await runtime.authFlow.count({ where: { kind: "HR_INVITATION" } }), 1);
+  assert.equal(await runtime.session.count(), 0);
+  console.log("PASS: isolated encrypted HR_INVITATION flow passes DB kind constraint without creating workspace session or calling Supabase.");
   if (priorEncryptionKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
   else process.env.AUTH_ENCRYPTION_KEY = priorEncryptionKey;
   if (priorFlowLocal === undefined) delete process.env.LOCAL_DEVELOPMENT;
