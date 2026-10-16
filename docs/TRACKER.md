@@ -118,6 +118,13 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Run `npm ci`, `npm run db:generate`, `npm run typecheck`, `npm test`, `npm run build` in a clean feature-branch checkout; new Packs tests remain unverified.
 - [ ] Keep PR #6 in draft pending real CI/test evidence, migration parity and sandbox checks. No Production deployments, migrations or inactive-user deletions authorised.
 
+### Public-repo CI retry — 16 October 2026
+
+- [x] Repository visibility was confirmed public. Opened isolated draft PR [#8](https://github.com/Next-ofkin/Nolt-hr/pull/8) adding only `.github/workflows/pr-checks.yml` from branch `ci/restore-pr-checks` into `develop`. This is not the major feature PR.
+- [x] GitHub recognised the actual workflow for [run 38961492955](https://github.com/Next-ofkin/Nolt-hr/actions/runs/38961492955): named `NOLT HR PR checks`, with job `Typecheck, unit tests and build`. Previous synthetic `BuildFailed` path no longer describes this run.
+- [ ] Real job `117177403255` ended `failure` with **no returned step records**; job log download returned BlobNotFound/404. Unit/typecheck/build tests were **not established as executed**. Inspect GitHub run UI annotations, account Actions restrictions and runner setup. Do not infer an application test failure.
+- [ ] Keep draft PR #8 and PR #6 unmerged pending successful real checks; keep Production unchanged.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
