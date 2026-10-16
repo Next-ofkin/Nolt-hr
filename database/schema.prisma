@@ -282,6 +282,17 @@ model AuditEvent {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([targetId,createdAt])
 }
+model HrInvitation {
+  id String @id @default(uuid()) @db.Uuid
+  email String
+  name String
+  state String @default("DRAFT")
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  @@index([createdAt,id])
+}
+
 model EmployeeInvitation {
   id String @id @default(uuid()) @db.Uuid
   employeeId String @db.Uuid
