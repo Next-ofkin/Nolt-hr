@@ -1729,18 +1729,26 @@ try {
         sub: ledgerSubject, aal: "aal2", session_id: runnerSessionId,
       } }, error: null }),
     } };
+    const provisionalSessionId = randomUUID();
+    await owner.query(
+      'INSERT INTO public."Session"(id,"tokenHash","csrfHash","userId","expiresAt") VALUES($1,$2,$3,$4,now()+interval \'1 hour\')',
+      [provisionalSessionId,"pre-hr-"+randomUUID(),"pre-csrf-"+randomUUID(),ledgerSubject],
+    );
     const dryRun = await runHrActivation({
       db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
       flowId: runnerFlowId, encryptionKey: runnerKey, apply: false,
     });
     assert.deepEqual(dryRun, { databasePrerequisitesMet: true, providerAal2Verified: true, activated: false });
     assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
+    assert.equal((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt,null);
     const approved = await runHrActivation({
       db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
       flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
     });
     assert.equal(approved.activated,true);
     assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
+    assert.ok((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt);
+    assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session" WHERE "userId"=$1 AND "revokedAt" IS NULL',[ledgerSubject])).rows[0].n,0);
     await assert.rejects(runHrActivation({
       db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
       flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
