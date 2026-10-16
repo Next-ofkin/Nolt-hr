@@ -72,3 +72,6 @@ A feature-gated POST /api/v1/hr-invitations/password endpoint requires the HR-on
 
 ## HR password concurrency hardening
 The password endpoint now conditionally claims the encrypted HR AuthFlow *before* changing the Supabase password. This prevents concurrent requests with the same flow snapshot from issuing multiple provider updates. The flow is deliberately non-retryable if the provider update fails or times out: do not infer the password was saved, and require administrator reconciliation or a new, separately authorised invitation flow. A unit regression checks that competing requests reach the provider no more than once. No HR role activation or workspace session is enabled. Provider-integrated failure handling and an atomic promotion boundary remain launch blockers.
+
+## Password state hardening
+The HR password step now records CLAIMED before contacting Supabase, and CONFIRMED only following provider success and a fresh identity check. A failed provider operation cannot yield a confirmed marker. Role activation is still not wired up. Recovery procedures and integration verification remain pending.
