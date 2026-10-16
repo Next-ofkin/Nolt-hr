@@ -22,3 +22,6 @@ The pure `apps/api/src/hr-invitation-rules.ts` module rejects any acceptance wit
 
 ## Queuing backend (feature branch only)
 A Developer-protected `POST /api/v1/developer/hr-invitation-drafts/:id/queue` accepts `{requestKey: uuid}` and performs a locked, audited `DRAFT → QUEUED` transition, rejecting an email already used by either a User or Employee. This is intentionally **disabled by default** with `HR_INVITATION_DELIVERY_ENABLED` unset. Do not set this variable to `true` yet: there is no sender handling the new queue event and no HR activation endpoint. Queued does not mean sent. No production account role mutations are implemented.
+
+## Delivery transport module (not wired, no sending enabled)
+`apps/api/src/hr-invitation-delivery.ts` encapsulates Supabase Auth admin invitation delivery with explicit `HR_INVITATION_DELIVERY_ENABLED=true` **and** `HR_INVITATION_TEST_RECIPIENTS` matching the address. It is NOT connected to queue workers or API routes yet; it cannot send any emails until reviewed integration code is added. It does not grant roles or consume invitations. Missing approved recipient, missing sender configuration, and uncertain network outcomes fail closed. Unit tests use disabled/unapproved recipients and make no provider requests. The landing path `/hr-invitations/accept` is reserved and does not yet exist; do not enable sending.
