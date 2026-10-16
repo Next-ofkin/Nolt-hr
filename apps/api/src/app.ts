@@ -20,6 +20,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Database } from "./database.js";
+import { DeveloperOverviewController, DeveloperOverviewService } from "./developer.js";
 import { databaseReadiness } from "./database-diagnostics.js";
 import {
   ResponsesController,
@@ -27,7 +28,7 @@ import {
   ReviewsController,
   ReviewGuard,
 } from "./responses.js";
-import { AuthController, HrGuard, SessionGuard } from "./auth.js";
+import { AuthController, DeveloperGuard, HrGuard, SessionGuard } from "./auth.js";
 import { FormsController, FormsService } from "./forms.js";
 import { Sessions } from "./sessions.js";
 import { SupabaseAuth } from "./supabase-auth.js";
@@ -64,6 +65,7 @@ class HealthController {
 @Module({
   controllers: [
     HealthController,
+    DeveloperOverviewController,
     ResponsesController,
     ReviewsController,
     AuthController,
@@ -79,6 +81,8 @@ class HealthController {
   ],
   providers: [
     Database,
+    DeveloperOverviewService,
+    DeveloperGuard,
     ResponsesService,
     ReviewGuard,
     Sessions,
