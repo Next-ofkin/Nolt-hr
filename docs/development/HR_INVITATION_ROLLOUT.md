@@ -19,3 +19,6 @@ The first draft migration `20261016100000_hr_invitation_drafts` is already appli
 
 ## Verification policy checks (feature branch)
 The pure `apps/api/src/hr-invitation-rules.ts` module rejects any acceptance without verified matching email, newly eligible identity, valid SENT/UNCERTAIN invitation, and actual MFA `aal2`. Its denial cases are covered by `tests/hr-invitation-rules.test.ts`. It is **not** yet wired to account promotion, email sending, or provider callbacks; these tests do not prove an end-to-end invitation. No production or hosted changes are authorized by this policy test alone.
+
+## Queuing backend (feature branch only)
+A Developer-protected `POST /api/v1/developer/hr-invitation-drafts/:id/queue` accepts `{requestKey: uuid}` and performs a locked, audited `DRAFT → QUEUED` transition, rejecting an email already used by either a User or Employee. This is intentionally **disabled by default** with `HR_INVITATION_DELIVERY_ENABLED` unset. Do not set this variable to `true` yet: there is no sender handling the new queue event and no HR activation endpoint. Queued does not mean sent. No production account role mutations are implemented.
