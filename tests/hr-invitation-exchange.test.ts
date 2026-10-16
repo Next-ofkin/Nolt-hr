@@ -22,7 +22,7 @@ test("matching HR recipient starts only the dedicated MFA flow", async () => {
   const id = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
   const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
   const email = "new-hr@example.invalid";
-  let started: unknown[] | null = null;
+  const record: { started?: unknown[] } = {};
   const db = {
     hrInvitation: { findUnique: async () => ({
       id, email, state: "SENT", expiresAt: new Date(Date.now() + 180_000),
@@ -37,7 +37,7 @@ test("matching HR recipient starts only the dedicated MFA flow", async () => {
       user: { id: subject, email, email_confirmed_at: new Date().toISOString() },
     }),
     tokens: (v: unknown) => v,
-    start: async (...args: unknown[]) => { started = args; return { next: "mfa" }; },
+    start: async (...args: unknown[]) => { record.started = args; return { next: "mfa" }; },
   };
   try {
     const service = new HrInvitationExchangeService(db as never, auth as never);
@@ -46,11 +46,11 @@ test("matching HR recipient starts only the dedicated MFA flow", async () => {
       { headers: {} } as never, {} as never,
     );
     assert.deepEqual(result, { next: "mfa" });
-    assert.ok(started);
-    assert.equal(started[0], "HR_INVITATION");
-    assert.deepEqual((started[1] as { invitationId: string }).invitationId, id);
-    assert.ok((started[4] as number) > 0);
-    assert.ok((started[4] as number) <= 180_000);
+    assert.ok(record.started);
+    assert.equal(record.started[0], "HR_INVITATION");
+    assert.deepEqual((record.started[1] as { invitationId: string }).invitationId, id);
+    assert.ok((record.started[4] as number) > 0);
+    assert.ok((record.started[4] as number) <= 180_000);
   } finally {
     if (old === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = old;
