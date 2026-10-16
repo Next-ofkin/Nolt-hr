@@ -1,9 +1,9 @@
 import {
   BadRequestException, Body, Controller, ForbiddenException, Inject,
-  Injectable, Post, Req, ServiceUnavailableException,
+  Injectable, Post, Req, Res, ServiceUnavailableException,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import { Database } from "./database.js";
 import { SupabaseAuth } from "./supabase-auth.js";
@@ -19,8 +19,8 @@ const payload = z.object({
 }).strict();
 
 export class HrExchangeResultDto {
-  @ApiProperty({ enum: ["awaiting_activation"] })
-  next!: "awaiting_activation";
+  @ApiProperty({ enum: ["mfa"] })
+  next!: "mfa";
 }
 
 @Injectable()
@@ -30,7 +30,7 @@ export class HrInvitationExchangeService {
     @Inject(SupabaseAuth) private readonly auth: SupabaseAuth,
   ) {}
 
-  async exchange(input: unknown): Promise<HrExchangeResultDto> {
+  async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
     // This endpoint can check identity, but cannot grant access or create a
     // privileged flow until the HR-specific MFA and activation path is ready.
     if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
@@ -68,7 +68,13 @@ export class HrInvitationExchangeService {
     });
     if (!account || account.role !== "EMPLOYEE" || !account.active || employee)
       throw new ForbiddenException("This account is not eligible for HR invitation activation.");
-    return { next: "awaiting_activation" };
+    // Encrypted, short-lived HR-only flow. Never issue an application session here.
+    await this.auth.start(
+      "HR_INVITATION",
+      { invitationId: invitation.id, tokens: this.auth.tokens(verified.session) },
+      req, res, Math.min(600000, invitation.expiresAt.getTime() - Date.now()),
+    );
+    return { next: "mfa" };
   }
 }
 
@@ -79,9 +85,9 @@ export class HrInvitationExchangeController {
   constructor(@Inject(HrInvitationExchangeService) private readonly service: HrInvitationExchangeService) {}
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
-  exchange(@Body() value: unknown, @Req() req: Request) {
+  exchange(@Body() value: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     assertOrigin(req);
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
-    return this.service.exchange(value);
+    return this.service.exchange(value, req, res);
   }
 }
