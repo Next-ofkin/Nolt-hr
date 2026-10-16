@@ -1615,6 +1615,40 @@ try {
   );
   console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
 
+  // A restricted owner-only activation boundary is tested with reversible role changes.
+  const activationGrants = await owner.query(
+    "SELECT has_function_privilege('nolt_app','nolt_private.accept_hr_invitation(uuid,uuid)','EXECUTE') AS runtime_execute, has_function_privilege('authenticated','nolt_private.accept_hr_invitation(uuid,uuid)','EXECUTE') AS web_execute",
+  );
+  assert.equal(activationGrants.rows[0].runtime_execute,false);
+  assert.equal(activationGrants.rows[0].web_execute,false);
+  assert.equal(
+    (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+    false,
+  );
+  await owner.query("BEGIN");
+  try {
+    await owner.query("UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1",[ledgerSubject]);
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+      true,
+    );
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2) AS accepted",[ledgerId,ledgerSubject])).rows[0].accepted,
+      false,
+    );
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
+    assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"ACCEPTED");
+    assert.equal(
+      (await owner.query('SELECT count(*)::int AS n FROM public."AuditEvent" WHERE "targetId"=$1 AND action=\'HR_INVITATION_ACCEPTED\'',[ledgerId])).rows[0].n,
+      1,
+    );
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
+  assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"SENT");
+  console.log("PASS: restricted HR activation function rejects unconfirmed identity, atomically consumes one invitation, denies replay and rolls back role change.");
+
   // A fabricated successful provider response without a fresh INSERT claim is unsafe.
   const forgedId = randomUUID(), forgedSubject = randomUUID();
   await owner.query(
