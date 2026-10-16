@@ -87,8 +87,8 @@ async function main() {
       async qr => showSandboxQr(qr, async url => {
         stdout.write("Open locally on this computer and scan the QR: " + url + "\n");
         await scanReader.question("Press ENTER after scanning the QR code: ");
+        scanReader.close();
       }));
-    scanReader.close();
     stdout.write(JSON.stringify(result)+"\n");
   } finally {
     reader.close();
