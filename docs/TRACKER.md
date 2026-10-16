@@ -108,6 +108,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Add vetted isolated PostgreSQL/domain and browser test jobs; prior workflow used local synthetic services, and must not acquire real Supabase secrets.
 - [ ] Protect `develop`/`main` using required checks only after workflow reliability is proven.
 
+### Owner-supplied GitHub Actions diagnostics — 16 October 2026
+
+- [x] Owner supplied external diagnostic findings for failed run [38959500319](https://github.com/Next-ofkin/Nolt-hr/actions/runs/38959500319): `startup_failure`, synthetic `BuildFailed` path, empty name, workflow ID `383222104` reported deleted, **zero jobs**, no runner or test output; a second run `38959492070` showed the same pattern. These are pre-job failures, **not** application-test failures.
+- [x] External review reported `.github/workflows/pr-checks.yml` is syntactically valid and PR #6 still targets `develop`. These checks were reported by a separate coding assistant, not independently reproduced with an executed local test suite.
+- [ ] Owner to inspect GitHub account billing/payment status, actual Actions budgets/limits and repo Actions policy. **No billing lock has been confirmed.** Avoid raising spending limits without evidence.
+- [ ] If policy/billing looks normal, request GitHub Support investigate the reported deleted `BuildFailed` workflow registration (`383222104`). Do not assume orphaned registry is the proven cause.
+- [ ] Trigger a new Actions run only after platform settings diagnosis; record workflow name, jobs, run URL and results.
+- [ ] Run `npm ci`, `npm run db:generate`, `npm run typecheck`, `npm test`, `npm run build` in a clean feature-branch checkout; new Packs tests remain unverified.
+- [ ] Keep PR #6 in draft pending real CI/test evidence, migration parity and sandbox checks. No Production deployments, migrations or inactive-user deletions authorised.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
