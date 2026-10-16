@@ -25,13 +25,16 @@ function DeveloperHome() {
   const [data, setData] = useState<Overview | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/v1/developer/overview?page=${page}&pageSize=${pageSize}`, { credentials: "same-origin", cache: "no-store" });
+      const response = await fetch(`/api/v1/developer/overview?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(appliedSearch)}&status=${status}`, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your account does not have Developer administration access." : "We couldn't retrieve the account overview. Please try again.");
       const overview: Overview = await response.json();
       setData(overview);
@@ -41,7 +44,7 @@ function DeveloperHome() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, appliedSearch, status]);
   useEffect(() => { void load(); }, [load]);
 
   const greeting = session?.name?.trim().split(/\s+/)[0] || "Developer";
@@ -86,6 +89,11 @@ function DeveloperHome() {
             <div><h2 className="text-lg font-semibold tracking-tight">HR administration</h2><p className="mt-1 text-sm text-muted-foreground">Verified administrators and their access status</p></div>
             <span className="rounded-full bg-[#e9f6f0] px-3 py-1 text-xs font-semibold text-[#126c58]">Read-only overview</span>
           </div>
+          <form className="flex flex-wrap items-center gap-3 border-b bg-[#fcfdfc] px-5 py-4 sm:px-6" onSubmit={e => { e.preventDefault(); setPage(1); setAppliedSearch(search.trim()); }}>
+            <label className="min-w-[12rem] flex-1"><span className="sr-only">Search HR administrators by name or email</span><input value={search} onChange={e=>setSearch(e.target.value)} maxLength={120} placeholder="Search name or email" className="h-10 w-full rounded-xl border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/></label>
+            <label><span className="sr-only">Filter HR account status</span><select aria-label="HR account status" value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}} className="h-10 rounded-xl border bg-white px-3 text-sm"><option value="all">All accounts</option><option value="active">Active only</option><option value="inactive">Inactive only</option></select></label>
+            <Button type="submit" variant="outline" className="h-10 rounded-xl">Search</Button>
+          </form>
           {loading ? <p role="status" className="p-8 text-sm text-muted-foreground">Loading administrator accounts…</p> : !data ? <p className="p-8 text-sm text-muted-foreground">Account information is unavailable.</p> : data.hrAccounts.length===0 ? <div className="px-6 py-14 text-center"><Users className="mx-auto text-muted-foreground"/><p className="mt-3 font-medium">No HR administrators found</p><p className="mt-1 text-sm text-muted-foreground">HR accounts will appear here when configured.</p></div> : <div className="divide-y">{data.hrAccounts.map(person=><div key={person.id} className="flex items-center gap-3 px-5 py-4 sm:px-6"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eaf3f1] text-sm font-semibold text-[#1a665b]">{initials(person.name)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{person.name}</p><p className="truncate text-xs text-muted-foreground">{person.email}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${person.active?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"}`}>{person.active?"Active":"Inactive"}</span></div>)}</div>}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-[#fafcfb] px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
