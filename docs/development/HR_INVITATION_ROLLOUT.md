@@ -93,3 +93,6 @@ The activation check compares recorded HR password confirmation to PostgreSQL cl
 
 ## Preventing stale MFA updates from erasing password evidence
 The shared Supabase MFA status, enrollment and verification code now uses a conditional encrypted-state compare-and-swap for HR_INVITATION flows instead of updating them by ID alone. If a concurrent HR password claim changes the state or the flow expires, a stale MFA request fails closed instead of reverting the claimed/confirmed password marker. Status checks deliberately avoid rewriting an already claimed or confirmed flow. Employee, recovery and external authentication flows retain their existing behaviour. This does not enable HR promotion: the privileged activation SQL remains unavailable to nolt_app and invitation delivery/acceptance remain disabled. Real-provider concurrency integration tests are still needed before rollout.
+
+## HR identity issuer validation
+The recipient HR proof now requires the identity to match both the Supabase subject and the configured Supabase Auth issuer, rather than accepting any identity record with the same subject. A regression test verifies an unknown issuer is rejected before any activation. No role-changing API endpoint or runtime promotion grant has been added. Real-provider integrated activation still requires dedicated authorization and review.
