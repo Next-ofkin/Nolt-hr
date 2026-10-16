@@ -84,3 +84,6 @@ The pending lifecycle migration adds `AuthFlow_hr_password_binding_check`: the d
 
 ## Activation timestamp validation
 The owner-only activation function additionally rejects HR password confirmation timestamps before flow creation, at or beyond flow expiry, or in the future. An isolated PostgreSQL regression exercises a future-dated confirmation and then restores a valid timestamp before testing one-time activation. This is defence in depth; it does not confer runtime EXECUTE permission, replace provider MFA verification, or enable live activation.
+
+## Read-only activation readiness
+GET /api/v1/hr-invitations/activation-readiness is disabled unless acceptance is explicitly enabled. It requires the HR-only flow with a valid CSRF token, exact bound invitation and subject, CONFIRMED encrypted password state and a corresponding time-valid database confirmation. It then re-runs the Supabase AAL2 identity proof and verifies the invitation and user match. A successful result returns prerequisitesMet=true but activationAllowed=false; it never changes roles or creates sessions. Unit tests cover disabled, incomplete and matching flows. This is an internal security checkpoint, not a launch-ready HR activation implementation. The ordinary API remains forbidden from executing the privileged promotion function, and both invitation switches must remain disabled.
