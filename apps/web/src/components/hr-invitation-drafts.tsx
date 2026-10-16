@@ -1,5 +1,6 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { ClipboardCheck, Clock3, Loader2, UserPlus, XCircle } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
