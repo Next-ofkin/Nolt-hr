@@ -7,7 +7,7 @@ test("HR recipient exchange is fail-closed before DB or Supabase access", async 
   delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   try {
     const unavailable = new Proxy({}, { get() { throw Error("Unexpected external dependency access"); } });
-    const service = new HrInvitationExchangeService(unavailable as never, unavailable as never);
+    const service = new HrInvitationExchangeService(unavailable as never, unavailable as never, unavailable as never);
     await assert.rejects(service.exchange({}), (e: unknown) =>
       Boolean(e && typeof e === "object" && "status" in e && e.status === 503));
   } finally {
@@ -40,7 +40,7 @@ test("matching HR recipient starts only the dedicated MFA flow", async () => {
     start: async (...args: unknown[]) => { record.started = args; return { next: "mfa" }; },
   };
   try {
-    const service = new HrInvitationExchangeService(db as never, auth as never);
+    const service = new HrInvitationExchangeService(db as never, auth as never, {} as never);
     const result = await service.exchange(
       { invitationId: id, proof: { access_token: "access", refresh_token: "refresh" } },
       { headers: {} } as never, {} as never,
@@ -54,5 +54,48 @@ test("matching HR recipient starts only the dedicated MFA flow", async () => {
   } finally {
     if (old === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = old;
+  }
+});
+
+test("HR completion verification refuses access without touching any backend when disabled", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  try {
+    const forbidden = new Proxy({}, { get() { throw Error("Unexpected database/provider access"); } });
+    const service = new HrInvitationExchangeService(forbidden as never, forbidden as never, forbidden as never);
+    await assert.rejects(service.verification({} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 503));
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
+  }
+});
+
+test("HR verification requires its own flow and never invokes activation", async () => {
+  const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  const invitationId = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const calls: string[] = [];
+  const auth = { flow: async () => ({
+    row: { kind: "HR_INVITATION" },
+    state: { invitationId, tokens: { access_token: "test", refresh_token: "test" } },
+  }) };
+  const db = { hrInvitation: { findUnique: async () => {
+    calls.push("read invitation");
+    return { id: invitationId };
+  } } };
+  const proof = { verify: async () => {
+    calls.push("verify provider MFA");
+    return { activationAllowed: false };
+  } };
+  try {
+    const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
+    assert.deepEqual(await service.verification({} as never), {
+      verified: true, activationAllowed: false,
+    });
+    assert.deepEqual(calls, ["read invitation", "verify provider MFA"]);
+  } finally {
+    if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
   }
 });
