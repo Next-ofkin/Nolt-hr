@@ -101,6 +101,13 @@ BEGIN
       AND af."hrInvitationId"=p_invitation AND af."hrSubject"=p_subject
       AND af."expiresAt" > now() AND af."hrPasswordConfirmedAt" IS NOT NULL;
   IF flow_count <> 1 THEN RETURN FALSE; END IF;
+  -- Confirmation must follow identity creation and precede invitation expiry.
+  IF NOT EXISTS (
+    SELECT 1 FROM public."AuthFlow" af
+    WHERE af.id=p_flow AND af."hrPasswordConfirmedAt" >= af."createdAt"
+      AND af."hrPasswordConfirmedAt" < af."expiresAt"
+      AND af."hrPasswordConfirmedAt" <= now()
+  ) THEN RETURN FALSE; END IF;
   -- Existing sessions for the pre-activation role must not survive promotion.
   DELETE FROM public."AuthFlow" WHERE id=p_flow AND kind='HR_INVITATION'
     AND "hrInvitationId"=p_invitation AND "hrSubject"=p_subject
