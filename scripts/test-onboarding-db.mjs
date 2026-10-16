@@ -1677,7 +1677,7 @@ try {
       (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
       false,
     );
-    await owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=now() WHERE id=$1',[activationFlowId]);
+    await owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=clock_timestamp() WHERE id=$1',[activationFlowId]);
 
     assert.equal(
       (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
