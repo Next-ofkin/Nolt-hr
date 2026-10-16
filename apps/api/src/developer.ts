@@ -5,6 +5,7 @@ import { ApiOkResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
+import { canQueueHrInvitation } from "./hr-invitation-rules.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
 
 const draftInput = z.object({
@@ -90,6 +91,34 @@ export class DeveloperOverviewService {
       throw error;
     }
   }
+  // Fail closed. No delivery handler or activation path is enabled by this action.
+  async queue(actorId: string, id: string, requestKey: string): Promise<HrDraftDto> {
+    if (process.env.HR_INVITATION_DELIVERY_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation sending is not enabled yet.");
+    if (!z.string().uuid().safeParse(requestKey).success)
+      throw new BadRequestException("A valid invitation request key is required.");
+    const item = await this.db.$transaction(async (tx) => {
+      // Database lock prevents competing queue operations, revocation and replay.
+      await tx.$queryRaw`SELECT id FROM public."HrInvitation" WHERE id=${id}::uuid FOR UPDATE`;
+      const invite = await tx.hrInvitation.findUnique({ where: { id } });
+      if (!invite) throw new NotFoundException("Invitation not found.");
+      if (invite.requestKey === requestKey && invite.state === "QUEUED") return invite;
+      if (!canQueueHrInvitation(invite.state as Parameters<typeof canQueueHrInvitation>[0]))
+        throw new ConflictException("Only invitation drafts may be queued.");
+      if (await tx.user.findUnique({ where: { email: invite.email }, select: { id: true } }))
+        throw new ConflictException("Existing accounts cannot be invited or promoted.");
+      const employee = await tx.employee.findUnique({ where: { email: invite.email }, select: { id: true } });
+      if (employee) throw new ConflictException("An employee record already uses this email.");
+      const updated = await tx.hrInvitation.update({
+        where: { id },
+        data: { state: "QUEUED", requestKey, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+      });
+      await tx.auditEvent.create({ data: { actorId, action: "HR_INVITATION_QUEUED", targetId: id } });
+      await tx.outboxEvent.create({ data: { type: "HR_INVITATION_QUEUED", targetId: id } });
+      return updated;
+    });
+    return { id: item.id, name: item.name, email: item.email, state: item.state, createdAt: item.createdAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null };
+  }
   async revoke(actorId: string, id: string): Promise<HrDraftDto> {
     const item = await this.db.$transaction(async (tx) => {
       const current = await tx.hrInvitation.findUnique({ where: { id } });
@@ -154,6 +183,14 @@ export class DeveloperOverviewController {
   @ApiOkResponse({ type: HrDraftDto })
   prepare(@Req() req: AuthRequest, @Body() payload: unknown) {
     return this.service.prepare(req.actor.id, payload);
+  }
+
+  @Post("hr-invitation-drafts/:id/queue")
+  @ApiOkResponse({ type: HrDraftDto })
+  queue(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string, @Body() payload: unknown) {
+    const value = z.object({ requestKey: z.string().uuid() }).strict().safeParse(payload);
+    if (!value.success) throw new BadRequestException("A valid invitation request key is required.");
+    return this.service.queue(req.actor.id, id, value.data.requestKey);
   }
 
   @Post("hr-invitation-drafts/:id/revoke")
