@@ -139,8 +139,6 @@ export class DeveloperOverviewService {
 @Controller("developer")
 export class DeveloperOverviewController {
   constructor(@Inject(DeveloperOverviewService) private readonly service: DeveloperOverviewService) {}
-  @Get("overview")
-  @ApiOkResponse({ type: DeveloperOverviewDto })
   @Get("hr-invitation-drafts")
   @ApiOkResponse({ type: HrDraftListDto })
   drafts() { return this.service.drafts(); }
@@ -157,6 +155,8 @@ export class DeveloperOverviewController {
     return this.service.revoke(req.actor.id, id);
   }
 
+  @Get("overview")
+  @ApiOkResponse({ type: DeveloperOverviewDto })
   overview(@Query("page") page?: string, @Query("pageSize") pageSize?: string, @Query("search") search?: string, @Query("status") status?: string) {
     return this.service.overview(Number(page ?? 1), Number(pageSize ?? 10), search ?? "", status ?? "all");
   }
