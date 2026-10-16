@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { appOrigin } from "./security.js";
 
 export type HrDeliveryResult =
-  | { status: "SENT" }
+  | { status: "SENT"; providerSubject: string }
   | { status: "FAILED" | "UNCERTAIN"; errorCode: string; retryable: boolean };
 
 export function hrRecipientAllowed(email: string, env: NodeJS.ProcessEnv = process.env): boolean {
@@ -43,7 +43,14 @@ export async function deliverHrInvitationEmail(
       data: { name: invitation.name },
     });
     if (result.error) return hrDeliveryError(result.error.code, result.error.status);
-    return { status: "SENT" };
+    // Require Supabase to identify the exact account it created for this invitation.
+    // Do not mark as SENT without this binding; the caller must persist it first.
+    const subject = result.data.user?.id;
+    if (!subject || !/^[a-f0-9-]{36}$/i.test(subject))
+      return { status: "UNCERTAIN", errorCode: "PROVIDER_SUBJECT_MISSING", retryable: false };
+    if (result.data.user?.email?.trim().toLowerCase() !== invitation.email.trim().toLowerCase())
+      return { status: "UNCERTAIN", errorCode: "PROVIDER_EMAIL_MISMATCH", retryable: false };
+    return { status: "SENT", providerSubject: subject };
   } catch {
     // Network timeouts leave uncertain delivery; do not blindly retry and create multiple links.
     return { status: "UNCERTAIN", errorCode: "DELIVERY_UNCERTAIN", retryable: false };
