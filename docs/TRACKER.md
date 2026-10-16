@@ -2,6 +2,85 @@
 
 Owner approved local implementation on 13 October 2026. This file is the working checklist; checked items require implementation and verification evidence. A phase is not complete simply because its UI exists.
 
+## Master delivery plan — 16 October 2026
+
+Owner direction: continue NOLT HR Forms & Packs as the main product; use isolated sandbox first and promote reviewed application code/configuration/Prisma migrations to Production. **Do not mirror test records, password hashes, MFA enrolments, Auth UUIDs or sessions between environments.** The six active existing application users and their records remain protected. Owner changed the earlier full-reset request to **selective cleanup of inactive users and exclusively owned disposable records**. No data deletion is authorised by this tracker update.
+
+### Environment contract and verified audit baseline
+
+- Production Supabase project: `Nolthr` (`llslubzdkdnvhbatmfug`); 27 NOLT public application tables plus `_prisma_migrations`. Sandbox: `NOLT HR Auth Sandbox` (`wyoeaiowdvzjtcnzhktv`); no application public tables at audit time; one confirmed sandbox Auth user. Recheck before changes.
+- Production `public."User"`: 130 rows, **six active (1 DEVELOPER, 1 HR, 4 EMPLOYEE)** and **124 inactive**. Production `auth.users`: seven, correctly joined by `Identity.issuer = 'https://llslubzdkdnvhbatmfug.supabase.co/auth/v1'` and `Identity.subject = auth.users.id::text`: six correspond to active application users, one to inactive. Never infer inactivity from sign-in age alone.
+- Production currently has 17 recorded completed Prisma migrations, but `main/database/migrations` listed 15 directories. Investigate unmerged `20261015170000_one_time_developer_bootstrap` and `20261016100000_hr_invitation_drafts` before schema promotion.
+- Production has 65 foreign-key constraints (36 RESTRICT), one private bucket `nolt-private-documents` and zero currently listed objects. Preserve system `auth`/`storage` schemas, RLS, grants, indexes, triggers, extension config and migration history.
+- Historical checks in this tracker are evidence of the specific previously tested code/environment; **not** proof that the newest deployment, sandbox or every module is production-ready. Re-verify affected features after promotion.
+
+### P0 — Safety and selective production hygiene (no delete approval yet)
+
+- [x] Read-only inventory of production app-user activity, Auth identity linkage, table relationships, migration count and storage.
+- [ ] Identify exact six protected user IDs and dependent records, distinguishing ownership, authorship, reviewer access, shared published forms, audit/outbox evidence and historical submissions. Compare all Auth links and identify the one inactive Auth principal for explicit review.
+- [ ] Build a complete **row-level dry-run impact report** for the 124 inactive app accounts. Protect shared resources and any records used by active users; do not assume an inactive creator means a shared form can be deleted. Resolve the two unclassified employee-profile relationships.
+- [ ] Agree retention/privacy obligations for employment, submissions, audit and invitation events. Identify external notifications, job workers and service integrations affected by cleanup.
+- [ ] Produce a verified export/backup and rehearse restore in a separate safe environment; cover database, Auth relationships, storage, secrets/config inventory and deployed functions separately. Record recovery and rollback procedure.
+- [ ] Prepare a dependency-aware, transactional, idempotent cleanup plan with explicit allowlisted IDs, pre/post counts, error stop, session revocation and restoration checkpoints. Never truncate shared tables or delete all Auth users.
+- [ ] **STOP GATE:** present exact accounts/rows/data categories to delete and recoverable backup evidence; obtain separate explicit final owner approval before any deletion.
+- [ ] Once approved, execute only the reviewed inactive-user cleanup in Production during a controlled window; verify all six active accounts, their MFA/sign-in, owned and shared records, form assignments, submissions and audit integrity remain intact.
+
+### P1 — GitHub, migrations and sandbox baseline
+
+- [ ] Resolve Prisma migration divergence: find the two missing migration folders on other branches/commits, compare checksums and schema against Production, then bring approved history into GitHub without rewriting applied migrations.
+- [ ] Establish versioned configuration for Sandbox and Production, separate database URLs, Auth project refs, secrets, storage buckets, SMTP/Resend and redirect allowlists; no secrets in commits or browser bundles.
+- [ ] Recreate the application schema in the sandbox from **approved, reconciled migrations**, with RLS/grants/function hardening and a private test-storage bucket; don't import production personal data.
+- [ ] Seed synthetic DEVELOPER/HR/EMPLOYEE/guarantor test fixtures in the sandbox only; map Auth identities to each environment's own UUIDs. Keep production live-data isolation.
+- [ ] Add a deploy pipeline/checklist: PR review → migration diff and dry-run → sandbox integration tests, auth/AAL2/RLS/security checks → controlled approved Production schema migration → smoke tests → documented rollback. Only forward-promote schema/code/reference configuration, not test records.
+
+### P2 — Core HR Forms (finish verified remaining work)
+
+- [x] Historical first slice: HR draft/save/reopen, field ordering/required and recipient type, preview, immutable published versions, access/stale edit checks.
+- [x] Historical: employee version-bound drafts/submissions, correction/resubmission and HR review; draft-only deletion/published withdrawal safeguards.
+- [ ] Audit implementation on current branch and trace UI → typed API → PostgreSQL for authoring, preview, publish/withdraw, assignment, employee submission and HR correction. Refresh browser/accessibility evidence.
+- [ ] Add builder sections, multiple choice, conditional required/visibility rules, repeating groups and complete validation/field dictionary.
+- [ ] Implement and verify per-field sensitivity, version history/search/duplication/archive, draft deletion/published withdrawal UX, consent/legal policy and granular review authorisation.
+- [ ] Finish private uploads, antivirus scan (ClamAV must pass real scanner checks), authorised downloads, signatures/consent version/checksum; keep required file/signature completion blocked until real verification passes.
+
+### P3 — Onboarding Packs, assignment and deadlines
+
+- [ ] Confirm pack definition: named/versioned HR-managed bundle of **specific published form versions**, required vs optional items, employment-type template, order, recipient type and immutable assignment snapshot.
+- [ ] Build Pack template creation/edit/preview/publish/withdraw/versioning and audit history with accessible UI and API.
+- [ ] Implement employee/case pack assignment, idempotency, conflict checks, own checklist and HR assignment/reassignment rules.
+- [ ] Implement the agreed five-day default deadline policy (precise clock/timezone/start trigger to be ratified), due-date reminders, overdue locking, authorised extensions/reopen and full audit history.
+- [ ] Calculate trustworthy pack progress/readiness and HR approval gates (required vs optional, corrected/rejected submissions, missing uploads/signatures and guarantor evidence).
+- [ ] End-to-end sandbox journey: HR creates pack → assigns real sandbox user → employee saves/submits → guarantor responds if required → HR corrects/approves → completed/overdue cases render correctly, with denial of cross-user access.
+
+### P4 — Invitation, Auth and external requests
+
+- [x] Historical: staff signup/email, password/TOTP MFA/AAL2, invitation acceptance and owner-verified login; simulated newer HR-invitation browser tests passed (88 unit; 5 browser at commit `9d2c55e`), but full sandbox integration has not been proven.
+- [ ] Connect developer-controlled HR invitation → MFA → password setup → activation-pending workflow to **real sandbox APIs**; keep production HR activation off until independently accepted.
+- [ ] Test password recovery, session revocation, least-privilege HR provisioning, developer technical-admin limits, role changes and high-risk Auth edge cases.
+- [x] Historical owner decision D25: guarantor/reference recipients use direct, request-scoped verified-email access, **not staff MFA**.
+- [ ] Complete and verify real external email delivery (only to an explicitly approved test recipient), text draft/submission, independent HR review/corrections, multiple slots, expiry/revocation, privacy and replacement.
+- [ ] Keep live file/signature validation separately gated on scanner readiness; review retention/export and recipient consent.
+
+### P5 — Wider HR product roadmap (after Forms & Packs acceptance)
+
+- [ ] Versioned policies and acknowledgement; confidentiality/indemnity multi-party execution; beneficiary allocations/guardian authorisation.
+- [ ] HMO/dependents and approved AXA export; induction/certification; asset issuance/return; scoped reporting, reminders and exports.
+- [ ] Offboarding initiation, handover, clearance, exit interview, guarded closure, deactivation and retained evidence.
+
+### Release and operating acceptance
+
+- [ ] Implement continuous test coverage and hosted staged smoke tests (unit, Prisma/PostgreSQL, auth/AAL2, RLS/access control, API, responsive browser, mobile/accessibility, upload/signature).
+- [ ] Approve role/sensitivity matrix, email sender, policy copy, user retention and recovery/incident runbooks. Verify backups and restoration, monitoring/outbox processing and job workers.
+- [ ] Ensure deployment respects the selected hosting services and their commercial-plan conditions; independently verify deployment URL, login, core Forms/Packs journeys and all approval gates.
+- [ ] Require owner acceptance and explicit production release approval for each launch milestone. A successful sandbox test is **not** permission to migrate data or enable a production workflow.
+
+### Next executable priorities
+
+1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
+2. Prepare selective-cleanup impact report protecting all six active users; backup and rehearse the recovery. **No destructive change without separate final approval.**
+3. Bootstrap matching application schema in the Auth Sandbox from approved Prisma history and synthetic data, then resume Forms/Packs implementation and real sandbox end-to-end tests.
+
+---
+
 ## Owner amendment ? simple guarantor invitations, 15 October 2026
 
 - [x] Owner confirmed receipt of the guarantor test email.
