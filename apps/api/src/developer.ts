@@ -9,7 +9,7 @@ import { DeveloperGuard, SessionGuard } from "./auth.js";
 
 const draftInput = z.object({
   name: z.string().trim().min(2).max(160),
-  email: z.email().max(254).transform((v) => v.trim().toLowerCase()),
+  email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()),
 }).strict();
 class HrDraftDto {
   @ApiProperty() id!: string;
