@@ -296,6 +296,8 @@ model HrInvitation {
   acceptedAt DateTime? @db.Timestamptz(3)
   acceptedBy String? @db.Uuid
   providerSubject String? @db.Uuid
+  creationSecretHash String?
+  creationSubject String? @db.Uuid
   deliveryAttempts Int @default(0)
   deliveryError String?
   @@index([createdAt,id])
