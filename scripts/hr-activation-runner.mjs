@@ -27,6 +27,10 @@ export function validateRunnerEnvironment(env, args, apply) {
     throw new Error("Supabase project URL does not match the approved project.");
   if (!env.SUPABASE_PUBLISHABLE_KEY || !env.AUTH_ENCRYPTION_KEY)
     throw new Error("Supabase publishable key and flow encryption key are required.");
+  const ownerUrl = new URL(env.DIRECT_DATABASE_URL);
+  if (!ownerUrl.hostname.endsWith(".pooler.supabase.com") ||
+      !decodeURIComponent(ownerUrl.username).endsWith(".llslubzdkdnvhbatmfug"))
+    throw new Error("Expected the approved Supabase owner pooler for HR activation.");
   if (apply && env.HR_ACTIVATION_RUNNER_ENABLED !== "true")
     throw new Error("Privileged HR activation runner is disabled.");
   return args;
