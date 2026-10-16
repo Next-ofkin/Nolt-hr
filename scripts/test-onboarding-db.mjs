@@ -99,6 +99,18 @@ try {
   assert.equal(hrFlowCookie.length, 1);
   assert.equal(await runtime.authFlow.count({ where: { kind: "HR_INVITATION" } }), 1);
   assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session"')).rows[0].n, 0);
+  await owner.query("BEGIN");
+  try {
+    await owner.query("SAVEPOINT hr_password_binding");
+    await assert.rejects(
+      owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=now() WHERE kind=\'HR_INVITATION\' AND "hrSubject" IS NULL'),
+      (error) => error.code === "23514",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT hr_password_binding");
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  console.log("PASS: PostgreSQL refuses confirmed HR password flow without bound invitation and subject.");
   console.log("PASS: isolated encrypted HR_INVITATION flow passes DB kind constraint without creating workspace session or calling Supabase.");
   if (priorEncryptionKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
   else process.env.AUTH_ENCRYPTION_KEY = priorEncryptionKey;
