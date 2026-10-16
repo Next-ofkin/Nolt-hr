@@ -11,6 +11,7 @@ type Overview = {
   summary: { developers: number; hr: number; employees: number; totalActive: number };
   hrAccounts: { id: string; name: string; email: string; active: boolean; createdAt: string }[];
   inviteEnabled: boolean;
+  hrPagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
 
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(n=>n[0]?.toUpperCase()??"").join("");
@@ -22,22 +23,25 @@ export function DeveloperWorkspace() {
 function DeveloperHome() {
   const { session } = useAuth();
   const [data, setData] = useState<Overview | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/v1/developer/overview", { credentials: "same-origin", cache: "no-store" });
+      const response = await fetch(`/api/v1/developer/overview?page=${page}&pageSize=${pageSize}`, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your account does not have Developer administration access." : "We couldn't retrieve the account overview. Please try again.");
       const overview: Overview = await response.json();
       setData(overview);
+      if (overview.hrPagination.page > overview.hrPagination.totalPages) setPage(overview.hrPagination.totalPages);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load the Developer workspace.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
   useEffect(() => { void load(); }, [load]);
 
   const greeting = session?.name?.trim().split(/\s+/)[0] || "Developer";
@@ -83,7 +87,22 @@ function DeveloperHome() {
             <span className="rounded-full bg-[#e9f6f0] px-3 py-1 text-xs font-semibold text-[#126c58]">Read-only overview</span>
           </div>
           {loading ? <p role="status" className="p-8 text-sm text-muted-foreground">Loading administrator accounts…</p> : !data ? <p className="p-8 text-sm text-muted-foreground">Account information is unavailable.</p> : data.hrAccounts.length===0 ? <div className="px-6 py-14 text-center"><Users className="mx-auto text-muted-foreground"/><p className="mt-3 font-medium">No HR administrators found</p><p className="mt-1 text-sm text-muted-foreground">HR accounts will appear here when configured.</p></div> : <div className="divide-y">{data.hrAccounts.map(person=><div key={person.id} className="flex items-center gap-3 px-5 py-4 sm:px-6"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eaf3f1] text-sm font-semibold text-[#1a665b]">{initials(person.name)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{person.name}</p><p className="truncate text-xs text-muted-foreground">{person.email}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${person.active?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"}`}>{person.active?"Active":"Inactive"}</span></div>)}</div>}
-          <div className="border-t bg-[#fafcfb] px-5 py-4 text-xs text-muted-foreground sm:px-6">Account data is restricted to authorised Developer sessions.</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-[#fafcfb] px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span aria-live="polite">{data ? `Showing ${data.hrPagination.total === 0 ? 0 : (data.hrPagination.page-1)*data.hrPagination.pageSize+1}–${Math.min(data.hrPagination.page*data.hrPagination.pageSize,data.hrPagination.total)} of ${data.hrPagination.total}` : "—"} administrators</span>
+              <label className="flex items-center gap-2">Rows per page
+                <select aria-label="HR administrators per page" className="rounded-lg border bg-white px-2 py-1.5 text-foreground" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} disabled={loading}>
+                  <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="mr-1 text-xs text-muted-foreground">Page {data?.hrPagination.page ?? 1} of {data?.hrPagination.totalPages ?? 1}</span>
+              <Button type="button" size="sm" variant="outline" aria-label="Previous HR administrators page" disabled={loading || !data || page <= 1} onClick={() => setPage(p=>Math.max(1,p-1))}>Previous</Button>
+              <Button type="button" size="sm" variant="outline" aria-label="Next HR administrators page" disabled={loading || !data || page >= data.hrPagination.totalPages} onClick={() => setPage(p=>p+1)}>Next</Button>
+            </div>
+          </div>
+          <div className="border-t px-5 py-3 text-xs text-muted-foreground sm:px-6">Account data is restricted to authorised Developer sessions.</div>
         </section>
         <aside className="space-y-5">
           <section className="rounded-2xl border border-[#dbe9e4] bg-[#eff8f3] p-6">
