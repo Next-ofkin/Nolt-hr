@@ -1,12 +1,13 @@
 import {
   BadRequestException, Body, Controller, ForbiddenException, Inject,
-  Injectable, Post, Req, Res, ServiceUnavailableException,
+  Injectable, Get, Post, Req, Res, ServiceUnavailableException,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { Database } from "./database.js";
 import { SupabaseAuth } from "./supabase-auth.js";
+import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import { assertOrigin, LoginLimiter } from "./security.js";
 
 const token = z.string().min(1).max(16000);
@@ -18,6 +19,11 @@ const payload = z.object({
   ]),
 }).strict();
 
+export class HrVerificationDto {
+  @ApiProperty({ type: Boolean }) verified!: boolean;
+  @ApiProperty({ type: Boolean }) activationAllowed!: boolean;
+}
+
 export class HrExchangeResultDto {
   @ApiProperty({ enum: ["mfa"] })
   next!: "mfa";
@@ -28,7 +34,22 @@ export class HrInvitationExchangeService {
   constructor(
     @Inject(Database) private readonly db: Database,
     @Inject(SupabaseAuth) private readonly auth: SupabaseAuth,
+    @Inject(HrInvitationProofService) private readonly proof: HrInvitationProofService,
   ) {}
+
+  async verification(req: Request): Promise<HrVerificationDto> {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation verification is not available yet.");
+    const flow = await this.auth.flow(req);
+    if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId || !flow.state.tokens)
+      throw new ForbiddenException("Open your HR invitation email first.");
+    const invitation = await this.db.hrInvitation.findUnique({
+      where: { id: flow.state.invitationId },
+    });
+    if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
+    await this.proof.verify(invitation, flow.state.tokens);
+    return { verified: true, activationAllowed: false };
+  }
 
   async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
     // This endpoint can check identity, but cannot grant access or create a
@@ -83,6 +104,11 @@ export class HrInvitationExchangeService {
 export class HrInvitationExchangeController {
   private readonly limiter = new LoginLimiter(20);
   constructor(@Inject(HrInvitationExchangeService) private readonly service: HrInvitationExchangeService) {}
+  @Get("verification")
+  verification(@Req() req: Request) {
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.verification(req);
+  }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
   exchange(@Body() value: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
