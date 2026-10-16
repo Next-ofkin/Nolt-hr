@@ -4,7 +4,7 @@ BEGIN;
 ALTER TABLE public."AuthFlow" DROP CONSTRAINT "AuthFlow_kind_check";
 ALTER TABLE public."AuthFlow" ADD CONSTRAINT "AuthFlow_kind_check"
  CHECK(kind IN ('EMAIL_SIGNUP','EMAIL_RECOVERY','MFA','RECOVERY','INVITATION','EXTERNAL','HR_INVITATION'));
-ALTER TABLE public."AuthFlow" ADD COLUMN "hrPasswordConfirmedAt" TIMESTAMPTZ(3);
+ALTER TABLE public."AuthFlow" ADD COLUMN "hrPasswordConfirmedAt" TIMESTAMPTZ(3), ADD COLUMN "hrInvitationId" UUID, ADD COLUMN "hrSubject" UUID;
 ALTER TABLE public."HrInvitation"
   ADD COLUMN "requestKey" UUID,
   ADD COLUMN "expiresAt" TIMESTAMPTZ(3),
@@ -96,10 +96,12 @@ BEGIN
   -- may unlock the owner-only activation operation. Browser claims are irrelevant.
   SELECT count(*) INTO flow_count FROM public."AuthFlow" af
     WHERE af.id=p_flow AND af.kind='HR_INVITATION'
+      AND af."hrInvitationId"=p_invitation AND af."hrSubject"=p_subject
       AND af."expiresAt" > now() AND af."hrPasswordConfirmedAt" IS NOT NULL;
   IF flow_count <> 1 THEN RETURN FALSE; END IF;
   -- Existing sessions for the pre-activation role must not survive promotion.
   DELETE FROM public."AuthFlow" WHERE id=p_flow AND kind='HR_INVITATION'
+    AND "hrInvitationId"=p_invitation AND "hrSubject"=p_subject
     AND "hrPasswordConfirmedAt" IS NOT NULL;
   UPDATE public."User" SET role='HR' WHERE id=p_subject AND role='EMPLOYEE';
   UPDATE public."Session" SET "revokedAt"=now()
