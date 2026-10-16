@@ -46,7 +46,7 @@ export async function verifyInteractiveProvider(client, identity, password, otp)
   });
 }
 
-async function hiddenQuestion(question) {
+export async function hiddenQuestion(question) {
   // Hide input, including on redirected output. Never log credentials.
   stdout.write(question);
   const secretOutput = new Writable({ write(_chunk, _enc, callback) { callback(); } });
