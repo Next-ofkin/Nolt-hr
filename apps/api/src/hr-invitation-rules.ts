@@ -18,8 +18,8 @@ export interface HrInvitationVerification {
   revoked: boolean;
 }
 
-/** The link and an authenticated session alone never grant the HR role. */
-export function canAcceptHrInvitation(input: HrInvitationVerification): boolean {
+/** Verifies identity only; never authorizes promotion. */
+export function canVerifyHrInvitationIdentity(input: HrInvitationVerification): boolean {
   return (
     (input.state === "SENT" || input.state === "UNCERTAIN") &&
     !input.expired &&
@@ -34,6 +34,11 @@ export function canAcceptHrInvitation(input: HrInvitationVerification): boolean 
     Boolean(input.confirmedEmail) &&
     input.inviteEmail.trim().toLowerCase() === input.confirmedEmail?.trim().toLowerCase()
   );
+}
+
+/** Only trusted fresh-account provenance plus identity verification can authorize activation. */
+export function canAcceptHrInvitation(input: HrInvitationVerification): boolean {
+  return input.freshInvitationIdentity === true && canVerifyHrInvitationIdentity(input);
 }
 
 export function canQueueHrInvitation(state: HrInvitationStatus): boolean {
