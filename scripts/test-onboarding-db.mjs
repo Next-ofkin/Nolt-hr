@@ -18,6 +18,7 @@ import { InvitationsService } from "../apps/api/dist/invitations.js";
 import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
 import { HrInvitationDeliveryLedger } from "../apps/api/dist/hr-invitation-ledger.js";
 import { HrInvitationWorker } from "../apps/api/dist/hr-invitation-worker.js";
+import { DeveloperOverviewService } from "../apps/api/dist/developer.js";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { ResponsesService } from "../apps/api/dist/responses.js";
 import { ExternalContactsService } from "../apps/api/dist/external-contacts.js";
@@ -1650,6 +1651,35 @@ try {
     else process.env.HR_INVITATION_TEST_RECIPIENTS = recipientsBefore;
   }
   console.log("PASS: concurrent HR workers exclusively claim one queued invite, call synthetic transport once, bind subject and preserve roles (no email or Auth call).");
+
+  // Revocation and acceptance are mutually exclusive; no provider calls or promotion.
+  const revokeId = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt","providerSubject","acceptedAt","acceptedBy") VALUES($1,$2,$3,$4,\'ACCEPTED\',now()+interval \'20 minutes\',$5,now(),$5)',
+    [revokeId, "accepted-hr-qa@example.invalid", "Accepted QA", developerQa, developerQa],
+  );
+  const developerService = new DeveloperOverviewService(runtime);
+  await assert.rejects(
+    developerService.revoke(developerQa,revokeId),
+    (e) => e?.status === 409,
+  );
+  assert.equal(
+    (await owner.query('SELECT state,"revokedAt" FROM public."HrInvitation" WHERE id=$1',[revokeId])).rows[0].state,
+    "ACCEPTED",
+  );
+  const draftToRevoke = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy") VALUES($1,$2,$3,$4)',
+    [draftToRevoke, "revokable-hr-qa@example.invalid", "Revokable QA", developerQa],
+  );
+  assert.equal((await developerService.revoke(developerQa,draftToRevoke)).state,"REVOKED");
+  assert.equal((await developerService.revoke(developerQa,draftToRevoke)).state,"REVOKED");
+  assert.equal(
+    (await owner.query('SELECT count(*)::int AS n FROM public."AuditEvent" WHERE "targetId"=$1 AND action=\'HR_INVITATION_DRAFT_REVOKED\'',[draftToRevoke])).rows[0].n,
+    1,
+  );
+  console.log("PASS: locked HR revocation rejects accepted invitations, is idempotent for revoked drafts and emits one audit event (disposable PostgreSQL).");
+
 
 
 } finally {
