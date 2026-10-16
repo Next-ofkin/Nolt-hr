@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Building2, CheckCircle2, Clock3, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Users, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { HrInvitationDrafts } from "./hr-invitation-drafts";
 import { WorkspaceAccess } from "./workspace-access";
 import { Button } from "./ui/button";
 
@@ -113,12 +114,7 @@ function DeveloperHome() {
           <div className="border-t px-5 py-3 text-xs text-muted-foreground sm:px-6">Account data is restricted to authorised Developer sessions.</div>
         </section>
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-[#dbe9e4] bg-[#eff8f3] p-6">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-[#dcefe5] text-[#146f56]"><UserRoundPlus size={22}/></span>
-            <h2 className="mt-5 text-xl font-semibold tracking-tight">Invite your HR team</h2>
-            <p className="mt-2 text-sm leading-6 text-[#526a62]">A secure invitation workflow is next: verified email, single-use acceptance and mandatory MFA before granting HR access.</p>
-            <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#cae2d7] bg-white/70 px-3 py-3 text-xs font-medium text-[#276450]"><Clock3 size={16}/> Secure invitation flow in development</div>
-          </section>
+          <HrInvitationDrafts />
           <section className="rounded-2xl border bg-white p-6">
             <div className="flex items-center gap-2 text-[#0a7466]"><LockKeyhole size={20}/><h2 className="font-semibold">Your access, protected</h2></div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">Developer permissions manage technical configuration and HR account governance. Employee records and sensitive HR reviews stay separate.</p>
