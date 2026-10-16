@@ -12,6 +12,7 @@ const valid: HrInvitationVerification = {
   inviteEmail: "new-admin@example.invalid",
   confirmedEmail: "NEW-ADMIN@example.invalid",
   providerSubject: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a",
+  invitedSubject: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a",
   hasExistingAccount: false,
   emailVerified: true,
   mfaVerified: true,
@@ -29,6 +30,7 @@ test("HR invitation activation requires confirmed matching email and MFA AAL2", 
     { emailVerified: false }, { mfaVerified: false },
     { assuranceLevel: "aal1" }, { confirmedEmail: null },
     { confirmedEmail: "attacker@example.invalid" }, { providerSubject: null },
+    { invitedSubject: null }, { invitedSubject: "cbfab129-8d44-4ed3-82a2-d026b09fe902" },
   ];
   for (const patch of denials) {
     assert.equal(canAcceptHrInvitation({ ...valid, ...patch }), false, JSON.stringify(patch));
