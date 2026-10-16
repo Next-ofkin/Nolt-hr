@@ -86,7 +86,7 @@ function DeveloperHome() {
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
         <section className="overflow-hidden rounded-2xl border border-[#e4eae8] bg-white shadow-[0_12px_35px_-28px_#183d38]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5 sm:p-6">
-            <div><h2 className="text-lg font-semibold tracking-tight">HR administration</h2><p className="mt-1 text-sm text-muted-foreground">Verified administrators and their access status</p></div>
+            <div><h2 className="text-lg font-semibold tracking-tight">HR administration</h2><p className="mt-1 text-sm text-muted-foreground">HR administrators and their account status</p></div>
             <span className="rounded-full bg-[#e9f6f0] px-3 py-1 text-xs font-semibold text-[#126c58]">Read-only overview</span>
           </div>
           <form className="flex flex-wrap items-center gap-3 border-b bg-[#fcfdfc] px-5 py-4 sm:px-6" onSubmit={e => { e.preventDefault(); setPage(1); setAppliedSearch(search.trim()); }}>
