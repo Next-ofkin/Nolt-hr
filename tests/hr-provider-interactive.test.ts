@@ -5,8 +5,7 @@ const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
 const email = "disposable-hr@example.invalid";
 const sessionId = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
 const env = { HR_PROVIDER_TEST_ENABLED:"true",
-  SUPABASE_URL:"https://llslubzdkdnvhbatmfug.supabase.co",
-  SUPABASE_PROJECT_REF:"llslubzdkdnvhbatmfug", SUPABASE_PUBLISHABLE_KEY:"synthetic",
+  HR_PROVIDER_SANDBOX_REF:"abcdefghijklmnopqrst", HR_PROVIDER_SANDBOX_PUBLISHABLE_KEY:"synthetic",
   HR_PROVIDER_TEST_SUBJECT:subject, HR_PROVIDER_TEST_EMAIL:email };
 const verifiedUser = { id:subject,email,email_confirmed_at:"confirmed",factors:[{factor_type:"totp",status:"verified"}] };
 function clientFixture(aal = "aal2") {
@@ -26,8 +25,8 @@ function clientFixture(aal = "aal2") {
 test("interactive real-provider diagnostic defaults disabled and pins identity and project", () => {
   assert.throws(()=>validateInteractiveProviderEnvironment({}));
   assert.throws(()=>validateInteractiveProviderEnvironment({...env,HR_PROVIDER_TEST_ENABLED:"false"}));
-  assert.throws(()=>validateInteractiveProviderEnvironment({...env,SUPABASE_URL:"https://example.invalid"}));
-  assert.deepEqual(validateInteractiveProviderEnvironment(env),{subject,email});
+  assert.throws(()=>validateInteractiveProviderEnvironment({...env,HR_PROVIDER_SANDBOX_REF:"llslubzdkdnvhbatmfug"}));
+  assert.deepEqual(validateInteractiveProviderEnvironment(env),{subject,email,url:"https://abcdefghijklmnopqrst.supabase.co",key:"synthetic"});
 });
 test("interactive diagnostic requires TOTP and returns no application session or activation permission", async()=>{
   const {client,calls}=clientFixture();
