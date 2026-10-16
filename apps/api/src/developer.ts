@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, ConflictException, Controller, Get, Inject, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, UseGuards,
+  BadRequestException, Body, ConflictException, Controller, Get, Inject, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, ServiceUnavailableException, UseGuards,
 } from "@nestjs/common";
 import { ApiOkResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
@@ -51,10 +51,17 @@ class DeveloperOverviewDto {
 export class DeveloperOverviewService {
   constructor(@Inject(Database) private readonly db: Database) {}
   async drafts(): Promise<HrDraftListDto> {
-    const items = await this.db.hrInvitation.findMany({
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 25,
-    });
+    let items;
+    try {
+      items = await this.db.hrInvitation.findMany({
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 25,
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2021")
+        throw new ServiceUnavailableException("HR invitation drafts are awaiting an approved database migration.");
+      throw error;
+    }
     return { items: items.map((i) => ({
       id: i.id, name: i.name, email: i.email, state: i.state,
       createdAt: i.createdAt.toISOString(),
