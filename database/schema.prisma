@@ -55,6 +55,8 @@ model AuthFlow {
   kind String
   encryptedState String
   hrPasswordConfirmedAt DateTime? @db.Timestamptz(3)
+  hrInvitationId String? @db.Uuid
+  hrSubject String? @db.Uuid
   expiresAt DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([expiresAt])
