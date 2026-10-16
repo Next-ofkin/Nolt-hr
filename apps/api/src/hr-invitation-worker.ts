@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { Database } from "./database.js";
 import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
@@ -11,12 +12,14 @@ export class HrInvitationWorker {
     @Inject(HrInvitationDeliveryLedger) private readonly ledger: HrInvitationDeliveryLedger,
   ) {}
 
-  protected send(invitation: { id: string; email: string; name: string }): Promise<HrDeliveryResult> {
+  protected send(invitation: { id: string; email: string; name: string; creationSecret: string }): Promise<HrDeliveryResult> {
     return deliverHrInvitationEmail(invitation);
   }
 
   async deliverNext(): Promise<boolean> {
     if (process.env.HR_INVITATION_DELIVERY_ENABLED !== "true") return false;
+    const creationSecret = randomBytes(32).toString("hex");
+    const creationSecretHash = createHash("sha256").update(creationSecret).digest("hex");
     const job = await this.db.$transaction(async (tx) => {
       // SENDING is never reclaimed automatically: a provider call may have
       // succeeded just before a worker crash. Manual reconciliation required.
@@ -43,7 +46,7 @@ export class HrInvitationWorker {
       }
       await tx.hrInvitation.update({
         where: { id: invitation.id },
-        data: { state: "SENDING", deliveryAttempts: { increment: 1 } },
+        data: { state: "SENDING", creationSecretHash, deliveryAttempts: { increment: 1 } },
       });
       return { skipped: false as const, invitation };
     });
@@ -51,7 +54,7 @@ export class HrInvitationWorker {
     if (job.skipped) return true;
     // External side effect takes place only AFTER the exclusive claim has committed.
     // Failure or network ambiguity never retries automatically.
-    const result = await this.send(job.invitation);
+    const result = await this.send({ ...job.invitation, creationSecret });
     await this.ledger.record(job.invitation.id, result);
     return true;
   }
