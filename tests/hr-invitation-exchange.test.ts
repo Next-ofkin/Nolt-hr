@@ -201,3 +201,65 @@ test("failed HR password update leaves claim unconfirmed and never activates", a
     else process.env.AUTH_ENCRYPTION_KEY = key;
   }
 });
+
+test("activation readiness stays unavailable before any dependency access when disabled", async () => {
+  const previous = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  try {
+    const forbidden = new Proxy({}, { get() { throw Error("External access forbidden"); } });
+    const service = new HrInvitationExchangeService(forbidden as never, forbidden as never, forbidden as never);
+    await assert.rejects(service.activationReadiness({} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 503));
+  } finally {
+    if (previous === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = previous;
+  }
+});
+
+test("activation readiness refuses an unconfirmed flow before provider verification", async () => {
+  const previous = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  const forbidden = new Proxy({}, { get() { throw Error("External access forbidden"); } });
+  const auth = { flow: async () => ({
+    row: { kind: "HR_INVITATION", hrPasswordConfirmedAt: null },
+    state: { invitationId: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a", hrSubject: "cbfab129-8d44-4ed3-82a2-d026b09fe902", tokens: { access_token: "a", refresh_token: "b" }, hrPasswordStatus: "CLAIMED" },
+  }) };
+  try {
+    const service = new HrInvitationExchangeService(forbidden as never, auth as never, forbidden as never);
+    await assert.rejects(service.activationReadiness({} as never), (e: unknown) =>
+      Boolean(e && typeof e === "object" && "status" in e && e.status === 403));
+  } finally {
+    if (previous === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = previous;
+  }
+});
+
+test("activation readiness reports prerequisites only and never grants access", async () => {
+  const previous = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
+  const invitationId = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email = "hr-test@example.invalid";
+  const now = Date.now();
+  const verifiedAt = new Date(now - 30_000);
+  const row = {
+    kind: "HR_INVITATION", hrInvitationId: invitationId, hrSubject: subject,
+    createdAt: new Date(now - 60_000), expiresAt: new Date(now + 60_000),
+    hrPasswordConfirmedAt: verifiedAt,
+  };
+  const state = { invitationId, hrSubject: subject, hrPasswordStatus: "CONFIRMED",
+    tokens: { access_token: "a", refresh_token: "b" } };
+  const db = { hrInvitation: { findUnique: async () => ({ id: invitationId, email }) } };
+  const auth = { flow: async () => ({ row, state }) };
+  let checked = 0;
+  const proof = { verify: async () => { checked++; return { subject, email }; } };
+  try {
+    const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
+    assert.deepEqual(await service.activationReadiness({} as never),
+      { prerequisitesMet: true, activationAllowed: false });
+    assert.equal(checked, 1);
+  } finally {
+    if (previous === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = previous;
+  }
+});
