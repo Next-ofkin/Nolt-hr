@@ -22,8 +22,9 @@ export class HrInvitationProofService {
     email: string;
     expiresAt: Date | null;
     revokedAt: Date | null;
+    providerSubject: string | null;
   }, tokens: HrProviderTokens) {
-    if (!["SENT", "UNCERTAIN"].includes(invitation.state) ||
+    if (!invitation.providerSubject || !["SENT", "UNCERTAIN"].includes(invitation.state) ||
         !invitation.expiresAt || invitation.expiresAt <= new Date() ||
         invitation.revokedAt)
       throw new ForbiddenException("This HR invitation is no longer available.");
@@ -63,10 +64,10 @@ export class HrInvitationProofService {
       expired: invitation.expiresAt <= new Date(),
       revoked: Boolean(invitation.revokedAt),
     });
-    if (!allowed || subject !== user.id)
+    if (!allowed || subject !== user.id || invitation.providerSubject !== user.id)
       throw new UnauthorizedException("Verified email and MFA are required.");
-    // An earlier account with the same subject cannot be distinguished from a
-    // fresh invite using these fields alone: no caller may promote on this proof.
+    // The delivery worker must first persist the providerSubject returned by
+    // Supabase. This proof is read-only and cannot be used to promote anyone.
     return { subject: user.id, email, assuranceLevel: "aal2" as const, activationAllowed: false as const };
   }
 }
