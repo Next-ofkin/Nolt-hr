@@ -43,3 +43,20 @@ test("offline activation preflight fails closed for a mismatched identity", asyn
   assert.deepEqual(await hrActivationPreflight(db as never, invitation, subject, flow),
     { databasePrerequisitesMet: false, providerAal2Verified: false, activationAllowed: false });
 });
+
+test("offline activation preflight uses PostgreSQL wall clock for freshly rounded confirmation", async () => {
+  const now = Date.now();
+  const db = { query: async () => ({ rows: [{
+    checkedAt: new Date(now + 2000), state: "SENT",
+    expiresAt: new Date(now + 120000), revokedAt: null,
+    creationSubject: subject, providerSubject: subject,
+    userId: subject, role: "EMPLOYEE", active: true, authVersion: 1,
+    flowId: flow, flowKind: "HR_INVITATION", hrInvitationId: invitation,
+    hrSubject: subject, flowCreatedAt: new Date(now - 10000),
+    flowExpiresAt: new Date(now + 120000),
+    hrPasswordConfirmedAt: new Date(now + 1000),
+  }] }) };
+  const result = await hrActivationPreflight(db as never, invitation, subject, flow);
+  assert.equal(result.databasePrerequisitesMet, true);
+  assert.equal(result.activationAllowed, false);
+});
