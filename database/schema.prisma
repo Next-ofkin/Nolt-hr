@@ -290,7 +290,16 @@ model HrInvitation {
   createdBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   revokedAt DateTime? @db.Timestamptz(3)
+  requestKey String? @db.Uuid
+  expiresAt DateTime? @db.Timestamptz(3)
+  sentAt DateTime? @db.Timestamptz(3)
+  acceptedAt DateTime? @db.Timestamptz(3)
+  acceptedBy String? @db.Uuid
+  providerSubject String? @db.Uuid
+  deliveryAttempts Int @default(0)
+  deliveryError String?
   @@index([createdAt,id])
+  @@index([state,expiresAt])
 }
 
 model EmployeeInvitation {
