@@ -299,6 +299,14 @@ export class SupabaseAuth {
       );
     return identity.user;
   }
+  private async replaceHrFlowSnapshot(row: { id: string; encryptedState: string; kind: string }, next: unknown) {
+    const changed = await this.db.authFlow.updateMany({
+      where: { id: row.id, kind: "HR_INVITATION", encryptedState: row.encryptedState, expiresAt: { gt: new Date() }, hrPasswordConfirmedAt: null },
+      data: { encryptedState: seal(next) },
+    });
+    if (changed.count !== 1)
+      throw new ForbiddenException("HR verification changed. Restart the invitation verification.");
+  }
   async status(req: Request) {
     const { row, state, csrfToken } = await this.flow(req);
     if (row.kind.startsWith("EMAIL_"))
@@ -318,12 +326,20 @@ export class SupabaseAuth {
     const factor = data.totp[0];
     const assurance =
       await auth.client.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (row.kind === "HR_INVITATION") {
+      if (state.hrPasswordStatus || state.hrPasswordSet) {
+        // The completed/claimed flow must not be overwritten by a stale MFA GET.
+      } else {
+        await this.replaceHrFlowSnapshot(row, { ...state, tokens: this.tokens(auth.session) });
+      }
+    } else {
     await this.db.authFlow.update({
       where: { id: row.id },
       data: {
         encryptedState: seal({ ...state, tokens: this.tokens(auth.session) }),
       },
     });
+    }
     return {
       stage:
         row.kind === "HR_INVITATION" && assurance.data?.currentLevel === "aal2"
@@ -382,10 +398,16 @@ export class SupabaseAuth {
       qrCode: data.totp.qr_code,
       secret: data.totp.secret,
     };
+    if (row.kind === "HR_INVITATION") {
+      if (state.hrPasswordStatus || state.hrPasswordSet)
+        throw new ForbiddenException("HR password setup already started.");
+      await this.replaceHrFlowSnapshot(row, next);
+    } else {
     await this.db.authFlow.update({
       where: { id: row.id },
       data: { encryptedState: seal(next) },
     });
+    }
     return {
       factorId: data.id,
       qrCode: data.totp.qr_code,
@@ -417,12 +439,18 @@ export class SupabaseAuth {
     if (!data.session) throw new UnauthorizedException("Sign in again.");
     const checked = await this.validate(seal(this.tokens(data.session)));
     if (row.kind === "INVITATION" || row.kind === "EXTERNAL" || row.kind === "HR_INVITATION") {
+      if (row.kind === "HR_INVITATION") {
+        if (state.hrPasswordStatus || state.hrPasswordSet)
+          throw new ForbiddenException("HR password setup already started.");
+        await this.replaceHrFlowSnapshot(row, { ...state, tokens: this.tokens(data.session) });
+      } else {
       await this.db.authFlow.update({
         where: { id: row.id },
         data: {
           encryptedState: seal({ ...state, tokens: this.tokens(data.session) }),
         },
       });
+      }
       return {
         invitation: row.kind === "INVITATION",
         hrInvitation: row.kind === "HR_INVITATION",
