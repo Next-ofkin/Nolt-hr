@@ -20,7 +20,7 @@ export function validateOfflineActivationEnvironment(env, args, allowApply = fal
 
 export async function hrActivationPreflight(client, invitationId, subjectId, flowId) {
   const result = await client.query(
-    `SELECT h.id, h.state, h.email, h."expiresAt", h."revokedAt",
+    `SELECT clock_timestamp() AS "checkedAt", h.id, h.state, h.email, h."expiresAt", h."revokedAt",
        h."creationSubject", h."providerSubject",
        u.id AS "userId", u.role, u.active, u."authVersion",
        af.id AS "flowId", af.kind AS "flowKind", af."hrInvitationId",
@@ -33,7 +33,7 @@ export async function hrActivationPreflight(client, invitationId, subjectId, flo
     [invitationId, subjectId, flowId],
   );
   const row = result.rows[0];
-  const now = Date.now();
+  const now = row?.checkedAt ? new Date(row.checkedAt).getTime() : Date.now();
   const ready = Boolean(
     row && ["SENT", "UNCERTAIN"].includes(row.state) &&
     row.expiresAt && new Date(row.expiresAt).getTime() > now &&
