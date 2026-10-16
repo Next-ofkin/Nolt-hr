@@ -23,8 +23,9 @@ export class HrInvitationProofService {
     expiresAt: Date | null;
     revokedAt: Date | null;
     providerSubject: string | null;
+    creationSubject: string | null;
   }, tokens: HrProviderTokens) {
-    if (!invitation.providerSubject || !["SENT", "UNCERTAIN"].includes(invitation.state) ||
+    if (!invitation.providerSubject || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject || !["SENT", "UNCERTAIN"].includes(invitation.state) ||
         !invitation.expiresAt || invitation.expiresAt <= new Date() ||
         invitation.revokedAt)
       throw new ForbiddenException("This HR invitation is no longer available.");
