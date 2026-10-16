@@ -98,7 +98,7 @@ try {
   );
   assert.equal(hrFlowCookie.length, 1);
   assert.equal(await runtime.authFlow.count({ where: { kind: "HR_INVITATION" } }), 1);
-  assert.equal(await runtime.session.count(), 0);
+  assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session"')).rows[0].n, 0);
   console.log("PASS: isolated encrypted HR_INVITATION flow passes DB kind constraint without creating workspace session or calling Supabase.");
   if (priorEncryptionKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
   else process.env.AUTH_ENCRYPTION_KEY = priorEncryptionKey;
