@@ -7,6 +7,7 @@ export interface HrInvitationVerification {
   inviteEmail: string;
   confirmedEmail: string | null;
   providerSubject: string | null;
+  invitedSubject?: string | null;
   hasExistingAccount: boolean;
   emailVerified: boolean;
   mfaVerified: boolean;
@@ -26,6 +27,8 @@ export function canAcceptHrInvitation(input: HrInvitationVerification): boolean 
     input.mfaVerified &&
     input.assuranceLevel === "aal2" &&
     Boolean(input.providerSubject) &&
+    Boolean(input.invitedSubject) &&
+    input.providerSubject === input.invitedSubject &&
     Boolean(input.confirmedEmail) &&
     input.inviteEmail.trim().toLowerCase() === input.confirmedEmail?.trim().toLowerCase()
   );
