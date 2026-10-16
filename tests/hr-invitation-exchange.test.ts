@@ -263,3 +263,31 @@ test("activation readiness reports prerequisites only and never grants access", 
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = previous;
   }
 });
+
+test("HR MFA storage uses compare-and-swap instead of unconditional updates", async () => {
+  const { SupabaseAuth } = await import("../apps/api/src/supabase-auth.js");
+  const old = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
+  const row = { id: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a", kind: "HR_INVITATION", encryptedState: "snapshot" };
+  let observed: unknown;
+  const db = { authFlow: {
+    updateMany: async (value: unknown) => { observed = value; return { count: 0 }; },
+    update: async () => { throw Error("An HR flow must not be overwritten unconditionally"); },
+  } };
+  try {
+    const auth = new SupabaseAuth(db as never);
+    await assert.rejects(
+      (auth as unknown as { replaceHrFlowSnapshot: (row: unknown, value: unknown) => Promise<void> })
+        .replaceHrFlowSnapshot(row, { invitationId: row.id }),
+      (error: unknown) => Boolean(error && typeof error === "object" && "status" in error && error.status === 403),
+    );
+    assert.ok(observed);
+    const query = observed as { where: { encryptedState: string; kind: string; hrPasswordConfirmedAt: null } };
+    assert.equal(query.where.encryptedState, "snapshot");
+    assert.equal(query.where.kind, "HR_INVITATION");
+    assert.equal(query.where.hrPasswordConfirmedAt, null);
+  } finally {
+    if (old === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = old;
+  }
+});
