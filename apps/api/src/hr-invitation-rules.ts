@@ -8,6 +8,8 @@ export interface HrInvitationVerification {
   confirmedEmail: string | null;
   providerSubject: string | null;
   invitedSubject?: string | null;
+  /** Trusted server-side claim made when Supabase creates this exact new Auth user. */
+  freshInvitationIdentity?: boolean;
   hasExistingAccount: boolean;
   emailVerified: boolean;
   mfaVerified: boolean;
