@@ -134,6 +134,8 @@ test("HR password setup refuses already completed flow before contacting provide
 
 test("competing HR password requests claim one flow before touching Supabase", async () => {
   const prior = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const oldKey = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED = "true";
   const id = "e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
   const subject = "cbfab129-8d44-4ed3-82a2-d026b09fe902";
@@ -163,6 +165,8 @@ test("competing HR password requests claim one flow before touching Supabase", a
     assert.equal(claims, 2);
     assert.equal(updates, 1);
   } finally {
+    if (oldKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = oldKey;
     if (prior === undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED = prior;
   }
