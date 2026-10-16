@@ -5,17 +5,22 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout, stderr } from "node:process";
 import { config } from "dotenv";
 import { pathToFileURL } from "node:url";
-import { validateInteractiveProviderEnvironment } from "./hr-provider-interactive-check.mjs";
+import { validateInteractiveProviderEnvironment, hiddenQuestion } from "./hr-provider-interactive-check.mjs";
 
 export async function enrollSandboxTotp(auth, identity, password, getCode, showQr) {
   if (!password || typeof getCode !== "function") throw Error("Password and local code prompt required.");
-  const signed = await auth.signInWithPassword({ email: identity.email, password });
-  if (signed.error || signed.data?.user?.id !== identity.subject ||
-      !signed.data?.user?.email_confirmed_at || !signed.data?.session)
-    throw Error("Sandbox test identity sign-in rejected.");
+  let signed;
+  try { signed = await auth.signInWithPassword({ email: identity.email, password }); }
+  catch { throw Error("Sandbox provider sign-in network request failed."); }
+  if (signed.error) throw Error("Sandbox sign-in rejected: check password, email confirmation and Auth settings.");
+  if (!signed.data?.session || !signed.data?.user?.email_confirmed_at)
+    throw Error("Sandbox login has no confirmed session; check email confirmation.");
+  if (signed.data.user.id !== identity.subject)
+    throw Error("Sandbox account UUID does not match HR_PROVIDER_TEST_SUBJECT.");
   const factors = await auth.mfa.listFactors();
-  if (factors.error || factors.data?.totp?.some(f => f.status === "verified"))
-    throw Error("A verified authenticator already exists; do not change it.");
+  if (factors.error) throw Error("Sandbox authenticator factor listing failed.");
+  if (factors.data?.totp?.some(f => f.status === "verified"))
+    throw Error("An authenticator is already verified; use the provider-interactive check.");
   const enrolled = await auth.mfa.enroll({ factorType: "totp", friendlyName: "NOLT sandbox QA" });
   if (enrolled.error || !enrolled.data?.id || !enrolled.data?.totp?.qr_code)
     throw Error("Sandbox TOTP enrollment failed.");
@@ -74,13 +79,16 @@ async function main() {
     if ((await reader.question("Type ENROLL to create one TOTP factor on the disposable test account: ")).trim() !== "ENROLL")
       throw Error("Cancelled.");
     // Read credentials only on the operator's workstation, never in flags or repository files.
-    const password = await reader.question("Disposable account password (local terminal only): ");
+    reader.close();
+    const password = await hiddenQuestion("Disposable sandbox password (hidden): ");
+    const scanReader = createInterface({ input: stdin, output: stdout });
     const result = await enrollSandboxTotp(client.auth, identity, password,
-      () => reader.question("Enter the current six-digit authenticator code: "),
+      () => hiddenQuestion("Enter current six-digit authenticator code (hidden): "),
       async qr => showSandboxQr(qr, async url => {
         stdout.write("Open locally on this computer and scan the QR: " + url + "\n");
-        await reader.question("Press ENTER after scanning the QR code: ");
+        await scanReader.question("Press ENTER after scanning the QR code: ");
       }));
+    scanReader.close();
     stdout.write(JSON.stringify(result)+"\n");
   } finally {
     reader.close();
@@ -88,4 +96,4 @@ async function main() {
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-  main().catch(()=>{stderr.write("Sandbox authenticator enrollment was not completed.\n");process.exitCode=1;});
+  main().catch(error=>{stderr.write((error instanceof Error ? error.message : "Sandbox enrollment failed.")+"\n");process.exitCode=1;});
