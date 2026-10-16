@@ -75,3 +75,6 @@ The password endpoint now conditionally claims the encrypted HR AuthFlow *before
 
 ## Password state hardening
 The HR password step now records CLAIMED before contacting Supabase, and CONFIRMED only following provider success and a fresh identity check. A failed provider operation cannot yield a confirmed marker. Role activation is still not wired up. Recovery procedures and integration verification remain pending.
+
+## Restricted activation prerequisite
+The pending lifecycle migration now requires an unexpired, database-confirmed HR password flow bound to the exact invitation and Supabase subject before the owner-only activation function can run. It consumes that flow transactionally. The API still has no permission to call the function, and no live role-changing endpoint has been enabled. The isolated domain suite tests missing confirmation, mismatched subject or invitation, successful single-use activation, and rollback. Neither password confirmation nor a browser response grants an HR role. Do not enable acceptance or delivery or deploy the hosted migration pending independent MFA-to-DB authorization design.
