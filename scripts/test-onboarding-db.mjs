@@ -1646,8 +1646,8 @@ try {
       false,
     );
     await owner.query(
-      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',now())',
-      [activationFlowId,"confirmed-flow-"+activationFlowId,"csrf-"+activationFlowId,"encrypted-fixture"],
+      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt","hrInvitationId","hrSubject") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',now(),$5,$6)',
+      [activationFlowId,"confirmed-flow-"+activationFlowId,"csrf-"+activationFlowId,"encrypted-fixture",ledgerId,ledgerSubject],
     );
     assert.equal(
       (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
