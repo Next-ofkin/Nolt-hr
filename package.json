@@ -46,6 +46,7 @@
     "auth:hr:preflight": "node scripts/hr-activation-preflight.mjs",
     "auth:hr:provider-check": "node scripts/hr-provider-readonly-check.mjs",
     "auth:hr:provider-interactive": "node scripts/hr-provider-interactive-check.mjs",
+    "auth:hr:sandbox-enroll": "node scripts/hr-provider-sandbox-enroll.mjs",
     "auth:hr:activate": "node scripts/hr-activation-runner.mjs",
     "auth:developer:preflight": "node scripts/developer-bootstrap.mjs",
     "auth:developer:apply": "node scripts/developer-bootstrap.mjs --apply"
