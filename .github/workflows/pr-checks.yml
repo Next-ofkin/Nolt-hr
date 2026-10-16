@@ -1,0 +1,46 @@
+name: NOLT HR PR checks
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nolt-pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code-checks:
+    name: Typecheck, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Check types
+        run: npm run typecheck
+      - name: Run unit and security tests (including packs)
+        run: npm test
+      - name: Build application
+        run: npm run build
+
+# Intentionally no deployment, database migration, hosted Supabase access,
+# production secrets, or migration promotion. Domain/Playwright tests require
+# a separately vetted synthetic PostgreSQL test job before becoming required.
