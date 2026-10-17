@@ -48,3 +48,13 @@ export function addCalendarDaysUTC(startDate: string, days: number): string {
   parsed.setUTCDate(parsed.getUTCDate() + days);
   return parsed.toISOString().slice(0, 10);
 }
+
+/** Optimistic-lock request for editing a saved draft. */
+export const updatePackSchema = packTemplateSchema.extend({
+  expectedRevision: z.number().int().positive(),
+});
+
+/** Publishing is a separate HR action; never implied by saving. */
+export const publishPackSchema = z.object({
+  expectedRevision: z.number().int().positive(),
+}).strict();
