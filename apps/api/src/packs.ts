@@ -245,7 +245,9 @@ export class PacksController {
   list() { return this.packs.list(); }
   @Get("cases/:caseId")
   @ApiOkResponse({ description: "HR overview of assigned packs and per-form progress" })
-  caseAssignments(@Param("caseId", ParseUUIDPipe) caseId: string) {
+  caseAssignments(@Req() req: AuthRequest, @Param("caseId", ParseUUIDPipe) caseId: string) {
+    if (!req.actor.permissions.includes("employees.manage"))
+      throw new ForbiddenException("Employee management permission is required.");
     return this.packs.caseAssignments(caseId);
   }
   @Post(":id/assign")
