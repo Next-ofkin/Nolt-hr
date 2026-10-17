@@ -1,5 +1,26 @@
 # NOLT HR implementation tracker
 
+## Owner-approved simplified delivery approach — 18 October 2026
+
+Owner direction: **prioritise implementing NOLT HR Forms, Packs and HR workflows now**, without requiring CircleCI, GitHub Actions or a separate Supabase Auth sandbox as milestones for every feature. A separate NOLT development team will take responsibility for final deployment. All prior technical/release checklists remain reference material, not permission to change Production.
+
+### Implementation-first workflow
+- [x] Confirm simplified approach: build on feature branches, maintain application schema as versioned Prisma migration files, review each change and merge to `develop` as appropriate. Keep `main` as the stable handoff/release branch.
+- [ ] Deliver HR Pack CRUD and versioned Pack Items referencing immutable published FormVersion rows, API guards and HR interface, reusing the existing Forms/employee/onboarding code.
+- [ ] Deliver pack assignment, employee checklist, due dates/extensions, required-form progress, HR review and guarantor integration in small working slices.
+- [ ] Run practical, relevant local checks while building (at minimum compile/typecheck and targeted tests before merge). Do not block product development solely because hosted CI fails.
+- [ ] Maintain one documented, ordered Prisma migration history; do not drop/recreate live tables or clear `_prisma_migrations` in an attempt to repair consistency.
+- [ ] Preserve the six active Production users and their dependent data. Deletion of inactive users or their records is **not** authorised; require an impact list, backup and separate final approval.
+- [ ] For NOLT developer handoff: provide reviewed source, ordered migration files/checksums, setup and environment documentation, seed/test-data separation, technical limitations, security checks, operations/deployment notes and an acceptance checklist.
+- [ ] NOLT developers should deploy to an appropriately isolated/empty target after verifying migrations on a disposable database, rather than reset the existing hosted database as a shortcut. Any use of the current Production for testing requires a separate risk/impact decision.
+
+### Working priorities
+1. Resume actual Forms & Packs feature implementation and UI; avoid additional CI-provider setup.
+2. Keep pack APIs, schema and frontend consistent through reviewed Prisma migrations.
+3. Produce a deployable handoff package for the NOLT development team after features and minimal local acceptance are complete.
+
+---
+
 Owner approved local implementation on 13 October 2026. This file is the working checklist; checked items require implementation and verification evidence. A phase is not complete simply because its UI exists.
 
 ## Master delivery plan — 16 October 2026
