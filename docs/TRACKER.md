@@ -182,6 +182,17 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Implement immutable versioned revisions/new versions for **published** packs before future republishing; current published packs remain locked.
 - [ ] Complete pack assignment and due dates, employee checklist/progress, HR review integration and UI acceptance.
 
+### Published Pack assignment to employee onboarding — 18 October 2026
+
+- [x] Added **unapplied**, additive Prisma migration `20261018110000_pack_assignments`, `PackAssignment` and `PackAssignmentForm` linking published packs, existing active onboarding cases and their individual `FormAssignment` records; full Prisma model relations added.
+- [x] Added HR `POST /packs/:id/assign` requiring `forms.manage` and `employees.manage`, a matching employee employment type, a published nonempty pack, an active case and its expected revision. Transaction checks duplicate existing case forms, validates published versions, assigns all required/optional forms, increments the case revision, and records audit/outbox events.
+- [x] Added HR `GET /packs/cases/:caseId` with employee-management permission for pack progress by individual form response status.
+- [x] Embedded `PackAssignmentPanel` in the employee HR workspace, choosing a matching published pack, explicit optional due date, showing assigned packs and current per-form statuses. Employee's existing onboarding checklist receives the individual form assignments; no separate employee Packs view yet.
+- [x] Added Pack assignment request-contract test, matching published pack ID filtering and HR progress access check.
+- [ ] Run Prisma generation/schema validation and typecheck/build, contract tests, database migration and end-to-end workflow on a disposable/local database. **Committed ≠ tested.**
+- [ ] Decide five-day deadline policy (calendar/business days, timezone and start trigger); current API intentionally requires HR to select a date or leave blank.
+- [ ] Next: improve employee pack-level progress/completion status, HR approvals, versioned pack upgrades and due-date extensions. Never run new migrations against Production without approval.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
