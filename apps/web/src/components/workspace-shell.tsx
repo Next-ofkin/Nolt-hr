@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   ClipboardList,
   FileStack,
+  PackageOpen,
   LayoutDashboard,
 } from "lucide-react";
 export function WorkspaceShell({
@@ -13,7 +14,7 @@ export function WorkspaceShell({
   active = "forms",
 }: {
   children: React.ReactNode;
-  active?: "forms" | "tracker" | "employees";
+  active?: "forms" | "tracker" | "employees" | "packs";
 }) {
   const { session } = useAuth();
   return (
@@ -56,6 +57,12 @@ export function WorkspaceShell({
                 ? "My onboarding"
                 : "Forms"}
             </Link>}
+            {session?.permissions.includes("forms.manage") && !session?.permissions.includes("hr.accounts.manage") && (
+              <Link href="/packs" aria-current={active === "packs" ? "page" : undefined}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "packs" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}>
+                <PackageOpen size={16} /> Packs
+              </Link>
+            )}
             {!session?.permissions.includes("hr.accounts.manage") && <Link
               href="/tracker"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "tracker" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
