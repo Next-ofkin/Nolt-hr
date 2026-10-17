@@ -163,6 +163,15 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Add pack-to-onboarding assignment, deadlines, employee checklist/progress, HR approval and appropriate regression checks.
 - [ ] Never deploy the new migration to existing Production without separate migration review and release approval.
 
+### Pack Builder UI progress — 18 October 2026
+
+- [x] Added `/packs` authenticated HR page and reusable `PacksWorkspace` frontend on feature branch. HR can compose draft name/description/employment type, search published forms, add/remove/reorder them, set required/optional, save with session CSRF and view saved pack drafts.
+- [x] Added role-scoped Packs navigation; developer-only technical-admin workspace does not gain HR Packs access.
+- [x] Added HR `GET /forms/published` endpoint, selecting published form versions regardless of which form version is latest. Pack Builder uses that endpoint rather than latest-only `GET /forms`.
+- [ ] Run `npm run db:generate`, `npm run typecheck`, targeted Pack tests and `npm run build` in a Node 24 checkout; this environment cannot clone the repository because GitHub DNS is unavailable. **No test pass is asserted.**
+- [ ] Apply migration and verify full HTTP/DB journey **on a disposable local database** before live deployment. Production remains unchanged. Drafts cannot be saved on hosted database until migration is intentionally applied.
+- [ ] Next slices: edit drafts, pack versioning/publishing/withdrawal, assignment, five-day deadline policy, employee checklist and HR progress/review.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
