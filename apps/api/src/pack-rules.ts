@@ -65,3 +65,16 @@ export const assignPackSchema = z.object({
   expectedCaseRevision: z.number().int().positive(),
   dueDate: z.iso.date().nullable().default(null),
 }).strict();
+
+/** HR may extend a deadline only forward, giving a documented reason. */
+export const extendPackDeadlineSchema = z.object({
+  newDueDate: z.iso.date(),
+  reason: z.string().trim().min(10).max(1000),
+}).strict();
+
+/** Compare ISO calendar dates without timezone-dependent locale formatting. */
+export function isPackOverdue(dueDate: string | null, today: string, approved: boolean): boolean {
+  if (!dueDate || approved) return false;
+  if (!z.iso.date().safeParse(today).success) throw new Error("Invalid current date");
+  return dueDate < today;
+}
