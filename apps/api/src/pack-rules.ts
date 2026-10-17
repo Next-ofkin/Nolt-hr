@@ -58,3 +58,10 @@ export const updatePackSchema = packTemplateSchema.safeExtend({
 export const publishPackSchema = z.object({
   expectedRevision: z.number().int().positive(),
 }).strict();
+
+/** Deadline is HR-specified; no guessed five-day calendar policy. */
+export const assignPackSchema = z.object({
+  caseId: z.string().uuid(),
+  expectedCaseRevision: z.number().int().positive(),
+  dueDate: z.iso.date().nullable().default(null),
+}).strict();
