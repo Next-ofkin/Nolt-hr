@@ -6,7 +6,7 @@ import { ApiBody, ApiCookieAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } fr
 import { Prisma } from "@prisma/client";
 import { Database } from "./database.js";
 import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
-import { assignPackSchema, packTemplateSchema, publishPackSchema, updatePackSchema } from "./pack-rules.js";
+import { assignPackSchema, extendPackDeadlineSchema, isPackOverdue, packTemplateSchema, publishPackSchema, updatePackSchema } from "./pack-rules.js";
 
 const packAssignmentInclude = {
   pack: { select: { name: true, employmentType: true } },
@@ -201,7 +201,9 @@ export class PacksService {
     const approvedRequired = required.filter(form => form.status === "APPROVED").length;
     const submittedRequired = required.filter(form => form.status === "SUBMITTED").length;
     const ready = required.length > 0 && approvedRequired === required.length;
+    const today = new Date().toISOString().slice(0, 10);
     return {
+      overdue: isPackOverdue(a.dueDate?.toISOString().slice(0, 10) ?? null, today, Boolean(a.approvedAt)),
       id: a.id, packId: a.packId, packName: a.pack.name, caseId: a.caseId,
       dueDate: a.dueDate?.toISOString().slice(0, 10) ?? null,
       assignedAt: a.createdAt.toISOString(),
@@ -231,6 +233,44 @@ export class PacksService {
       orderBy: { createdAt: "desc" }, include: packAssignmentInclude,
     });
     return rows.map(row => this.progress(row));
+  }
+
+  async extendDeadline(actorId: string, id: string, input: unknown) {
+    const parsed = extendPackDeadlineSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException("Choose a valid date and provide a reason of at least 10 characters.");
+    const { newDueDate, reason } = parsed.data;
+    const today = new Date().toISOString().slice(0, 10);
+    if (newDueDate <= today) throw new BadRequestException("Choose a future deadline.");
+    return this.db.$transaction(async tx => {
+      // Case lock serializes assignment and submission while changing due dates.
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT c.id FROM public."OnboardingCase" c
+        JOIN public."PackAssignment" p ON p."caseId"=c.id
+        WHERE p.id=${id}::uuid FOR UPDATE OF c`;
+      if (!rows.length) throw new NotFoundException("Pack assignment not found.");
+      const assignment = await tx.packAssignment.findUnique({
+        where: { id }, include: { forms: { select: { formAssignmentId: true } },
+          onboardingCase: { select: { status: true } } },
+      });
+      if (!assignment || assignment.onboardingCase.status !== "ACTIVE" || assignment.approvedAt)
+        throw new ConflictException("Only active, unapproved Pack deadlines may be extended.");
+      const previous = assignment.dueDate?.toISOString().slice(0, 10) ?? null;
+      if (previous && newDueDate <= previous)
+        throw new ConflictException("An extension must be later than the existing deadline.");
+      const next = new Date(newDueDate + "T00:00:00.000Z");
+      await tx.packAssignment.update({ where: { id }, data: { dueDate: next } });
+      await tx.formAssignment.updateMany({
+        where: { id: { in: assignment.forms.map(link => link.formAssignmentId) } },
+        data: { dueDate: next },
+      });
+      await tx.packDeadlineChange.create({ data: {
+        packAssignmentId: id, changedBy: actorId,
+        previousDueDate: assignment.dueDate, newDueDate: next, reason,
+      } });
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_DEADLINE_EXTENDED",
+        targetId: id, metadata: { previousDueDate: previous, newDueDate, reason } } });
+      await tx.outboxEvent.create({ data: { type: "PACK_DEADLINE_EXTENDED", targetId: id } });
+      return { packAssignmentId: id, dueDate: newDueDate, extended: true };
+    });
   }
 
   async approve(actorId: string, id: string) {
@@ -318,6 +358,14 @@ export class PacksController {
     if (!req.actor.permissions.includes("employees.manage"))
       throw new ForbiddenException("Employee assignment permission is required.");
     return this.packs.assign(req.actor.id, id, body);
+  }
+  @Post("assignments/:id/extend-deadline")
+  @ApiCreatedResponse({ description: "Extend an unapproved pack deadline with an audit reason" })
+  extendDeadline(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: unknown) {
+    if (!req.actor.permissions.includes("employees.manage"))
+      throw new ForbiddenException("Employee management permission is required.");
+    return this.packs.extendDeadline(req.actor.id, id, body);
   }
   @Post("assignments/:id/approve")
   @ApiCreatedResponse({ description: "Approve a pack only after all required form reviews" })
