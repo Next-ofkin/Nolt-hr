@@ -172,6 +172,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Apply migration and verify full HTTP/DB journey **on a disposable local database** before live deployment. Production remains unchanged. Drafts cannot be saved on hosted database until migration is intentionally applied.
 - [ ] Next slices: edit drafts, pack versioning/publishing/withdrawal, assignment, five-day deadline policy, employee checklist and HR progress/review.
 
+### Pack draft editing and publishing — 18 October 2026
+
+- [x] Added revision-checked `PUT /packs/:id` draft editing. Updates use optimistic `expectedRevision` checks, transactional version validation, pack-item replacement and audit/outbox records; non-draft packs reject edits.
+- [x] Added explicit `POST /packs/:id/publish`. Publishing row-locks the pack, rejects stale revisions/empty packs, verifies selected versions are still published, marks pack `PUBLISHED` and audits event. No employee assignment or email is implied.
+- [x] Updated Pack Builder UI with **Edit draft**, **Save changes**, and **Publish pack** actions; published packs no longer display edit controls.
+- [x] Updated unapplied Pack migration so the restricted `nolt_app` role can delete draft pack items within authorised server transactions; fixed refined Zod schema extension using `safeExtend`. Added focused revision/publish contract tests.
+- [ ] Validate Prisma generation, TS/build, focused tests and PostgreSQL draft-edit/publish concurrency integration. **The commits are untested; no hosted migration has been run.**
+- [ ] Implement immutable versioned revisions/new versions for **published** packs before future republishing; current published packs remain locked.
+- [ ] Complete pack assignment and due dates, employee checklist/progress, HR review integration and UI acceptance.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
