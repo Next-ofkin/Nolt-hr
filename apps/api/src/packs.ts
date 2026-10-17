@@ -8,6 +8,13 @@ import { Database } from "./database.js";
 import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
 import { assignPackSchema, packTemplateSchema, publishPackSchema, updatePackSchema } from "./pack-rules.js";
 
+const packAssignmentInclude = {
+  pack: { select: { name: true, employmentType: true } },
+  forms: { orderBy: { position: "asc" as const },
+    include: { formAssignment: { include: { formVersion: { select: { title: true } },
+      response: { select: { status: true } } } } } },
+} satisfies Prisma.PackAssignmentInclude;
+
 @Injectable()
 export class PacksService {
   constructor(@Inject(Database) private readonly db: Database) {}
@@ -181,14 +188,8 @@ export class PacksService {
   }
 
 
-  private readonly assignmentInclude = {
-    pack: { select: { name: true, employmentType: true } },
-    forms: { orderBy: { position: "asc" as const },
-      include: { formAssignment: { include: { formVersion: { select: { title: true } },
-        response: { select: { status: true } } } } } },
-  };
 
-  private progress(a: Prisma.PackAssignmentGetPayload<{ include: typeof this.assignmentInclude }>) {
+  private progress(a: Prisma.PackAssignmentGetPayload<{ include: typeof packAssignmentInclude }>) {
     const forms = a.forms.map(link => ({
       assignmentId: link.formAssignmentId,
       title: link.formAssignment.formVersion.title,
@@ -219,7 +220,7 @@ export class PacksService {
     if (!record) throw new NotFoundException("Onboarding case not found.");
     const rows = await this.db.packAssignment.findMany({
       where: { caseId }, orderBy: { createdAt: "desc" },
-      include: this.assignmentInclude,
+      include: packAssignmentInclude,
     });
     return rows.map(row => this.progress(row));
   }
@@ -227,7 +228,7 @@ export class PacksService {
   async myAssignments(userId: string) {
     const rows = await this.db.packAssignment.findMany({
       where: { onboardingCase: { employee: { userId }, status: "ACTIVE" } },
-      orderBy: { createdAt: "desc" }, include: this.assignmentInclude,
+      orderBy: { createdAt: "desc" }, include: packAssignmentInclude,
     });
     return rows.map(row => this.progress(row));
   }
@@ -239,7 +240,7 @@ export class PacksService {
         WHERE pa.id=${id}::uuid FOR UPDATE OF c`;
       if (!rows.length) throw new NotFoundException("Pack assignment not found.");
       const assignment = await tx.packAssignment.findUnique({
-        where: { id }, include: this.assignmentInclude,
+        where: { id }, include: packAssignmentInclude,
       });
       if (!assignment) throw new NotFoundException("Pack assignment not found.");
       const currentCase = await tx.onboardingCase.findUnique({ where: { id: assignment.caseId } });
