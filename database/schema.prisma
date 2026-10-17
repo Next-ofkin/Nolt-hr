@@ -13,6 +13,7 @@ model User {
   authVersion Int @default(1)
   permissions String[] @default([])
   identities Identity[]
+  packTemplates PackTemplate[]
   emailSessions ExternalEmailSession[]
   sessions Session[]
   employee Employee?
@@ -87,6 +88,7 @@ model Form {
   createdBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   versions FormVersion[]
+  packItems PackItem[]
   assignments FormAssignment[]
   @@index([createdAt])
 }
@@ -104,6 +106,7 @@ model FormVersion {
   publishedAt DateTime? @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
   assignments FormAssignment[]
+  packItems PackItem[]
   @@unique([id,formId])
   @@unique([formId,version])
   @@index([status,updatedAt])
@@ -411,4 +414,37 @@ model ExternalEmailSession {
   @@index([requestId])
   @@index([userId])
   @@index([expiresAt])
+}
+
+model PackTemplate {
+  id String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(160)
+  description String @default("")
+  employmentType String @db.VarChar(80)
+  status String @default("DRAFT")
+  revision Int @default(1)
+  createdBy String @db.Uuid
+  creator User @relation(fields:[createdBy], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  publishedAt DateTime? @db.Timestamptz(3)
+  items PackItem[]
+  @@index([status, employmentType])
+  @@index([createdAt])
+}
+
+model PackItem {
+  id String @id @default(uuid()) @db.Uuid
+  packId String @db.Uuid
+  pack PackTemplate @relation(fields:[packId], references:[id], onDelete:Restrict)
+  formId String @db.Uuid
+  form Form @relation(fields:[formId], references:[id], onDelete:Restrict)
+  formVersionId String @db.Uuid
+  formVersion FormVersion @relation(fields:[formVersionId, formId], references:[id, formId], onDelete:Restrict)
+  required Boolean @default(true)
+  position Int
+  @@unique([packId, formId])
+  @@unique([packId, formVersionId])
+  @@unique([packId, position])
+  @@index([formVersionId])
 }
