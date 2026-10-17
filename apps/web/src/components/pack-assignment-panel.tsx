@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; items: { id: string }[] };
-type Progress = { id: string; packName: string; totalForms: number; dueDate: string | null;
+type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
 
 export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrfToken, onAssigned }: {
@@ -39,7 +39,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   const options = packs.filter(pack =>
     pack.status === "PUBLISHED" && pack.items.length > 0 &&
     pack.employmentType.trim().toLowerCase() === employmentType.trim().toLowerCase() &&
-    !existing.some(assigned => assigned.id === pack.id),
+    !existing.some(assigned => assigned.packId === pack.id),
   );
 
   async function assign() {
