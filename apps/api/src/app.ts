@@ -34,7 +34,7 @@ import {
 } from "./responses.js";
 import { AuthController, DeveloperGuard, HrGuard, SessionGuard } from "./auth.js";
 import { FormsController, FormsService } from "./forms.js";
-import { PacksController, PacksService } from "./packs.js";
+import { MyPacksController, PacksController, PacksService } from "./packs.js";
 import { Sessions } from "./sessions.js";
 import { SupabaseAuth } from "./supabase-auth.js";
 import {
@@ -77,6 +77,7 @@ class HealthController {
     AuthController,
     FormsController,
     PacksController,
+    MyPacksController,
     EmployeesController,
     MyOnboardingController,
     InvitationsController,
