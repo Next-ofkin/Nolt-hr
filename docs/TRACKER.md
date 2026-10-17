@@ -153,6 +153,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Distinguish local unit/build gate from future local PostgreSQL/domain tests, real sandbox Auth/MFA checks and browser regression.
 - [ ] Keep GitHub Actions/CircleCI optional until free hosted runners work. Do not bypass review, security testing or explicit Production approval.
 
+### Forms & Packs implementation progress — 18 October 2026
+
+- [x] Added **additive, not yet applied** Prisma migration `20261018100000_pack_templates` on `feat/developer-hr-employee-auth`: `PackTemplate` and `PackItem` schema, indexed immutable form/version references, restricted grants and RLS.
+- [x] Updated `database/schema.prisma` with Pack models and relations. Added guarded HR `GET /packs`, `GET /packs/:id` and `POST /packs` controller/service wiring.
+- [x] Pack creation validates names, unique items and order, locks selected form/version rows, verifies each selected version is **PUBLISHED** and belongs to the expected form, and atomically writes pack, items, audit and outbox records. Creation is draft-only; it does **not** publish or assign a pack.
+- [ ] Execute Prisma validation, typecheck, Pack tests, migration on disposable PostgreSQL and API integration checks. Repository edits have been committed but are **not yet verified as passing**.
+- [ ] Build HR Pack Builder frontend for selecting/reordering published forms and submitting pack drafts; add update/publish/withdraw lifecycle with concurrency controls.
+- [ ] Add pack-to-onboarding assignment, deadlines, employee checklist/progress, HR approval and appropriate regression checks.
+- [ ] Never deploy the new migration to existing Production without separate migration review and release approval.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
