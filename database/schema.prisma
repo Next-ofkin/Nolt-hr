@@ -16,6 +16,7 @@ model User {
   packTemplates PackTemplate[]
   packAssignments PackAssignment[] @relation("PackAssigner")
   packApprovals PackAssignment[] @relation("PackApprover")
+  packDeadlineChanges PackDeadlineChange[]
   emailSessions ExternalEmailSession[]
   sessions Session[]
   employee Employee?
@@ -468,6 +469,7 @@ model PackAssignment {
   dueDate DateTime? @db.Date
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   forms PackAssignmentForm[]
+  deadlineChanges PackDeadlineChange[]
   @@unique([packId,caseId])
   @@index([caseId])
   @@index([approvedAt])
@@ -481,4 +483,17 @@ model PackAssignmentForm {
   formAssignment FormAssignment @relation(fields:[formAssignmentId],references:[id],onDelete:Restrict)
   position Int
   @@unique([packAssignmentId,position])
+}
+
+model PackDeadlineChange {
+  id String @id @default(uuid()) @db.Uuid
+  packAssignmentId String @db.Uuid
+  packAssignment PackAssignment @relation(fields:[packAssignmentId], references:[id], onDelete:Restrict)
+  changedBy String @db.Uuid
+  actor User @relation(fields:[changedBy], references:[id], onDelete:Restrict)
+  previousDueDate DateTime? @db.Date
+  newDueDate DateTime @db.Date
+  reason String @db.VarChar(1000)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([packAssignmentId, createdAt])
 }
