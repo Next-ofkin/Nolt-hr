@@ -14,6 +14,7 @@ model User {
   permissions String[] @default([])
   identities Identity[]
   packTemplates PackTemplate[]
+  packAssignments PackAssignment[]
   emailSessions ExternalEmailSession[]
   sessions Session[]
   employee Employee?
@@ -141,6 +142,7 @@ model OnboardingCase {
   createdBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   assignments FormAssignment[]
+  packAssignments PackAssignment[]
   @@index([employeeId,createdAt])
 }
 model FormAssignment {
@@ -156,6 +158,7 @@ model FormAssignment {
   assignedBy String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   response EmployeeResponse?
+  packAssignmentForm PackAssignmentForm?
   reviewAccess AssignmentReviewAccess?
   submissions FormSubmission[]
   files StoredFile[]
@@ -429,6 +432,7 @@ model PackTemplate {
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
   publishedAt DateTime? @db.Timestamptz(3)
   items PackItem[]
+  assignments PackAssignment[]
   @@index([status, employmentType])
   @@index([createdAt])
 }
@@ -447,4 +451,29 @@ model PackItem {
   @@unique([packId, formVersionId])
   @@unique([packId, position])
   @@index([formVersionId])
+}
+
+model PackAssignment {
+  id String @id @default(uuid()) @db.Uuid
+  packId String @db.Uuid
+  pack PackTemplate @relation(fields:[packId],references:[id],onDelete:Restrict)
+  caseId String @db.Uuid
+  onboardingCase OnboardingCase @relation(fields:[caseId],references:[id],onDelete:Restrict)
+  assignedBy String @db.Uuid
+  actor User @relation(fields:[assignedBy],references:[id],onDelete:Restrict)
+  dueDate DateTime? @db.Date
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  forms PackAssignmentForm[]
+  @@unique([packId,caseId])
+  @@index([caseId])
+}
+
+model PackAssignmentForm {
+  id String @id @default(uuid()) @db.Uuid
+  packAssignmentId String @db.Uuid
+  packAssignment PackAssignment @relation(fields:[packAssignmentId],references:[id],onDelete:Restrict)
+  formAssignmentId String @unique @db.Uuid
+  formAssignment FormAssignment @relation(fields:[formAssignmentId],references:[id],onDelete:Restrict)
+  position Int
+  @@unique([packAssignmentId,position])
 }
