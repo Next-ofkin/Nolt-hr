@@ -17,7 +17,7 @@ type PackItem = {
 };
 type Pack = {
   id: string; name: string; description: string; employmentType: string;
-  status: string; createdAt: string; items: PackItem[];
+  status: string; revision: number; createdAt: string; items: PackItem[];
 };
 type Selected = { formId: string; formVersionId: string; required: boolean };
 const headers = { "Content-Type": "application/json" };
@@ -42,6 +42,7 @@ export function PacksWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showComposer, setShowComposer] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; revision: number } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -86,18 +87,62 @@ export function PacksWorkspace() {
     return form ? `${form.title} · v${form.version} · ${form.recipient.toLowerCase()}` : `Form version ${item.formVersionId.slice(0, 8)}`;
   }
 
+  function startEdit(pack: Pack) {
+    if (pack.status !== "DRAFT") return;
+    setEditing({ id: pack.id, revision: pack.revision });
+    setName(pack.name);
+    setDescription(pack.description);
+    setEmploymentType(pack.employmentType);
+    setSelected([...pack.items].sort((a,b)=>a.position-b.position).map(item=>({
+      formId: item.formId, formVersionId: item.formVersionId, required: item.required,
+    })));
+    setSearch("");
+    setError("");
+    setNotice("");
+    setShowComposer(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetComposer() {
+    setEditing(null);
+    setName(""); setDescription(""); setEmploymentType(""); setSelected([]); setSearch("");
+    setShowComposer(false);
+  }
+
+  async function publish(pack: Pack) {
+    if (!session || busy || pack.status !== "DRAFT") return;
+    if (!window.confirm(`Publish "${pack.name}"? This pack will be locked against edits.`)) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/packs/${encodeURIComponent(pack.id)}/publish`, {
+        method: "POST", credentials: "same-origin",
+        headers: { ...headers, "x-csrf-token": session.csrfToken },
+        body: JSON.stringify({ expectedRevision: pack.revision }),
+      });
+      if (!response.ok) throw new Error(response.status === 409 ?
+        "This pack or a selected form has changed. Refresh before publishing." :
+        "Could not publish pack.");
+      if (editing?.id === pack.id) resetComposer();
+      await refresh();
+      setNotice("Pack published. Its contents are now locked. No employee has been assigned.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not publish pack.");
+    } finally { setBusy(false); }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || busy || !selected.length) return;
     setError(""); setNotice(""); setBusy(true);
     try {
-      const response = await fetch("/api/v1/packs", {
-        method: "POST", credentials: "same-origin", headers: {
+      const response = await fetch(editing ? `/api/v1/packs/${encodeURIComponent(editing.id)}` : "/api/v1/packs", {
+        method: editing ? "PUT" : "POST", credentials: "same-origin", headers: {
           ...headers, "x-csrf-token": session.csrfToken,
         },
         body: JSON.stringify({
           name: name.trim(), description: description.trim(), employmentType: employmentType.trim(),
           items: selected.map((item, order) => ({ ...item, order })),
+          ...(editing ? { expectedRevision: editing.revision } : {}),
         }),
       });
       if (!response.ok) {
@@ -106,10 +151,9 @@ export function PacksWorkspace() {
         if (response.status === 409) message = "A selected form changed. Refresh your forms and try again.";
         throw new Error(message);
       }
-      setName(""); setDescription(""); setEmploymentType(""); setSelected([]); setSearch("");
-      setShowComposer(false);
-      setNotice("Pack draft saved. It has not been published or assigned to an employee.");
+      resetComposer();
       await refresh();
+      setNotice(editing ? "Pack draft updated. It is still unpublished." : "Pack draft saved. It has not been published or assigned to an employee.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create this pack.");
     } finally {
@@ -124,10 +168,10 @@ export function PacksWorkspace() {
           <p className="text-xs font-semibold tracking-[0.15em] text-primary">PEOPLE OPERATIONS</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Onboarding packs</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Group published forms into reusable onboarding packs. Save drafts now; publishing and employee assignment are coming next.
+            Group published forms into reusable onboarding packs. Edit drafts, then publish to lock their contents. Employee assignment is coming next.
           </p>
         </div>
-        <Button type="button" onClick={() => setShowComposer(value => !value)} disabled={!session || loading} className="gap-2">
+        <Button type="button" onClick={() => showComposer ? resetComposer() : setShowComposer(true)} disabled={!session || loading} className="gap-2">
           {showComposer ? <X size={16} /> : <Plus size={16} />}
           {showComposer ? "Close builder" : "Create pack"}
         </Button>
@@ -139,7 +183,7 @@ export function PacksWorkspace() {
       {showComposer && <form onSubmit={event => void save(event)} className="rounded-2xl border bg-white p-5 sm:p-7 space-y-6">
         <div className="flex items-center gap-3">
           <span className="rounded-xl bg-secondary p-3 text-primary"><FileStack size={22}/></span>
-          <div><h2 className="text-xl font-semibold">New pack draft</h2><p className="text-sm text-muted-foreground">Choose published forms and their completion order.</p></div>
+          <div><h2 className="text-xl font-semibold">{editing ? "Edit pack draft" : "New pack draft"}</h2><p className="text-sm text-muted-foreground">Choose published forms and their completion order.</p></div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2"><Label htmlFor="pack-name">Pack name</Label>
@@ -183,7 +227,7 @@ export function PacksWorkspace() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
           <p className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck size={16}/> Saved as draft only. No employee will be notified.</p>
           <Button type="submit" disabled={!session || busy || !name.trim() || !employmentType.trim() || selected.length===0}>
-            {busy ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Save pack draft
+            {busy ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} {editing ? "Save changes" : "Save pack draft"}
           </Button>
         </div>
       </form>}
@@ -200,6 +244,12 @@ export function PacksWorkspace() {
             <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status.toLowerCase()}</span></div>
           <p className="mt-1 text-xs text-muted-foreground">{pack.employmentType} · {pack.items.length} forms · {pack.items.filter(item => item.required).length} required</p>
           {pack.description && <p className="mt-2 text-sm text-muted-foreground">{pack.description}</p>}
+          {pack.status === "DRAFT" && <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={busy}
+              onClick={() => startEdit(pack)}>Edit draft</Button>
+            <Button type="button" size="sm" disabled={busy || pack.items.length === 0}
+              onClick={() => void publish(pack)}>Publish pack</Button>
+          </div>}
           <ul className="mt-3 space-y-1 text-sm">{pack.items.map(item => <li key={item.id} className="text-muted-foreground">{item.position + 1}. {label(item)} {item.required ? "· required" : "· optional"}</li>)}</ul>
         </article>)}</div>}
       </section>
