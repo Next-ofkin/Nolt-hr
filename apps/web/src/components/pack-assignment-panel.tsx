@@ -5,7 +5,7 @@ import { Label } from "./ui/label";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; items: { id: string }[] };
 type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
-  approvedAt: string | null; status: string; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
+  approvedAt: string | null; status: string; overdue: boolean; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
 
 export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrfToken, onAssigned }: {
@@ -16,6 +16,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   const [existing, setExisting] = useState<Progress[]>([]);
   const [packId, setPackId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [extension, setExtension] = useState<{id:string; date:string; reason:string} | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -64,6 +65,26 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     } finally { setBusy(false); }
   }
 
+  async function extend() {
+    if (!extension || busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/packs/assignments/${encodeURIComponent(extension.id)}/extend-deadline`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify({ newDueDate: extension.date, reason: extension.reason }),
+      });
+      if (!response.ok) throw new Error(response.status === 409 ?
+        "The deadline must move forward, and the onboarding case must still be active." :
+        "Unable to extend deadline. Choose a future date and give a reason.");
+      setExtension(null);
+      await onAssigned();
+      await refresh();
+      setNotice("Deadline extended and recorded in the audit history.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Extension failed."); }
+    finally { setBusy(false); }
+  }
+
   async function approve(id: string) {
     if (busy || !window.confirm("Approve this pack? All required forms must already be approved.")) return;
     setBusy(true); setError(""); setNotice("");
@@ -106,6 +127,26 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
         <p className="font-medium">{a.packName}</p>
         <p className="mt-1 text-xs text-muted-foreground">{a.totalForms} forms · {a.approvedRequired}/{a.requiredForms} required approved · Due {a.dueDate ?? "date not set"}</p>
         <p className="mt-1 text-xs font-semibold">Pack status: {a.status.replaceAll("_"," ")}</p>
+        {a.overdue && <p role="status" className="mt-1 text-xs font-bold text-red-700">Overdue — HR follow-up needed</p>}
+        {!a.approvedAt && <div className="mt-2 space-y-2">
+          <Button type="button" variant="outline" size="sm" disabled={busy}
+            onClick={()=>setExtension({ id:a.id, date:"", reason:"" })}>Extend deadline</Button>
+          {extension?.id === a.id && <div className="space-y-2 rounded-lg border p-3">
+            <label className="block text-xs font-medium">New due date
+              <input type="date" className="mt-1 h-10 w-full rounded-lg border px-2" value={extension.date}
+                onChange={e=>setExtension(v=>v ? {...v,date:e.target.value}:v)} />
+            </label>
+            <label className="block text-xs font-medium">Reason for extension
+              <textarea className="mt-1 w-full rounded-lg border p-2" maxLength={1000}
+                value={extension.reason} onChange={e=>setExtension(v=>v ? {...v,reason:e.target.value}:v)} />
+            </label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" disabled={busy || !extension.date || extension.reason.trim().length < 10}
+                onClick={()=>void extend()}>Save extension</Button>
+              <Button type="button" size="sm" variant="outline" onClick={()=>setExtension(null)}>Cancel</Button>
+            </div>
+          </div>}
+        </div>}
         {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>void approve(a.id)}>Approve completed pack</Button>}
         <ul className="mt-2 space-y-1">{a.forms.map(form=>
           <li key={form.assignmentId} className="text-xs text-muted-foreground">
