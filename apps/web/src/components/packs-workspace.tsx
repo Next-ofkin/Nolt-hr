@@ -49,7 +49,7 @@ export function PacksWorkspace() {
     try {
       const [packRecords, formRecords] = await Promise.all([
         readJson<Pack[]>("/api/v1/packs"),
-        readJson<FormVersion[]>("/api/v1/forms"),
+        readJson<FormVersion[]>("/api/v1/forms/published"),
       ]);
       setPacks(packRecords);
       setForms(formRecords.filter(form => form.status === "PUBLISHED"));
