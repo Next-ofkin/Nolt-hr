@@ -14,7 +14,8 @@ model User {
   permissions String[] @default([])
   identities Identity[]
   packTemplates PackTemplate[]
-  packAssignments PackAssignment[]
+  packAssignments PackAssignment[] @relation("PackAssigner")
+  packApprovals PackAssignment[] @relation("PackApprover")
   emailSessions ExternalEmailSession[]
   sessions Session[]
   employee Employee?
@@ -460,12 +461,16 @@ model PackAssignment {
   caseId String @db.Uuid
   onboardingCase OnboardingCase @relation(fields:[caseId],references:[id],onDelete:Restrict)
   assignedBy String @db.Uuid
-  actor User @relation(fields:[assignedBy],references:[id],onDelete:Restrict)
+  actor User @relation("PackAssigner",fields:[assignedBy],references:[id],onDelete:Restrict)
+  approvedAt DateTime? @db.Timestamptz(3)
+  approvedBy String? @db.Uuid
+  approver User? @relation("PackApprover",fields:[approvedBy],references:[id],onDelete:Restrict)
   dueDate DateTime? @db.Date
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   forms PackAssignmentForm[]
   @@unique([packId,caseId])
   @@index([caseId])
+  @@index([approvedAt])
 }
 
 model PackAssignmentForm {
