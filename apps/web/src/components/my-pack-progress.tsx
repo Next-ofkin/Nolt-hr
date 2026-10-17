@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 type PackProgress = {
-  id: string; packName: string; dueDate: string | null; status: string;
+  id: string; packName: string; dueDate: string | null; status: string; overdue: boolean;
   requiredForms: number; approvedRequired: number; totalForms: number;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[];
 };
@@ -30,6 +30,7 @@ export function MyPackProgress({ refreshKey }: { refreshKey: number }) {
         <h3 className="font-semibold">{pack.packName}</h3>
         <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status.replaceAll("_", " ")}</span>
       </div>
+      {pack.overdue && <p role="status" className="mt-2 text-sm font-semibold text-red-700">Overdue — please contact HR about your deadline.</p>}
       <p className="mt-2 text-sm text-muted-foreground">
         {pack.approvedRequired} of {pack.requiredForms} required forms approved
         {pack.dueDate ? ` · Due ${pack.dueDate}` : ""}
