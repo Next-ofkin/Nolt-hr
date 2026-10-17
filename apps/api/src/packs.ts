@@ -180,26 +180,86 @@ export class PacksService {
     }
   }
 
-  async caseAssignments(caseId: string) {
-    const caseRecord = await this.db.onboardingCase.findUnique({ where: { id: caseId } });
-    if (!caseRecord) throw new NotFoundException("Onboarding case not found.");
-    const assignments = await this.db.packAssignment.findMany({
-      where: { caseId }, orderBy: { createdAt: "desc" },
-      include: { pack: { select: { name: true, employmentType: true } },
-        forms: { orderBy: { position: "asc" },
-          include: { formAssignment: { include: { formVersion: { select: { title: true } },
-            response: { select: { status: true } } } } } } },
-    });
-    return assignments.map(a => ({
+
+  private readonly assignmentInclude = {
+    pack: { select: { name: true, employmentType: true } },
+    forms: { orderBy: { position: "asc" as const },
+      include: { formAssignment: { include: { formVersion: { select: { title: true } },
+        response: { select: { status: true } } } } } },
+  };
+
+  private progress(a: Prisma.PackAssignmentGetPayload<{ include: typeof this.assignmentInclude }>) {
+    const forms = a.forms.map(link => ({
+      assignmentId: link.formAssignmentId,
+      title: link.formAssignment.formVersion.title,
+      required: link.formAssignment.required,
+      position: link.position,
+      status: link.formAssignment.response?.status ?? "NOT_STARTED",
+    }));
+    const required = forms.filter(form => form.required);
+    const approvedRequired = required.filter(form => form.status === "APPROVED").length;
+    const submittedRequired = required.filter(form => form.status === "SUBMITTED").length;
+    const ready = required.length > 0 && approvedRequired === required.length;
+    return {
       id: a.id, packId: a.packId, packName: a.pack.name, caseId: a.caseId,
       dueDate: a.dueDate?.toISOString().slice(0, 10) ?? null,
-      assignedAt: a.createdAt.toISOString(), totalForms: a.forms.length,
-      forms: a.forms.map(link => ({
-        assignmentId: link.formAssignmentId, title: link.formAssignment.formVersion.title,
-        required: link.formAssignment.required, position: link.position,
-        status: link.formAssignment.response?.status ?? "NOT_STARTED",
-      })),
-    }));
+      assignedAt: a.createdAt.toISOString(),
+      approvedAt: a.approvedAt?.toISOString() ?? null,
+      totalForms: forms.length,
+      requiredForms: required.length, approvedRequired, submittedRequired,
+      readyForApproval: ready && !a.approvedAt,
+      status: a.approvedAt ? "APPROVED" : ready ? "READY_FOR_APPROVAL" :
+        submittedRequired > 0 || approvedRequired > 0 ? "IN_PROGRESS" : "PENDING",
+      forms,
+    };
+  }
+
+  async caseAssignments(caseId: string) {
+    const record = await this.db.onboardingCase.findUnique({ where: { id: caseId } });
+    if (!record) throw new NotFoundException("Onboarding case not found.");
+    const rows = await this.db.packAssignment.findMany({
+      where: { caseId }, orderBy: { createdAt: "desc" },
+      include: this.assignmentInclude,
+    });
+    return rows.map(row => this.progress(row));
+  }
+
+  async myAssignments(userId: string) {
+    const rows = await this.db.packAssignment.findMany({
+      where: { onboardingCase: { employee: { userId }, status: "ACTIVE" } },
+      orderBy: { createdAt: "desc" }, include: this.assignmentInclude,
+    });
+    return rows.map(row => this.progress(row));
+  }
+
+  async approve(actorId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT c.id FROM public."OnboardingCase" c
+        JOIN public."PackAssignment" pa ON pa."caseId"=c.id
+        WHERE pa.id=${id}::uuid FOR UPDATE OF c`;
+      if (!rows.length) throw new NotFoundException("Pack assignment not found.");
+      const assignment = await tx.packAssignment.findUnique({
+        where: { id }, include: this.assignmentInclude,
+      });
+      if (!assignment) throw new NotFoundException("Pack assignment not found.");
+      const currentCase = await tx.onboardingCase.findUnique({ where: { id: assignment.caseId } });
+      if (currentCase?.status !== "ACTIVE")
+        throw new ConflictException("The onboarding case is no longer active.");
+      if (assignment.approvedAt)
+        throw new ConflictException("This pack has already been approved.");
+      const progress = this.progress(assignment);
+      if (!progress.readyForApproval)
+        throw new ConflictException("Every required form must receive HR approval first.");
+      await tx.packAssignment.update({
+        where: { id }, data: { approvedAt: new Date(), approvedBy: actorId },
+      });
+      await tx.auditEvent.create({
+        data: { actorId, action: "PACK_APPROVED", targetId: id,
+          metadata: { caseId: assignment.caseId, approvedRequired: progress.approvedRequired } },
+      });
+      await tx.outboxEvent.create({ data: { type: "PACK_APPROVED", targetId: id } });
+      return { approved: true, packAssignmentId: id };
+    });
   }
 
   async create(actorId: string, input: unknown) {
@@ -258,6 +318,13 @@ export class PacksController {
       throw new ForbiddenException("Employee assignment permission is required.");
     return this.packs.assign(req.actor.id, id, body);
   }
+  @Post("assignments/:id/approve")
+  @ApiCreatedResponse({ description: "Approve a pack only after all required form reviews" })
+  approve(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    if (!req.actor.permissions.includes("employees.manage"))
+      throw new ForbiddenException("Employee management permission is required.");
+    return this.packs.approve(req.actor.id, id);
+  }
   @Get(":id")
   @ApiOkResponse({ description: "Get a pack template" })
   get(@Param("id", ParseUUIDPipe) id: string) { return this.packs.get(id); }
@@ -276,5 +343,20 @@ export class PacksController {
   @ApiBody({ schema: { type: "object", additionalProperties: true } })
   create(@Req() req: AuthRequest, @Body() body: unknown) {
     return this.packs.create(req.actor.id, body);
+  }
+}
+
+@ApiTags("Own onboarding packs")
+@ApiCookieAuth("session")
+@UseGuards(SessionGuard)
+@Controller("me/packs")
+export class MyPacksController {
+  constructor(@Inject(PacksService) private readonly packs: PacksService) {}
+  @Get()
+  @ApiOkResponse({ description: "Own active-case pack progress without exposing other employees" })
+  my(@Req() req: AuthRequest) {
+    if (!req.actor.permissions.includes("profile.own"))
+      throw new ForbiddenException("Employee account required.");
+    return this.packs.myAssignments(req.actor.id);
   }
 }
