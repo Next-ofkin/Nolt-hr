@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { packTemplateSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
+import { packTemplateSchema, updatePackSchema, publishPackSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
 
 const first = "11111111-1111-4111-8111-111111111111";
 const second = "22222222-2222-4222-8222-222222222222";
@@ -49,4 +49,17 @@ test("calendar helper handles month and leap-year boundaries", () => {
 test("calendar helper rejects bad inputs", () => {
   assert.throws(() => addCalendarDaysUTC("2026-02-30", 5));
   assert.throws(() => addCalendarDaysUTC("2026-10-16", -1));
+});
+
+test("draft updates require a positive expected revision", () => {
+  assert.equal(updatePackSchema.safeParse({ ...base, expectedRevision: 3 }).success, true);
+  assert.equal(updatePackSchema.safeParse({ ...base }).success, false);
+  assert.equal(updatePackSchema.safeParse({ ...base, expectedRevision: 0 }).success, false);
+  assert.equal(updatePackSchema.safeParse({ ...base, expectedRevision: 1, items: [] }).success, false);
+});
+
+test("publishing requires only an expected revision and rejects extra claims", () => {
+  assert.equal(publishPackSchema.safeParse({ expectedRevision: 2 }).success, true);
+  assert.equal(publishPackSchema.safeParse({ expectedRevision: -1 }).success, false);
+  assert.equal(publishPackSchema.safeParse({ expectedRevision: 2, status: "PUBLISHED" }).success, false);
 });
