@@ -35,12 +35,17 @@ export class PacksService {
     });
     const content = parsed.data;
     return this.db.$transaction(async tx => {
-      // Acquire the same Form row locks as publish/withdraw, in fixed order,
-      // so a version cannot be withdrawn while its pack is being created.
+      // Lock selected parent forms and exact versions in deterministic order,
+      // preventing concurrent publish/withdraw from changing their state
+      // while this pack is created.
       const formIds = [...new Set(content.items.map(item => item.formId))].sort();
       for (const id of formIds) {
         const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Form" WHERE id = ${id}::uuid FOR UPDATE`;
         if (!locked.length) throw new BadRequestException("A selected form does not exist.");
+      }
+      const versionIds = [...new Set(content.items.map(item => item.formVersionId))].sort();
+      for (const id of versionIds) {
+        await tx.$queryRaw`SELECT id FROM "FormVersion" WHERE id = ${id}::uuid FOR SHARE`;
       }
       const versions = await tx.formVersion.findMany({
         where: { id: { in: content.items.map(item => item.formVersionId) } },
