@@ -50,7 +50,7 @@ export function addCalendarDaysUTC(startDate: string, days: number): string {
 }
 
 /** Optimistic-lock request for editing a saved draft. */
-export const updatePackSchema = packTemplateSchema.extend({
+export const updatePackSchema = packTemplateSchema.safeExtend({
   expectedRevision: z.number().int().positive(),
 });
 
