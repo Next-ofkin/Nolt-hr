@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { packTemplateSchema, updatePackSchema, publishPackSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
+import { assignPackSchema, packTemplateSchema, updatePackSchema, publishPackSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
 
 const first = "11111111-1111-4111-8111-111111111111";
 const second = "22222222-2222-4222-8222-222222222222";
@@ -62,4 +62,13 @@ test("publishing requires only an expected revision and rejects extra claims", (
   assert.equal(publishPackSchema.safeParse({ expectedRevision: 2 }).success, true);
   assert.equal(publishPackSchema.safeParse({ expectedRevision: -1 }).success, false);
   assert.equal(publishPackSchema.safeParse({ expectedRevision: 2, status: "PUBLISHED" }).success, false);
+});
+
+test("pack assignment is bound to an existing onboarding case revision", () => {
+  const valid = { caseId: first, expectedCaseRevision: 2, dueDate: "2026-11-12" };
+  assert.equal(assignPackSchema.safeParse(valid).success, true);
+  assert.equal(assignPackSchema.safeParse({ caseId: first, expectedCaseRevision: 2 }).success, true);
+  assert.equal(assignPackSchema.safeParse({ ...valid, expectedCaseRevision: 0 }).success, false);
+  assert.equal(assignPackSchema.safeParse({ ...valid, caseId: "not-a-uuid" }).success, false);
+  assert.equal(assignPackSchema.safeParse({ ...valid, assignedBy: third }).success, false);
 });
