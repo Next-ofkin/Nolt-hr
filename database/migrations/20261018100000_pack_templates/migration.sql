@@ -39,7 +39,7 @@ BEGIN
  END IF;
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='nolt_app') THEN
   GRANT SELECT,INSERT,UPDATE ON public."PackTemplate" TO nolt_app;
-  GRANT SELECT,INSERT ON public."PackItem" TO nolt_app;
+  GRANT SELECT,INSERT,DELETE ON public."PackItem" TO nolt_app;
   CREATE POLICY nolt_backend_pack_templates ON public."PackTemplate"
     FOR ALL TO nolt_app USING (true) WITH CHECK (true);
   CREATE POLICY nolt_backend_pack_items ON public."PackItem"
