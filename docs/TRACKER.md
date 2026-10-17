@@ -125,6 +125,13 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Real job `117177403255` ended `failure` with **no returned step records**; job log download returned BlobNotFound/404. Unit/typecheck/build tests were **not established as executed**. Inspect GitHub run UI annotations, account Actions restrictions and runner setup. Do not infer an application test failure.
 - [ ] Keep draft PR #8 and PR #6 unmerged pending successful real checks; keep Production unchanged.
 
+### Free local verification alternative — 18 October 2026
+
+- [x] Added `.vscode/tasks.json` on `feat/developer-hr-employee-auth` (commit `7b12f68`) with tasks for `npm ci`, isolated code checks (`db:generate`, `typecheck`, `test`, `build`) and focused Pack tests. The tasks themselves are verified in GitHub; **their execution results are not yet available**.
+- [ ] Run tasks using a local Node 24 VS Code checkout and attach exact pass/fail output to PR #6. No third-party CI account or payment card required.
+- [ ] Distinguish local unit/build gate from future local PostgreSQL/domain tests, real sandbox Auth/MFA checks and browser regression.
+- [ ] Keep GitHub Actions/CircleCI optional until free hosted runners work. Do not bypass review, security testing or explicit Production approval.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
