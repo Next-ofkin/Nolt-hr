@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "NOLT: Install dependencies (first time)",
+      "type": "shell",
+      "command": "npm ci",
+      "problemMatcher": []
+    },
+    {
+      "label": "NOLT: Check code (no hosted DB)",
+      "type": "shell",
+      "command": "npm run db:generate && npm run typecheck && npm test && npm run build",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "NOLT: Pack tests",
+      "type": "shell",
+      "command": "npx tsx --test tests/pack-rules.test.ts",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}
