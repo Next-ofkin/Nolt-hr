@@ -5,6 +5,7 @@ import { Label } from "./ui/label";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; items: { id: string }[] };
 type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
+  approvedAt: string | null; status: string; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
 
 export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrfToken, onAssigned }: {
@@ -63,6 +64,23 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     } finally { setBusy(false); }
   }
 
+  async function approve(id: string) {
+    if (busy || !window.confirm("Approve this pack? All required forms must already be approved.")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/packs/assignments/${encodeURIComponent(id)}/approve`, {
+        method: "POST", credentials: "same-origin", headers: { "x-csrf-token": csrfToken },
+      });
+      if (!response.ok) throw new Error(response.status === 409 ?
+        "Required forms are not all approved, or the pack has already been approved." :
+        "Unable to approve this pack.");
+      await refresh();
+      setNotice("Pack approved. An audit event has been recorded.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to approve this pack.");
+    } finally { setBusy(false); }
+  }
+
   return <section className="space-y-4 rounded-xl border bg-secondary/30 p-4">
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
       <p className="mt-1 text-xs text-muted-foreground">Assign all forms from a published pack to this active onboarding case.</p></div>
@@ -86,7 +104,9 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
       <p className="text-sm font-semibold">Assigned packs</p>
       {existing.map(a=><article key={a.id} className="rounded-lg border bg-white p-3">
         <p className="font-medium">{a.packName}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{a.totalForms} forms · Due {a.dueDate ?? "date not set"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{a.totalForms} forms · {a.approvedRequired}/{a.requiredForms} required approved · Due {a.dueDate ?? "date not set"}</p>
+        <p className="mt-1 text-xs font-semibold">Pack status: {a.status.replaceAll("_"," ")}</p>
+        {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>void approve(a.id)}>Approve completed pack</Button>}
         <ul className="mt-2 space-y-1">{a.forms.map(form=>
           <li key={form.assignmentId} className="text-xs text-muted-foreground">
             {form.title} · {form.required ? "Required" : "Optional"} · {form.status}
