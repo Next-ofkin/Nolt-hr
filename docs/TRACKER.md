@@ -193,6 +193,15 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Decide five-day deadline policy (calendar/business days, timezone and start trigger); current API intentionally requires HR to select a date or leave blank.
 - [ ] Next: improve employee pack-level progress/completion status, HR approvals, versioned pack upgrades and due-date extensions. Never run new migrations against Production without approval.
 
+### Pack readiness, explicit HR approval and own-progress UI — 18 October 2026
+
+- [x] Added a third **unapplied**, additive Prisma migration `20261018120000_pack_approval`: optional approval timestamp/actor, a pair-consistency check, index and restricted backend role update grant. Updated Prisma user/pack approval relations.
+- [x] Implemented derived pack readiness from existing form response statuses. Only packs with at least one required form and **all required forms `APPROVED`** are ready for separate HR approval; `SUBMITTED` never counts as approved. Optional items are displayed but do not block readiness.
+- [x] Implemented audited `POST /packs/assignments/:id/approve` with HR employee-management permission, active onboarding case lock, duplicate-approval prevention, readiness re-check and audit/outbox recording.
+- [x] Added `GET /me/packs` scoped to the authenticated employee's **own active onboarding case** and `MyPackProgress` component on employee onboarding home, showing required-form approvals, due date, per-form status and final HR decision. HR case panel now shows readiness and an Approve action.
+- [ ] Verify Prisma schema/code generation, frontend/API typecheck/build, unit and PostgreSQL integration tests, including reviewer decision/pack approval concurrency and role-isolation paths. **No tests passed or migrations deployed in this turn**; local clone failed due to container GitHub DNS resolution.
+- [ ] Remaining: optional-only pack policy, reviewer permissions and decision evidence for guarantor/reference forms, deadline extensions/overdue logic, pack version upgrades and developer handover. Reconcile migration checksums before any future hosted deployment.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
