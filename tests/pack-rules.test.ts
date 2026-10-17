@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assignPackSchema, packTemplateSchema, updatePackSchema, publishPackSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
+import { assignPackSchema, extendPackDeadlineSchema, isPackOverdue, packTemplateSchema, updatePackSchema, publishPackSchema, addCalendarDaysUTC } from "../apps/api/src/pack-rules.js";
 
 const first = "11111111-1111-4111-8111-111111111111";
 const second = "22222222-2222-4222-8222-222222222222";
@@ -71,4 +71,16 @@ test("pack assignment is bound to an existing onboarding case revision", () => {
   assert.equal(assignPackSchema.safeParse({ ...valid, expectedCaseRevision: 0 }).success, false);
   assert.equal(assignPackSchema.safeParse({ ...valid, caseId: "not-a-uuid" }).success, false);
   assert.equal(assignPackSchema.safeParse({ ...valid, assignedBy: third }).success, false);
+});
+
+test("extensions require a date and a documented reason", () => {
+  assert.equal(extendPackDeadlineSchema.safeParse({newDueDate:"2026-11-20",reason:"Additional records were requested"}).success,true);
+  assert.equal(extendPackDeadlineSchema.safeParse({newDueDate:"2026-11-20",reason:"short"}).success,false);
+  assert.equal(extendPackDeadlineSchema.safeParse({newDueDate:"not-a-date",reason:"Additional records were requested"}).success,false);
+});
+test("overdue is based on calendar date and stops once approved", () => {
+  assert.equal(isPackOverdue("2026-10-17","2026-10-18",false),true);
+  assert.equal(isPackOverdue("2026-10-18","2026-10-18",false),false);
+  assert.equal(isPackOverdue(null,"2026-10-18",false),false);
+  assert.equal(isPackOverdue("2026-10-17","2026-10-18",true),false);
 });
