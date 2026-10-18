@@ -236,6 +236,15 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Review implementation for policy/authorization edge cases (external guarantor/references, pack revisions, approval integrity). **No runtime or database test passed here.**
 - [ ] No Production migration, reset, deployment, data deletion or automatic merge authorised.
 
+### Local integration verification — 18 October 2026
+
+- [x] User pulled feature branch to commit `1b2ceed` and ran checks on local Windows checkout: `npm run db:generate` succeeded (Prisma 7.10.0), API typecheck/build succeeded, and **99/99 unit tests passed**.
+- [x] Web typecheck and `next build` failed due to an **unclosed JSX conditional** in `apps/web/src/components/packs-workspace.tsx`, immediately before the draft Pack actions.
+- [x] Patched the JSX closing brace on feature branch in commit `06a3827c`. No schema changes or Production operations.
+- [ ] User to pull the correction and rerun `npm run typecheck` and `npm run build`. Do not claim the full feature branch build passed until that rerun is observed.
+- [ ] Review package vulnerability report separately (previous `npm ci` reported 11 high vulnerabilities); avoid unconditional major upgrades.
+- [ ] Database migration and end-to-end verification remain pending.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
