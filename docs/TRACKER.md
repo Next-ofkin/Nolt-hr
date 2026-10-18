@@ -211,6 +211,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Run Prisma generation/typecheck/build, the actual unit tests and disposable PostgreSQL integration test before merge. No Production deployment, data deletion or migration execution authorised.
 - [ ] Next: pack template version-upgrades, deadline policy approval, evidence-based QA/handover.
 
+### Pack template versioning — 18 October 2026
+
+- [x] Added **unapplied additive** Prisma migration `20261018140000_pack_version_lineage`: `rootPackId`, `versionNumber`, version uniqueness and one-open-draft-per-family constraint; corresponding Prisma relations/index.
+- [x] Implemented HR `POST /packs/:id/versions`: create a new editable version of a published Pack within a database transaction, lock family root to serialize version allocation, reuse an existing open draft, copy form-version references/required flags/order and record audit/outbox events. Published originals and `PackAssignment.packId` remain unchanged.
+- [x] Updated HR Packs screen to display version number and **Create new version**, opening the resulting draft for editing.
+- [ ] Verify Prisma generation, typecheck and build, Pack API integration and migration execution against a disposable PostgreSQL database. GitHub access from this container remains DNS-blocked; **no runtime checks passed**, and no hosted migration/deploy occurred.
+- [ ] Next: version-group UI/history, sensible handling of withdrawn or superseded pack versions in future assignments, and QA/handoff checklist.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
