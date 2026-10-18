@@ -316,6 +316,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Validate migration SQL on isolated database before using the Prisma migration runner on Production; no Production writes/deployments performed.
 - [ ] The six new Pack migrations are additive but **not yet integration-tested**; do not claim live release readiness.
 
+### Owner human-testing and guarantor release checkpoint — 18 October 2026
+
+- [x] Inspected `apps/api/src/external-requests.ts`, `external-email.ts` and `apps/web/src/components/external-requests.tsx` on feature branch: employee-sent guarantor/reference request creation, Resend-queued delivery, request status, revocation/replacement, external proof/session and text submission endpoints are **implemented in source**.
+- [ ] **Not yet live-verified:** actual sender configuration, delivery to approved recipient, expiry/revocation browser behaviour, guarantor self-submission and complete HR independent review.
+- [x] Reviewed GitHub PR #6: still **draft**, mergeable=false; `main` and feature have diverged (304 commits ahead, 2 behind by comparison).
+- [ ] Owner requested merge to `main` for human testing, but Railway Production API tracks `main`, and six Pack migrations remain unapplied; no merge was performed to avoid a premature Production deployment. Resolve branch drift and schema/deployment safety gate before live release.
+- [ ] Human acceptance sequence: HR login/forms/packs/assignment, employee own form drafts/submission, external guarantor request and receipt, direct guarantor completion, HR review/approval, cross-user access rejection, deadline extension and rollback checks.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
