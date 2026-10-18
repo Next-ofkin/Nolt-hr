@@ -198,6 +198,17 @@ export class PacksService {
         });
         if (pack.status !== "PUBLISHED" || pack.items.length === 0)
           throw new ConflictException("Only published nonempty packs can be assigned.");
+        // A pack family can have older published versions assigned historically,
+        // but new assignments must use its latest published version.
+        const rootId = pack.rootPackId ?? pack.id;
+        await tx.$queryRaw`SELECT id FROM public."PackTemplate" WHERE id=${rootId}::uuid FOR SHARE`;
+        const newestPublished = await tx.packTemplate.findFirst({
+          where: { status: "PUBLISHED", OR: [{ id: rootId }, { rootPackId: rootId }] },
+          orderBy: [{ versionNumber: "desc" }, { createdAt: "desc" }],
+          select: { id: true },
+        });
+        if (!newestPublished || newestPublished.id !== pack.id)
+          throw new ConflictException("A newer published version exists. Select the latest Pack version.");
         if (pack.employmentType.trim().toLowerCase() !== activeCase.employee.employmentType.trim().toLowerCase())
           throw new BadRequestException("Pack employment type must match the employee.");
         if (await tx.packAssignment.findUnique({ where: { packId_caseId: { packId, caseId } } }))
