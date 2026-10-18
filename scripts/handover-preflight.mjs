@@ -46,13 +46,13 @@ for (const id of migrations) {
 const grantFile = resolve(root, "database/migrations/20261018120000_pack_approval/migration.sql");
 if (existsSync(grantFile)) {
   const sql = readFileSync(grantFile, "utf8");
-  check(/DO \\$tag\\$[\\s\\S]*END \\$tag\\$;/m.test(sql), "Pack approval migration DO block requires valid PostgreSQL dollar quoting.");
+  check(/DO \$tag\$[\s\S]*END \$tag\$;/m.test(sql), "Pack approval migration DO block requires valid PostgreSQL dollar quoting.");
 }
 const logoPath = process.env.NEXT_PUBLIC_BRAND_LOGO_PATH;
 if (logoPath) {
-  check(/^\\/branding\\/[a-zA-Z0-9_-]+\\.(png|webp|jpg|jpeg)$/.test(logoPath),
+  check(/^\/branding\/[a-zA-Z0-9_-]+\.(png|webp|jpg|jpeg)$/.test(logoPath),
     "Invalid logo path; use /branding/company-logo.png (or webp/jpg/jpeg).");
-  if (/^\\/branding\\/[a-zA-Z0-9_-]+\\.(png|webp|jpg|jpeg)$/.test(logoPath)) {
+  if (/^\/branding\/[a-zA-Z0-9_-]+\.(png|webp|jpg|jpeg)$/.test(logoPath)) {
     check(existsSync(resolve(root,"apps/web/public",logoPath.slice(1))), "Brand logo file is not in apps/web/public.");
   }
 }
