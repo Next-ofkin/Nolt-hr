@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { brand } from "@/lib/brand";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ "--primary": brand.primary } as CSSProperties}>
       <body className="min-h-screen antialiased">
         <AuthProvider>{children}</AuthProvider>
         <Toaster />
