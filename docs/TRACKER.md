@@ -324,6 +324,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Owner requested merge to `main` for human testing, but Railway Production API tracks `main`, and six Pack migrations remain unapplied; no merge was performed to avoid a premature Production deployment. Resolve branch drift and schema/deployment safety gate before live release.
 - [ ] Human acceptance sequence: HR login/forms/packs/assignment, employee own form drafts/submission, external guarantor request and receipt, direct guarantor completion, HR review/approval, cross-user access rejection, deadline extension and rollback checks.
 
+### Owner-delegated Production schema + main-merge checkpoint — 18 October 2026
+
+- [x] Reconciled the feature branch against the two `main`-only tracker commits, with the current `develop` tracker retained; feature merge commit `f546805`. GitHub compare now shows **0 behind `main`** and PR #6 `mergeable=true`; draft status remains.
+- [x] Found **seven** unapplied feature migrations (not six): `20261016120000_hr_invitation_lifecycle` plus six Packs migrations `20261018100000`–`20261018150000`. Do not skip the earlier HR lifecycle migration when using Prisma's ordered runner.
+- [x] Production schema prerequisites were queried read-only; no changes to the live database or its original users. Updated `docs/PRODUCTION_PACKS_RELEASE_GATE.md` on feature branch with complete list and Prisma-only migration history requirement.
+- [ ] **Database migration blocked**: This integration has read-only SQL and separate Supabase migration actions, but no access to the existing privileged Prisma migration runner/environment. Applying SQL through Supabase migration API would create a second history and is not equivalent to `npm run db:migrate`. Also no verified restorable backup (owner deferred backup). Avoid claiming database preparation complete.
+- [ ] **Main merge deferred**: Railway Production backend tracks `main`. Merging prior to applying seven migrations could deploy code against missing tables. After operator-run Prisma migrations and verification, review PR #6 then merge; user will perform live URL and human acceptance testing.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
