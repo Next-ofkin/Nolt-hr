@@ -428,6 +428,10 @@ model PackTemplate {
   employmentType String @db.VarChar(80)
   status String @default("DRAFT")
   revision Int @default(1)
+  rootPackId String? @db.Uuid
+  versionNumber Int @default(1)
+  rootPack PackTemplate? @relation("PackLineage",fields:[rootPackId],references:[id],onDelete:Restrict)
+  laterVersions PackTemplate[] @relation("PackLineage")
   createdBy String @db.Uuid
   creator User @relation(fields:[createdBy], references:[id], onDelete:Restrict)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -436,6 +440,7 @@ model PackTemplate {
   items PackItem[]
   assignments PackAssignment[]
   @@index([status, employmentType])
+  @@index([rootPackId,versionNumber])
   @@index([createdAt])
 }
 
