@@ -44,6 +44,18 @@ export function PacksWorkspace() {
   const [showComposer, setShowComposer] = useState(false);
   const [editing, setEditing] = useState<{ id: string; revision: number } | null>(null);
 
+  const [historyRoot, setHistoryRoot] = useState<string | null>(null);
+  const families = useMemo(() => {
+    const families = new Map<string, Pack[]>();
+    for (const pack of packs) {
+      const root = pack.rootPackId ?? pack.id;
+      families.set(root, [...(families.get(root) ?? []), pack]);
+    }
+    return [...families.entries()].map(([root, versions]) => ({
+      root, versions: versions.sort((a,b) => b.versionNumber - a.versionNumber),
+    })).sort((a,b) => b.versions[0].createdAt.localeCompare(a.versions[0].createdAt));
+  }, [packs]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -257,7 +269,16 @@ export function PacksWorkspace() {
         </div>
         {loading ? <p role="status" className="flex items-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 size={18} className="animate-spin"/> Loading packs…</p> :
         packs.length === 0 ? <p className="p-8 text-sm text-muted-foreground">No packs saved yet. Create your first pack draft above.</p> :
-        <div className="divide-y">{packs.map(pack => <article key={pack.id} className="p-5">
+        <div className="divide-y">{families.map(family => <div key={family.root} className="p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">{family.versions[0].name}</h3>
+            <Button size="sm" variant="outline" type="button"
+              onClick={() => setHistoryRoot(current => current === family.root ? null : family.root)}>
+              {historyRoot === family.root ? "Hide history" : `Version history (${family.versions.length})`}
+            </Button>
+          </div>
+          {(historyRoot === family.root ? family.versions : family.versions.slice(0,1)).map(pack =>
+            <article key={pack.id} className="mb-3 rounded-xl border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{pack.name} <span className="text-xs font-normal text-muted-foreground">v{pack.versionNumber}</span></h3>
             <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status.toLowerCase()}</span></div>
           <p className="mt-1 text-xs text-muted-foreground">{pack.employmentType} · {pack.items.length} forms · {pack.items.filter(item => item.required).length} required</p>
@@ -271,7 +292,7 @@ export function PacksWorkspace() {
               onClick={() => void publish(pack)}>Publish pack</Button>
           </div>}
           <ul className="mt-3 space-y-1 text-sm">{pack.items.map(item => <li key={item.id} className="text-muted-foreground">{item.position + 1}. {label(item)} {item.required ? "· required" : "· optional"}</li>)}</ul>
-        </article>)}</div>}
+        </article>)}</div>)}</div>}
       </section>
     </div>
   );
