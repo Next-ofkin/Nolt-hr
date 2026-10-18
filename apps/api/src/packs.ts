@@ -61,6 +61,57 @@ export class PacksService {
     }
   }
 
+  async newVersion(actorId: string, packId: string) {
+    try {
+      return await this.db.$transaction(async tx => {
+        const selected = await tx.packTemplate.findUnique({ where: { id: packId },
+          select: { id: true, rootPackId: true, status: true } });
+        if (!selected) throw new NotFoundException("Pack not found.");
+        if (selected.status !== "PUBLISHED")
+          throw new ConflictException("Only published packs can be used as a new version source.");
+        const rootId = selected.rootPackId ?? selected.id;
+        // Serialise version-number allocation and concurrent version requests.
+        await tx.$queryRaw`SELECT id FROM public."PackTemplate" WHERE id=${rootId}::uuid FOR UPDATE`;
+        const existing = await tx.packTemplate.findFirst({
+          where: { rootPackId: rootId, status: "DRAFT" },
+          include: { items: { orderBy: { position: "asc" } } },
+        });
+        if (existing) return existing;
+        const latest = await tx.packTemplate.findFirst({
+          where: { OR: [{ id: rootId }, { rootPackId: rootId }] },
+          orderBy: { versionNumber: "desc" },
+        });
+        if (!latest) throw new NotFoundException("Pack family not found.");
+        const source = await tx.packTemplate.findUniqueOrThrow({
+          where: { id: packId }, include: { items: { orderBy: { position: "asc" } } },
+        });
+        const copy = await tx.packTemplate.create({
+          data: {
+            rootPackId: rootId, versionNumber: latest.versionNumber + 1,
+            name: source.name, description: source.description,
+            employmentType: source.employmentType, createdBy: actorId,
+            items: { create: source.items.map(item => ({
+              formId: item.formId, formVersionId: item.formVersionId,
+              required: item.required, position: item.position,
+            })) },
+          }, include: { items: { orderBy: { position: "asc" } } },
+        });
+        await tx.auditEvent.create({
+          data: { actorId, action: "PACK_VERSION_DRAFT_CREATED", targetId: copy.id,
+            metadata: { sourcePackId: packId, rootPackId: rootId, versionNumber: copy.versionNumber } },
+        });
+        await tx.outboxEvent.create({
+          data: { type: "PACK_VERSION_DRAFT_CREATED", targetId: copy.id },
+        });
+        return copy;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
+        throw new ConflictException("Another Pack version was started. Refresh and reopen its draft.");
+      throw error;
+    }
+  }
+
   async update(actorId: string, id: string, input: unknown) {
     const parsed = updatePackSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException("Invalid pack changes or revision.");
@@ -381,6 +432,12 @@ export class PacksController {
   @ApiOkResponse({ description: "Update a revision-checked draft pack" })
   update(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
     @Body() body: unknown) { return this.packs.update(req.actor.id, id, body); }
+
+  @Post(":id/versions")
+  @ApiCreatedResponse({ description: "Create a new draft version without altering assigned published packs" })
+  newVersion(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.packs.newVersion(req.actor.id, id);
+  }
 
   @Post(":id/publish")
   @ApiCreatedResponse({ description: "Publish and lock a completed pack" })
