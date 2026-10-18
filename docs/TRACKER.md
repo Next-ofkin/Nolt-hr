@@ -219,6 +219,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Verify Prisma generation, typecheck and build, Pack API integration and migration execution against a disposable PostgreSQL database. GitHub access from this container remains DNS-blocked; **no runtime checks passed**, and no hosted migration/deploy occurred.
 - [ ] Next: version-group UI/history, sensible handling of withdrawn or superseded pack versions in future assignments, and QA/handoff checklist.
 
+### Pack version history and latest-only assignments — 18 October 2026
+
+- [x] HR Pack Builder now groups Pack templates by root lineage with an expandable version-history list, showing saved versions and preserving older Pack entries.
+- [x] HR Pack assignment selector filters to the **highest-numbered published version** per Pack family, while ignoring unpublished drafts. Selected version numbers are visible.
+- [x] Server-side Pack assignment independently rejects an older published version if a newer published version exists. Historical `PackAssignment.packId` references and underlying Form assignments are **not changed or migrated**.
+- [ ] Validate latest-version filtering after publish/draft transitions, repository TypeScript/Prisma checks, form/pack assignment integration and migrations locally; no claim of passing tests or Production changes.
+- [ ] Handover prerequisites: run isolated migrations in order, inspect migration-history checksums, verify HR/employee authorization, test version-update and approval concurrency, and document secrets/deployment rollback.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
