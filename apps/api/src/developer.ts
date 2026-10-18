@@ -169,7 +169,8 @@ export class DeveloperOverviewService {
         createdAt: a.createdAt.toISOString(),
       })),
       // Never advertise a live invitation action until acceptance is implemented.
-      inviteEnabled: false,
+      inviteEnabled: process.env.HR_INVITATION_DELIVERY_ENABLED === "true" &&
+        Boolean(process.env.HR_INVITATION_TEST_RECIPIENTS?.trim()),
     };
   }
 }
