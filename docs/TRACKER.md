@@ -227,6 +227,15 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Validate latest-version filtering after publish/draft transitions, repository TypeScript/Prisma checks, form/pack assignment integration and migrations locally; no claim of passing tests or Production changes.
 - [ ] Handover prerequisites: run isolated migrations in order, inspect migration-history checksums, verify HR/employee authorization, test version-update and approval concurrency, and document secrets/deployment rollback.
 
+### Consolidation and NOLT developer handover — 18 October 2026
+
+- [x] Corrected malformed PostgreSQL dollar-quoted `DO` block in **unapplied** Pack approval migration `20261018120000_pack_approval` (valid `DO $tag$ ... $tag$;`). This was a concrete migration syntax blocker.
+- [x] Added additive `20261018150000_pack_immutability` migration with PostgreSQL triggers preventing edits/deletions to published/withdrawn Pack content and items. This protects historical employee Pack snapshots against direct SQL mutations. Not applied anywhere.
+- [x] Created `docs/NOLT_DEVELOPER_HANDOVER.md` on feature branch with source overview, ordered migrations, build commands, mandatory tests, database/permissions review, known policy decisions and non-destructive release safeguards.
+- [ ] Validate every migration in fresh disposable PostgreSQL, Prisma generated schema, TypeScript/build and authentication/Pack integration before merging PR #6.
+- [ ] Review implementation for policy/authorization edge cases (external guarantor/references, pack revisions, approval integrity). **No runtime or database test passed here.**
+- [ ] No Production migration, reset, deployment, data deletion or automatic merge authorised.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
