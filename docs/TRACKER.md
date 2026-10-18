@@ -202,6 +202,15 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Verify Prisma schema/code generation, frontend/API typecheck/build, unit and PostgreSQL integration tests, including reviewer decision/pack approval concurrency and role-isolation paths. **No tests passed or migrations deployed in this turn**; local clone failed due to container GitHub DNS resolution.
 - [ ] Remaining: optional-only pack policy, reviewer permissions and decision evidence for guarantor/reference forms, deadline extensions/overdue logic, pack version upgrades and developer handover. Reconcile migration checksums before any future hosted deployment.
 
+### Pack deadlines and audited extensions — 18 October 2026
+
+- [x] Added **unapplied**, additive migration `20261018130000_pack_deadline_history` with immutable `PackDeadlineChange` records, restricted backend grants for due-date updates and audited actor/reason/old/new due dates.
+- [x] Added HR-only `POST /packs/assignments/:id/extend-deadline`; requires employee management permission, active unapproved pack, future date later than the current due date (when set), reason of at least 10 characters; updates Pack and linked FormAssignment due dates transactionally and records audit/outbox event.
+- [x] Server-derived overdue indicator for HR/employee pack progress (based on UTC calendar date and no final approval). Added HR deadline extension form and overdue warnings in both workspaces. **No overdue form-locking or automatic five-day deadline is enabled.**
+- [x] Added deadline-contract and overdue helper tests (authored, not yet executed).
+- [ ] Run Prisma generation/typecheck/build, the actual unit tests and disposable PostgreSQL integration test before merge. No Production deployment, data deletion or migration execution authorised.
+- [ ] Next: pack template version-upgrades, deadline policy approval, evidence-based QA/handover.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
