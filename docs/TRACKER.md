@@ -298,6 +298,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Audit the six SQL migrations against actual database objects, establish verified backup/recovery, then obtain explicit approval before any Production migration. Build success does not equal live DB readiness.
 - [ ] Confirm Vercel team access and deployment URLs; existing backend Railway production is on `main`, so feature branch merge would cause deployment before schema readiness.
 
+### Production Packs pre-deployment safety check — 18 October 2026
+
+- [x] Rechecked real Production Supabase `llslubzdkdnvhbatmfug` using **read-only SQL**; project healthy, 17 completed and 0 incomplete Prisma migrations, zero Pack migration entries; base tables, `nolt_app`, `FormVersion_id_formId_key`, `FormAssignment.dueDate` present.
+- [x] Added `docs/PRODUCTION_PACKS_RELEASE_GATE.md` on feature branch (commit `2d19bfbc`) with precise backup, migration lineage, privileges, deployment and verification gates.
+- [ ] **BLOCKER:** A fresh, restorable Production database backup has not been verified and no restore rehearsal has happened. Do **not** apply Pack migrations or merge into `main` until satisfied.
+- [ ] Validate migration SQL on isolated database before using the Prisma migration runner on Production; no Production writes/deployments performed.
+- [ ] The six new Pack migrations are additive but **not yet integration-tested**; do not claim live release readiness.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
