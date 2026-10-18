@@ -288,6 +288,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Authenticated end-to-end workflow, hosting previews/permissions, deployment and handover acceptance still pending.
 - [ ] Previous **99/99** unit tests predate branding/handover commits; don't claim rerun on current commit.
 
+### Production Supabase read-only migration inventory — 18 October 2026
+
+- [x] Queried existing Supabase project `llslubzdkdnvhbatmfug` **read-only**, without SQL writes, migration runs, or production deployments.
+- [x] Production `public` contains **27 base tables**. Prisma migration history exists: **17 completed, 0 incomplete**. Latest completed migration is `20261016100000_hr_invitation_drafts`.
+- [x] None of `PackTemplate`, `PackAssignment`, or `PackDeadlineChange` yet exists. Six Pack migrations `20261018100000`–`20261018150000` remain pending.
+- [x] Backend DB role `nolt_app` exists; `FormVersion` has unique index `FormVersion_id_formId_key` satisfying the planned composite PackItem FK (an earlier constraint-only query missed that **index**).
+- [x] Supabase security advisor reported informational RLS-with-no-policy notices on private bootstrap tables and public `_prisma_migrations`, plus leaked-password protection disabled warning (review with owner; avoid opening RLS access). Advisor reference: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+- [ ] Audit the six SQL migrations against actual database objects, establish verified backup/recovery, then obtain explicit approval before any Production migration. Build success does not equal live DB readiness.
+- [ ] Confirm Vercel team access and deployment URLs; existing backend Railway production is on `main`, so feature branch merge would cause deployment before schema readiness.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
