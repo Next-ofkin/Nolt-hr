@@ -332,6 +332,17 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] **Database migration blocked**: This integration has read-only SQL and separate Supabase migration actions, but no access to the existing privileged Prisma migration runner/environment. Applying SQL through Supabase migration API would create a second history and is not equivalent to `npm run db:migrate`. Also no verified restorable backup (owner deferred backup). Avoid claiming database preparation complete.
 - [ ] **Main merge deferred**: Railway Production backend tracks `main`. Merging prior to applying seven migrations could deploy code against missing tables. After operator-run Prisma migrations and verification, review PR #6 then merge; user will perform live URL and human acceptance testing.
 
+### GitHub repository housekeeping audit — 18 October 2026
+
+- [x] Audited all PRs: **0 open PRs**. PR #6 merged to `main` on 18 Oct 2026 (merge `430f337`); PRs #1, #2, #3 and #5 merged previously; PRs #4 and #8 closed without merge. Closed PRs remain in GitHub history even if their branches are removed.
+- [x] Audited seven branch names: `main`, `develop`, `feat/developer-hr-employee-auth`, `feat/reconcile-local-external-work`, `feat/secure-hr-lifecycle-packs-20261015`, `fix/ci-form-migration-validation-20261015`, `ci/restore-pr-checks`.
+- [x] Safe redundant branch candidates: `feat/developer-hr-employee-auth` and `feat/reconcile-local-external-work` have **0 commits ahead of `main`** (their work is already on main).
+- [x] Obsolete CI branches `ci/restore-pr-checks` and `fix/ci-form-migration-validation-20261015` are not needed for the current no-GitHub-Actions workflow. They contain unmerged historical commits; remove only if owner wants their abandoned experiments gone.
+- [ ] `feat/secure-hr-lifecycle-packs-20261015` has **22 commits ahead** and **315 behind** `main`; preserve for now since Git comparison alone cannot establish all unique content is safely superseded.
+- [ ] `develop` has 28 commits ahead and 308 behind `main`; differences centre on historical tracker records. Preserve and eventually reconcile if keeping an integration branch.
+- [ ] Remote branch deletion not performed: the connected GitHub tools support reading branches and modifying files but **do not expose delete branch/ref**. Owner can remove reviewed redundant branches in GitHub UI or locally using `git push origin --delete <branch>` (do not delete `main` or `develop`).
+- [ ] Do not make housekeeping-only commits to `main` while it is linked to Railway Production deployment.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
