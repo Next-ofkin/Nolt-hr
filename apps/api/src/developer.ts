@@ -170,6 +170,7 @@ export class DeveloperOverviewService {
       })),
       // Never advertise a live invitation action until acceptance is implemented.
       inviteEnabled: process.env.HR_INVITATION_DELIVERY_ENABLED === "true" &&
+        process.env.HR_INVITATION_ACCEPTANCE_ENABLED === "true" &&
         Boolean(process.env.HR_INVITATION_TEST_RECIPIENTS?.trim()),
     };
   }
