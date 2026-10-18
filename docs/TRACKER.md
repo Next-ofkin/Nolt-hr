@@ -264,6 +264,13 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Local typecheck/build after branding commits; check theme/background contrast and branding across login, employee and external flow pages.
 - [ ] Test migrations on isolated PostgreSQL, then evaluate reviewed Production migration plan with backup/rollback. **No live Production changes or merges authorised by this tracker.**
 
+### Read-only handover preparation — 18 October 2026
+
+- [x] Added `scripts/handover-preflight.mjs` and `npm run handover:check` for read-only Node 24 checks of tracked migration files, versioned branding setup, deployment guide, Git state, and logo path. Does not connect to any database, call an external service, deploy or manage secrets.
+- [x] Updated `docs/BRANDING_AND_DEPLOYMENT.md` to document this command.
+- [ ] Run the new preflight, TypeScript check, tests and build locally after branding commits. No verified pass is claimed for those commits.
+- [ ] Production migration review and explicit backup/approval still required; existing Railway backend deploys from `main`; Vercel access currently returned 403. No Production changes made.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
