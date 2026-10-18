@@ -245,6 +245,17 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Review package vulnerability report separately (previous `npm ci` reported 11 high vulnerabilities); avoid unconditional major upgrades.
 - [ ] Database migration and end-to-end verification remain pending.
 
+### Full local Forms & Packs build verified — 18 October 2026
+
+- [x] User fast-forwarded local `feat/developer-hr-employee-auth` to `06a3827`.
+- [x] `npm run typecheck` passed for API, web, API client and form schemas.
+- [x] `npm run build` passed for API and Next.js frontend; 18 routes generated including `/packs`.
+- [x] Previous local run on immediately preceding commit passed **99/99** unit tests. The JSX-only correction was followed by passing typecheck/build, but tests were not rerun on this exact commit.
+- [ ] Verify full migration sequence on an isolated/disposable PostgreSQL database, including grants and constraints; do not run against Production.
+- [ ] Exercise end-to-end HR form → pack → employee assignment → submission/review → final approval with synthetic accounts/data.
+- [ ] Triage reported 11 high npm dependency vulnerabilities before handover; do not blindly run breaking `npm audit fix --force`.
+- [ ] Keep PR #6 draft and Production untouched until migration/integration/security checks are complete.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
