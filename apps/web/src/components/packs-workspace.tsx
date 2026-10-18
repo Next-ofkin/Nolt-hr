@@ -284,7 +284,7 @@ export function PacksWorkspace() {
           <p className="mt-1 text-xs text-muted-foreground">{pack.employmentType} · {pack.items.length} forms · {pack.items.filter(item => item.required).length} required</p>
           {pack.description && <p className="mt-2 text-sm text-muted-foreground">{pack.description}</p>}
           {pack.status === "PUBLISHED" && <Button className="mt-3" type="button" variant="outline"
-            size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>
+            size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>}
           {pack.status === "DRAFT" && <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy}
               onClick={() => startEdit(pack)}>Edit draft</Button>
