@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
 import { canQueueHrInvitation, canRevokeHrInvitation } from "./hr-invitation-rules.js";
+import { hrRecipientAllowed } from "./hr-invitation-delivery.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
 
 const draftInput = z.object({
@@ -95,6 +96,8 @@ export class DeveloperOverviewService {
   async queue(actorId: string, id: string, requestKey: string): Promise<HrDraftDto> {
     if (process.env.HR_INVITATION_DELIVERY_ENABLED !== "true")
       throw new ServiceUnavailableException("HR invitation sending is not enabled yet.");
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation verification is not enabled yet.");
     if (!z.string().uuid().safeParse(requestKey).success)
       throw new BadRequestException("A valid invitation request key is required.");
     const item = await this.db.$transaction(async (tx) => {
@@ -102,6 +105,8 @@ export class DeveloperOverviewService {
       await tx.$queryRaw`SELECT id FROM public."HrInvitation" WHERE id=${id}::uuid FOR UPDATE`;
       const invite = await tx.hrInvitation.findUnique({ where: { id } });
       if (!invite) throw new NotFoundException("Invitation not found.");
+      if (!hrRecipientAllowed(invite.email))
+        throw new ServiceUnavailableException("This recipient is not approved for HR invitation testing.");
       if (invite.requestKey === requestKey && invite.state === "QUEUED") return invite;
       if (!canQueueHrInvitation(invite.state as Parameters<typeof canQueueHrInvitation>[0]))
         throw new ConflictException("Only invitation drafts may be queued.");
