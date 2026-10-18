@@ -1,4 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
+import { Logger } from "@nestjs/common";
+
+const diagnosticLogger = new Logger("HrInvitationProvider");
+
+/** Never log invitation addresses, URLs, bearer tokens, proof secrets or provider messages. */
+export function hrProviderDiagnostic(error: { code?: string; status?: number; name?: string }): string {
+  const code = /^[a-z0-9_]{1,64}$/i.test(error.code ?? "") ? error.code : "PROVIDER_REJECTED";
+  const status = Number.isInteger(error.status) && error.status! >= 100 && error.status! <= 599 ? error.status : "unknown";
+  const category = /^(AuthApiError|AuthUnknownError|AuthRetryableFetchError)$/.test(error.name ?? "") ? error.name : "OTHER";
+  return `HR_INVITE_PROVIDER_FAILURE status=${status} code=${code} category=${category}`;
+}
+
 import { appOrigin } from "./security.js";
 
 export type HrDeliveryResult =
@@ -44,7 +56,10 @@ export async function deliverHrInvitationEmail(
       redirectTo: appOrigin() + "/hr-invitations/accept?id=" + encodeURIComponent(invitation.id),
       data: { name: invitation.name, nolt_hr_creation_secret: invitation.creationSecret },
     });
-    if (result.error) return hrDeliveryError(result.error.code, result.error.status);
+    if (result.error) {
+      diagnosticLogger.warn(hrProviderDiagnostic({ code: result.error.code, status: result.error.status, name: result.error.name }));
+      return hrDeliveryError(result.error.code, result.error.status);
+    }
     // Require Supabase to identify the exact account it created for this invitation.
     // Do not mark as SENT without this binding; the caller must persist it first.
     const subject = result.data.user?.id;
@@ -54,6 +69,7 @@ export async function deliverHrInvitationEmail(
       return { status: "UNCERTAIN", errorCode: "PROVIDER_EMAIL_MISMATCH", retryable: false };
     return { status: "SENT", providerSubject: subject };
   } catch {
+    diagnosticLogger.warn("HR_INVITE_PROVIDER_FAILURE status=unknown code=DELIVERY_UNCERTAIN category=TRANSPORT");
     // Network timeouts leave uncertain delivery; do not blindly retry and create multiple links.
     return { status: "UNCERTAIN", errorCode: "DELIVERY_UNCERTAIN", retryable: false };
   }
