@@ -17,7 +17,7 @@ type PackItem = {
 };
 type Pack = {
   id: string; name: string; description: string; employmentType: string;
-  status: string; revision: number; createdAt: string; items: PackItem[];
+  status: string; revision: number; versionNumber: number; rootPackId: string | null; createdAt: string; items: PackItem[];
 };
 type Selected = { formId: string; formVersionId: string; required: boolean };
 const headers = { "Content-Type": "application/json" };
@@ -85,6 +85,24 @@ export function PacksWorkspace() {
   function label(item: Selected | PackItem) {
     const form = forms.find(form => form.id === item.formVersionId);
     return form ? `${form.title} · v${form.version} · ${form.recipient.toLowerCase()}` : `Form version ${item.formVersionId.slice(0, 8)}`;
+  }
+
+  async function startNextVersion(pack: Pack) {
+    if (!session || busy || pack.status !== "PUBLISHED") return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/v1/packs/${encodeURIComponent(pack.id)}/versions`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "x-csrf-token": session.csrfToken },
+      });
+      if (!response.ok) throw new Error("Could not create a new version. Refresh the Pack list.");
+      const draft = await response.json() as Pack;
+      await refresh();
+      startEdit(draft);
+      setNotice(`Pack version ${draft.versionNumber} draft is ready to edit. Previously assigned versions remain unchanged.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create new Pack version.");
+    } finally { setBusy(false); }
   }
 
   function startEdit(pack: Pack) {
@@ -240,10 +258,12 @@ export function PacksWorkspace() {
         {loading ? <p role="status" className="flex items-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 size={18} className="animate-spin"/> Loading packs…</p> :
         packs.length === 0 ? <p className="p-8 text-sm text-muted-foreground">No packs saved yet. Create your first pack draft above.</p> :
         <div className="divide-y">{packs.map(pack => <article key={pack.id} className="p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{pack.name}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{pack.name} <span className="text-xs font-normal text-muted-foreground">v{pack.versionNumber}</span></h3>
             <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status.toLowerCase()}</span></div>
           <p className="mt-1 text-xs text-muted-foreground">{pack.employmentType} · {pack.items.length} forms · {pack.items.filter(item => item.required).length} required</p>
           {pack.description && <p className="mt-2 text-sm text-muted-foreground">{pack.description}</p>}
+          {pack.status === "PUBLISHED" && <Button className="mt-3" type="button" variant="outline"
+            size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>
           {pack.status === "DRAFT" && <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy}
               onClick={() => startEdit(pack)}>Edit draft</Button>
