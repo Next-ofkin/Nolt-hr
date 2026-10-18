@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { AccountMenu } from "./account-menu";
+import { brand } from "@/lib/brand";
 import {
   ArrowUpRight,
   ClipboardList,
@@ -24,15 +25,15 @@ export function WorkspaceShell({
           <Link
             href="/"
             className="flex items-center gap-3"
-            aria-label="NOLT HR home"
+            aria-label={`${brand.name} ${brand.productName} home`}
           >
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-xl font-bold text-white">
-              N
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-primary text-xl font-bold text-white">
+              {brand.logoPath ? <img src={brand.logoPath} alt="" className="size-full object-contain" /> : brand.name.slice(0,1)}
             </span>
             <span className="text-xl font-bold tracking-tight">
-              NOLT
+              {brand.name}
               <span className="ml-2 border-l pl-2 text-sm font-normal text-muted-foreground">
-                People
+                {brand.tagline}
               </span>
             </span>
           </Link>
