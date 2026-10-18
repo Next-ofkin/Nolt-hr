@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 
-type Pack = { id: string; name: string; employmentType: string; status: string; items: { id: string }[] };
+type Pack = { id: string; name: string; employmentType: string; status: string; rootPackId: string | null; versionNumber: number; items: { id: string }[] };
 type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
   approvedAt: string | null; status: string; overdue: boolean; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
@@ -38,8 +38,16 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const options = packs.filter(pack =>
-    pack.status === "PUBLISHED" && pack.items.length > 0 &&
+  const latestPublished = new Map<string, Pack>();
+  for (const pack of packs) {
+    if (pack.status !== "PUBLISHED") continue;
+    const root = pack.rootPackId ?? pack.id;
+    const previous = latestPublished.get(root);
+    if (!previous || pack.versionNumber > previous.versionNumber)
+      latestPublished.set(root, pack);
+  }
+  const options = [...latestPublished.values()].filter(pack =>
+    pack.items.length > 0 &&
     pack.employmentType.trim().toLowerCase() === employmentType.trim().toLowerCase() &&
     !existing.some(assigned => assigned.packId === pack.id),
   );
@@ -111,7 +119,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
       <div className="space-y-1"><Label htmlFor="case-pack">Published pack</Label>
         <select id="case-pack" className="native-select w-full" value={packId} onChange={e=>setPackId(e.target.value)}>
           <option value="">Choose matching pack…</option>
-          {options.map(pack=><option value={pack.id} key={pack.id}>{pack.name} ({pack.items.length} forms)</option>)}
+          {options.map(pack=><option value={pack.id} key={pack.id}>{pack.name} · v{pack.versionNumber} ({pack.items.length} forms)</option>)}
         </select>
       </div>
       <div className="space-y-1"><Label htmlFor="case-pack-due">Due date (optional)</Label>
