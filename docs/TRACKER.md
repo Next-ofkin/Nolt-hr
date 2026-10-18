@@ -278,6 +278,16 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] User's `git pull --ff-only origin feat/developer-hr-employee-auth` failed with multiple branches; use `git fetch origin` followed by `git merge --ff-only origin/feat/developer-hr-employee-auth` on the intended branch, after checking local changes. Latest local typecheck/build passed on an older commit; branding and handover changes not yet verified.
 - [ ] No production migration, deployment or release merge implied.
 
+### Branding + handover local build verified — 18 October 2026
+
+- [x] User fast-forward merged feature branch to `7a2a7c7`; obsolete GitHub Actions workflow removed.
+- [x] Local `npm run handover:check` **PASS**; warning for untracked `.vscode/settings.json` only.
+- [x] Local `npm run typecheck` **PASS** for API, web, API client and shared schema.
+- [x] Local `npm run build` **PASS**, including API compilation and Next.js 18 routes with `/packs`.
+- [ ] Database migration history, backup and compatibility review against existing Production Supabase are still **unverified**; no live DB mutations made.
+- [ ] Authenticated end-to-end workflow, hosting previews/permissions, deployment and handover acceptance still pending.
+- [ ] Previous **99/99** unit tests predate branding/handover commits; don't claim rerun on current commit.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
