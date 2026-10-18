@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hrRecipientAllowed, hrDeliveryError, deliverHrInvitationEmail } from "../apps/api/src/hr-invitation-delivery.js";
+import { hrRecipientAllowed, hrDeliveryError, hrProviderDiagnostic, deliverHrInvitationEmail } from "../apps/api/src/hr-invitation-delivery.js";
 
 const ready = {
   HR_INVITATION_DELIVERY_ENABLED: "true",
@@ -40,4 +40,13 @@ test("HR delivery transport cannot send while disabled or recipient missing from
   assert.deepEqual(await deliverHrInvitationEmail({ ...invitation, email: "safe-hr@example.invalid" }, ready), {
     status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false,
   });
+});
+
+test("HR provider diagnostics expose status and safe code but never free-form provider messages", () => {
+  assert.equal(hrProviderDiagnostic({ status: 403, code: "not_admin", name: "AuthApiError" }),
+    "HR_INVITE_PROVIDER_FAILURE status=403 code=not_admin category=AuthApiError");
+  assert.equal(hrProviderDiagnostic({ status: 400, code: "invalid: secret@example.com", name: "UnexpectedName" }),
+    "HR_INVITE_PROVIDER_FAILURE status=400 code=PROVIDER_REJECTED category=OTHER");
+  assert.equal(hrProviderDiagnostic({}),
+    "HR_INVITE_PROVIDER_FAILURE status=unknown code=PROVIDER_REJECTED category=OTHER");
 });
