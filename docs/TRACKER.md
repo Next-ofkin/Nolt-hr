@@ -256,6 +256,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Triage reported 11 high npm dependency vulnerabilities before handover; do not blindly run breaking `npm audit fix --force`.
 - [ ] Keep PR #6 draft and Production untouched until migration/integration/security checks are complete.
 
+### Configurable branding and guided deployment handover — 18 October 2026
+
+- [x] Added `apps/web/src/lib/brand.ts` to read safe, build-time public company name, tagline, product name, description, validated primary colour and restricted same-origin logo path.
+- [x] Connected branded header, initial/logo, page metadata and primary theme colour; documented options in `.env.example`.
+- [x] Added `docs/BRANDING_AND_DEPLOYMENT.md` with future NOLT developer rebrand/import/setup/migrations/secret-handling instructions. No one-click deploy button is yet implemented; environment credentials, migration approval and domain cutover are explicit operator gates.
+- [ ] Local typecheck/build after branding commits; check theme/background contrast and branding across login, employee and external flow pages.
+- [ ] Test migrations on isolated PostgreSQL, then evaluate reviewed Production migration plan with backup/rollback. **No live Production changes or merges authorised by this tracker.**
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
