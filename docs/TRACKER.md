@@ -1,5 +1,15 @@
 # NOLT HR implementation tracker
 
+## At-a-glance status — updated 18 October 2026
+
+**Verified locally:** Prisma client generation, 99/99 Pack-inclusive unit tests on the pre-branding commit, clean TypeScript/backend/frontend build on `06a3827`, and handover preflight/typecheck/build on `7a2a7c7`. GitHub Actions retired. New Packs route compiles. **Not yet verified:** full unit test rerun after branding, Pack database migrations, authenticated end-to-end flows, security dependency triage, release deployment and handover acceptance.
+
+**Database:** Existing Supabase Production has 17 complete Prisma migrations with zero incomplete; six new Pack migrations are not applied. Owner has deferred backup discussion and suggested Telegram; no restorable database backup was verified. Do not equate file sharing/Telegram with a database restore, and do not mark recovery or Production readiness complete.
+
+Historical dated snapshots below retain their original context; checkboxes are updated only where newer evidence specifically resolves the action. Some broad tasks remain open because their untested portions are real work, even where code has been written.
+
+---
+
 ## Owner-approved simplified delivery approach — 18 October 2026
 
 Owner direction: **prioritise implementing NOLT HR Forms, Packs and HR workflows now**, without requiring CircleCI, GitHub Actions or a separate Supabase Auth sandbox as milestones for every feature. A separate NOLT development team will take responsibility for final deployment. All prior technical/release checklists remain reference material, not permission to change Production.
@@ -8,7 +18,7 @@ Owner direction: **prioritise implementing NOLT HR Forms, Packs and HR workflows
 - [x] Confirm simplified approach: build on feature branches, maintain application schema as versioned Prisma migration files, review each change and merge to `develop` as appropriate. Keep `main` as the stable handoff/release branch.
 - [ ] Deliver HR Pack CRUD and versioned Pack Items referencing immutable published FormVersion rows, API guards and HR interface, reusing the existing Forms/employee/onboarding code.
 - [ ] Deliver pack assignment, employee checklist, due dates/extensions, required-form progress, HR review and guarantor integration in small working slices.
-- [ ] Run practical, relevant local checks while building (at minimum compile/typecheck and targeted tests before merge). Do not block product development solely because hosted CI fails.
+- [x] Run practical local checks: Node 24 checkout passed Prisma generation, 99/99 Pack-inclusive unit tests (prior commit), full typecheck/build on feature commit `06a3827`, plus handover preflight/typecheck/build on `7a2a7c7`. This is **local verification**, not live integration or a completed merge.
 - [ ] Maintain one documented, ordered Prisma migration history; do not drop/recreate live tables or clear `_prisma_migrations` in an attempt to repair consistency.
 - [ ] Preserve the six active Production users and their dependent data. Deletion of inactive users or their records is **not** authorised; require an impact list, backup and separate final approval.
 - [ ] For NOLT developer handoff: provide reviewed source, ordered migration files/checksums, setup and environment documentation, seed/test-data separation, technical limitations, security checks, operations/deployment notes and an acceptance checklist.
@@ -98,8 +108,8 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 
 - [x] Located missing Production migration files `20261015170000_one_time_developer_bootstrap` and `20261016100000_hr_invitation_drafts` on `feat/developer-hr-employee-auth`, together with an additional unapplied `20261016120000_hr_invitation_lifecycle`. **Finding the files is not checksum verification nor permission to deploy them.**
 - [x] Added `apps/api/src/pack-rules.ts` on the feature branch: strict pack-template input contract, unique immutable form/version references and ordered entries, plus an explicit UTC calendar-day helper. Added `tests/pack-rules.test.ts` with six tests covering acceptance, duplicate rejection and date boundaries.
-- [ ] Run new pack tests and typecheck on checkout/CI; static GitHub commit alone is not a passing test.
-- [ ] Integrate the pack contract into the authenticated API, Prisma schema/migration and HR screens; no pack database tables exist yet.
+- [x] Run new Pack tests and typecheck locally: user supplied evidence of **99/99 tests passing**, including 11 Pack tests, followed by clean typecheck/build on fixed feature commit `06a3827`.
+- [x] Integrate Pack contracts into authenticated API, Prisma schema, six versioned migration files and HR frontend screens. **Production Pack tables do not exist yet**; migrations are unapplied.
 - [ ] Confirm the exact five-day deadline policy (calendar/business days, timezone, due-time and start trigger) before wiring reminders or access locks.
 - [ ] Compare all 17 Production migration checksums to the feature branch and reconcile `main`; no Production or Sandbox migration applied during this step.
 - [ ] Maintain the prior cleanup stop gate: six active users preserved; deletion only after impact report, recovery backup and separate explicit approval.
@@ -136,7 +146,7 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Owner to inspect GitHub account billing/payment status, actual Actions budgets/limits and repo Actions policy. **No billing lock has been confirmed.** Avoid raising spending limits without evidence.
 - [ ] If policy/billing looks normal, request GitHub Support investigate the reported deleted `BuildFailed` workflow registration (`383222104`). Do not assume orphaned registry is the proven cause.
 - [ ] Trigger a new Actions run only after platform settings diagnosis; record workflow name, jobs, run URL and results.
-- [ ] Run `npm ci`, `npm run db:generate`, `npm run typecheck`, `npm test`, `npm run build` in a clean feature-branch checkout; new Packs tests remain unverified.
+- [x] Owner's local Node 24 checkout ran `npm ci`, `db:generate`, `typecheck`, `npm test` (**99/99 Pack-inclusive tests**), and after JSX fix a successful full `build`. This was not a clean CI runner; subsequent branding changes passed typecheck/build but did not rerun all tests.
 - [ ] Keep PR #6 in draft pending real CI/test evidence, migration parity and sandbox checks. No Production deployments, migrations or inactive-user deletions authorised.
 
 ### Public-repo CI retry — 16 October 2026
@@ -149,7 +159,7 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 ### Free local verification alternative — 18 October 2026
 
 - [x] Added `.vscode/tasks.json` on `feat/developer-hr-employee-auth` (commit `7b12f68`) with tasks for `npm ci`, isolated code checks (`db:generate`, `typecheck`, `test`, `build`) and focused Pack tests. The tasks themselves are verified in GitHub; **their execution results are not yet available**.
-- [ ] Run tasks using a local Node 24 VS Code checkout and attach exact pass/fail output to PR #6. No third-party CI account or payment card required.
+- [x] Run tasks using local Node 24 VS Code checkout; owner provided exact terminal output in conversation (99 passing tests, typecheck and build). **PR #6 attachment/review remains separate**, no CI vendor or card required.
 - [ ] Distinguish local unit/build gate from future local PostgreSQL/domain tests, real sandbox Auth/MFA checks and browser regression.
 - [ ] Keep GitHub Actions/CircleCI optional until free hosted runners work. Do not bypass review, security testing or explicit Production approval.
 
@@ -159,8 +169,8 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [x] Updated `database/schema.prisma` with Pack models and relations. Added guarded HR `GET /packs`, `GET /packs/:id` and `POST /packs` controller/service wiring.
 - [x] Pack creation validates names, unique items and order, locks selected form/version rows, verifies each selected version is **PUBLISHED** and belongs to the expected form, and atomically writes pack, items, audit and outbox records. Creation is draft-only; it does **not** publish or assign a pack.
 - [ ] Execute Prisma validation, typecheck, Pack tests, migration on disposable PostgreSQL and API integration checks. Repository edits have been committed but are **not yet verified as passing**.
-- [ ] Build HR Pack Builder frontend for selecting/reordering published forms and submitting pack drafts; add update/publish/withdraw lifecycle with concurrency controls.
-- [ ] Add pack-to-onboarding assignment, deadlines, employee checklist/progress, HR approval and appropriate regression checks.
+- [x] Build HR Pack Builder frontend with published-form selection, ordering, draft create/edit and publish/new-version actions. API revision guards implemented. **Pack withdrawal UI and database integration remain pending**, tracked separately.
+- [x] Implement pack-to-case assignment, configurable due date and audited extensions, employee checklist/progress, HR approval; relevant Pack rule tests passed locally. **Full authenticated/DB regression remains pending**.
 - [ ] Never deploy the new migration to existing Production without separate migration review and release approval.
 
 ### Pack Builder UI progress — 18 October 2026
@@ -241,7 +251,7 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [x] User pulled feature branch to commit `1b2ceed` and ran checks on local Windows checkout: `npm run db:generate` succeeded (Prisma 7.10.0), API typecheck/build succeeded, and **99/99 unit tests passed**.
 - [x] Web typecheck and `next build` failed due to an **unclosed JSX conditional** in `apps/web/src/components/packs-workspace.tsx`, immediately before the draft Pack actions.
 - [x] Patched the JSX closing brace on feature branch in commit `06a3827c`. No schema changes or Production operations.
-- [ ] User to pull the correction and rerun `npm run typecheck` and `npm run build`. Do not claim the full feature branch build passed until that rerun is observed.
+- [x] User pulled JSX correction at `06a3827` and reported successful `npm run typecheck` and `npm run build`, including Next.js `/packs` route.
 - [ ] Review package vulnerability report separately (previous `npm ci` reported 11 high vulnerabilities); avoid unconditional major upgrades.
 - [ ] Database migration and end-to-end verification remain pending.
 
@@ -261,21 +271,21 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [x] Added `apps/web/src/lib/brand.ts` to read safe, build-time public company name, tagline, product name, description, validated primary colour and restricted same-origin logo path.
 - [x] Connected branded header, initial/logo, page metadata and primary theme colour; documented options in `.env.example`.
 - [x] Added `docs/BRANDING_AND_DEPLOYMENT.md` with future NOLT developer rebrand/import/setup/migrations/secret-handling instructions. No one-click deploy button is yet implemented; environment credentials, migration approval and domain cutover are explicit operator gates.
-- [ ] Local typecheck/build after branding commits; check theme/background contrast and branding across login, employee and external flow pages.
+- [ ] Branding typecheck/build **passed** at `7a2a7c7`; visual contrast and branding across login, employee and external screens **still need browser review**.
 - [ ] Test migrations on isolated PostgreSQL, then evaluate reviewed Production migration plan with backup/rollback. **No live Production changes or merges authorised by this tracker.**
 
 ### Read-only handover preparation — 18 October 2026
 
 - [x] Added `scripts/handover-preflight.mjs` and `npm run handover:check` for read-only Node 24 checks of tracked migration files, versioned branding setup, deployment guide, Git state, and logo path. Does not connect to any database, call an external service, deploy or manage secrets.
 - [x] Updated `docs/BRANDING_AND_DEPLOYMENT.md` to document this command.
-- [ ] Run the new preflight, TypeScript check, tests and build locally after branding commits. No verified pass is claimed for those commits.
+- [ ] After branding changes: **handover preflight, typecheck and build passed** at `7a2a7c7`; **unit tests have not been rerun** on that commit.
 - [ ] Production migration review and explicit backup/approval still required; existing Railway backend deploys from `main`; Vercel access currently returned 403. No Production changes made.
 
 ### GitHub Actions retired — 18 October 2026
 
 - [x] Removed unused `.github/workflows/pr-checks.yml` from `feat/developer-hr-employee-auth` (commit `7a2a7c77`) and `ci/restore-pr-checks` (commit `242a93d4`). No workflow files were found on `develop` or `main`.
 - [x] Closed draft PR #8 without merging. Local `npm run typecheck`, `npm test`, `npm run build`, and the new read-only `npm run handover:check` remain available; they are not GitHub Actions.
-- [ ] User's `git pull --ff-only origin feat/developer-hr-employee-auth` failed with multiple branches; use `git fetch origin` followed by `git merge --ff-only origin/feat/developer-hr-employee-auth` on the intended branch, after checking local changes. Latest local typecheck/build passed on an older commit; branding and handover changes not yet verified.
+- [x] User ran `git fetch origin` and `git merge --ff-only origin/feat/developer-hr-employee-auth` successfully to `7a2a7c7`, then passed handover preflight, typecheck and build. Untracked `.vscode/settings.json` was preserved.
 - [ ] No production migration, deployment or release merge implied.
 
 ### Branding + handover local build verified — 18 October 2026
