@@ -30,6 +30,9 @@ For the logo, add your PNG, WebP or JPEG image to `apps/web/public/branding/comp
 - Preview, deployment, database migration, merge and domain cutover remain manual **approval gates**. Successful local code build and unit tests do not replace migration testing.
 - Zero-cost hosting beyond existing free allowances is not guaranteed; confirm plan limits before provisioning services.
 
+## One-command handover preflight
+Run `npm run handover:check` using Node 24 to check the presence of handover files, Pack migration SQL markers, logo location and branding values. This command is **read-only**: it does not migrate, deploy, access Production or verify secrets. A successful preflight does not replace full app tests and migration review.
+
 ## Source verification
 ```sh
 npm ci
