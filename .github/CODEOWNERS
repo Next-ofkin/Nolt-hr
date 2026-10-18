@@ -1,0 +1,5 @@
+# Ownership is advisory unless a main branch ruleset requires code-owner approval.
+* @Next-ofkin
+/apps/api/ @Next-ofkin
+/database/ @Next-ofkin
+/.github/ @Next-ofkin
