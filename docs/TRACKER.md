@@ -343,6 +343,14 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Remote branch deletion not performed: the connected GitHub tools support reading branches and modifying files but **do not expose delete branch/ref**. Owner can remove reviewed redundant branches in GitHub UI or locally using `git push origin --delete <branch>` (do not delete `main` or `develop`).
 - [ ] Do not make housekeeping-only commits to `main` while it is linked to Railway Production deployment.
 
+### HR invitation human-test issue — 18 October 2026
+
+- [x] Live UI currently creates HR invitation DRAFT only; it deliberately does not send email.
+- [x] Backend has gated queue and delivery functions, but no UI queue action, and Railway Production is missing delivery, recipient allowlist and acceptance environment switches.
+- [ ] Implement explicit queue action with clear status and enforced backend feature gate.
+- [ ] Configure reviewed recipient allowlist, Supabase delivery/redirect settings, and human-approved MFA/HR activation before calling the feature complete.
+- [ ] Run live invitation, email receipt, proof, password and MFA tests.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
