@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { brand } from "@/lib/brand";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
 export const metadata: Metadata = {
-  title: "NOLT HR | Form library",
-  description: "NOLT Finance employee lifecycle workspace",
+  title: `${brand.name} ${brand.productName} | Employee workspace`,
+  description: brand.description,
 };
 export default function RootLayout({
   children,
