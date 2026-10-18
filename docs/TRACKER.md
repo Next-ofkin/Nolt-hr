@@ -271,6 +271,13 @@ Owner direction: continue NOLT HR Forms & Packs as the main product; use isolate
 - [ ] Run the new preflight, TypeScript check, tests and build locally after branding commits. No verified pass is claimed for those commits.
 - [ ] Production migration review and explicit backup/approval still required; existing Railway backend deploys from `main`; Vercel access currently returned 403. No Production changes made.
 
+### GitHub Actions retired — 18 October 2026
+
+- [x] Removed unused `.github/workflows/pr-checks.yml` from `feat/developer-hr-employee-auth` (commit `7a2a7c77`) and `ci/restore-pr-checks` (commit `242a93d4`). No workflow files were found on `develop` or `main`.
+- [x] Closed draft PR #8 without merging. Local `npm run typecheck`, `npm test`, `npm run build`, and the new read-only `npm run handover:check` remain available; they are not GitHub Actions.
+- [ ] User's `git pull --ff-only origin feat/developer-hr-employee-auth` failed with multiple branches; use `git fetch origin` followed by `git merge --ff-only origin/feat/developer-hr-employee-auth` on the intended branch, after checking local changes. Latest local typecheck/build passed on an older commit; branding and handover changes not yet verified.
+- [ ] No production migration, deployment or release merge implied.
+
 ### Next executable priorities
 
 1. Audit/reconcile production's 17 migration records against GitHub; inspect current Forms/Packs code and mark truly delivered vs documented requirements.
