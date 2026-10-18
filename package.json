@@ -49,7 +49,8 @@
     "auth:hr:sandbox-enroll": "node scripts/hr-provider-sandbox-enroll.mjs",
     "auth:hr:activate": "node scripts/hr-activation-runner.mjs",
     "auth:developer:preflight": "node scripts/developer-bootstrap.mjs",
-    "auth:developer:apply": "node scripts/developer-bootstrap.mjs --apply"
+    "auth:developer:apply": "node scripts/developer-bootstrap.mjs --apply",
+    "handover:check": "node scripts/handover-preflight.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
