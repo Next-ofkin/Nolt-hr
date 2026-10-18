@@ -8,12 +8,14 @@ import {
 } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
+import { DeveloperWorkspace } from "./developer-workspace";
 import { FormsWorkspace } from "./forms-workspace";
 import { WorkspaceAccess } from "./workspace-access";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
 import { EmployeeResponse } from "./employee-response";
 import { ExternalContact } from "./external-contact";
+import { MyPackProgress } from "./my-pack-progress";
 export function HomeWorkspace() {
   const { session } = useAuth();
   useEffect(() => {
@@ -21,6 +23,7 @@ export function HomeWorkspace() {
   }, [session?.externalRequestId]);
   if (session?.externalRequestId)
     return <p role="status">Opening your requested form…</p>;
+  if (session?.role === "DEVELOPER") return <DeveloperWorkspace />;
   if (session?.permissions.includes("profile.own"))
     return (
       <WorkspaceAccess permission="profile.own">
@@ -35,6 +38,7 @@ export function HomeWorkspace() {
 }
 function EmployeeHome() {
   const [responseId, setResponseId] = useState<string | null>(null);
+  const [packRefresh, setPackRefresh] = useState(0);
   const [data, setData] = useState<
       components["schemas"]["MyOnboardingDto"] | null
     >(null),
@@ -48,6 +52,7 @@ function EmployeeHome() {
       const r = await api.GET("/api/v1/me/onboarding");
       if (r.error) throw new Error(errorMessage(r.error));
       setData(r.data);
+      setPackRefresh(value => value + 1);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not load your checklist.",
@@ -94,6 +99,7 @@ function EmployeeHome() {
             <p>HR has not opened your onboarding case yet.</p>
           ) : (
             <>
+              <MyPackProgress refreshKey={packRefresh} />
               <p className="text-sm">
                 {
                   data.onboardingCase.assignments.filter((a) => a.required)

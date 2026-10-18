@@ -14,5 +14,14 @@ export default defineConfig({
     channel: "chromium",
     trace: "retain-on-failure",
   },
+  // Local browser checks need only the Next.js frontend: their API calls are mocked.
+  // Live tests require the separately approved full-stack environment.
+  webServer: process.env.AUTH_LIVE_TESTS === "true" ? undefined : {
+    command: "npm run dev -w @nolt/web",
+    url: "http://127.0.0.1:3000/login",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+    env: { API_ORIGIN: "http://127.0.0.1:4000" },
+  },
   reporter: "list",
 });

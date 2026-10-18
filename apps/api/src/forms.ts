@@ -137,6 +137,14 @@ export class FormsService {
     });
     return forms.flatMap((f) => f.versions.map(dto));
   }
+  async listPublished() {
+    const versions = await this.db.formVersion.findMany({
+      where: { status: "PUBLISHED" },
+      take: 500,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    });
+    return versions.map(dto);
+  }
   async get(id: string) {
     const row = await this.db.formVersion.findUnique({ where: { id } });
     if (!row) throw new NotFoundException("Form version not found.");
@@ -313,6 +321,11 @@ export class FormsController {
   @ApiOkResponse({ type: FormDto, isArray: true })
   list(): Promise<FormDto[]> {
     return this.service.list();
+  }
+  @Get("forms/published")
+  @ApiOkResponse({ type: FormDto, isArray: true })
+  listPublished(): Promise<FormDto[]> {
+    return this.service.listPublished();
   }
   @Post("forms")
   @ApiCreatedResponse({ type: FormDto })

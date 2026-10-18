@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 import { EmployeeInvitations } from "./employee-invitations";
+import { PackAssignmentPanel } from "./pack-assignment-panel";
 import { SubmissionReview } from "./submission-review";
 type Detail = components["schemas"]["EmployeeDetailDto"];
 type Employee = components["schemas"]["EmployeeDto"];
@@ -443,6 +444,20 @@ export function EmployeesWorkspace() {
               ) : (
                 <div className="space-y-4 border-t pt-5">
                   <h3 className="font-semibold">Onboarding · Pre-onboarding</h3>
+                  <PackAssignmentPanel
+                    key={c.id}
+                    caseId={c.id}
+                    caseRevision={c.revision}
+                    employmentType={detail.employee.employmentType}
+                    csrfToken={session!.csrfToken}
+                    onAssigned={async () => {
+                      const refreshed = await api.GET("/api/v1/employees/{id}", {
+                        params: { path: { id: detail.employee.id } },
+                      });
+                      if (refreshed.error || !refreshed.data) throw new Error("Could not reload the employee case.");
+                      setDetail(refreshed.data);
+                    }}
+                  />
                   <ul className="space-y-3">
                     {c.assignments.map((a) => {
                       const hasSubmission =

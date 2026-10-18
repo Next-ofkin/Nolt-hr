@@ -24,6 +24,10 @@ export default function MfaPage() {
       window.location.replace("/invitations/complete");
       return;
     }
+    if (r.data.stage === "hr_invitation") {
+      window.location.replace("/hr-invitations/complete");
+      return;
+    }
     if (r.data.stage === "external") {
       window.location.replace("/external/complete");
       return;
@@ -69,6 +73,8 @@ export default function MfaPage() {
       if (r.data.next === "password") {
         setCode("");
         await load();
+      } else if (r.data.next === "hr_invitation") {
+        window.location.assign("/hr-invitations/complete");
       } else if (r.data.next === "external") {
         window.location.assign("/external/complete");
       } else if (r.data.next === "invitation") {

@@ -1,5 +1,9 @@
 import { ExternalSessions, ExternalSessionGuard } from "./external-sessions.js";
 import { QueueWorkerService } from "./queue-worker.js";
+import { HrInvitationWorker } from "./hr-invitation-worker.js";
+import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
+import { HrInvitationExchangeController, HrInvitationExchangeService } from "./hr-invitation-exchange.js";
+import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import "reflect-metadata";
 import {
   ExternalRequestsController,
@@ -20,6 +24,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Database } from "./database.js";
+import { DeveloperOverviewController, DeveloperOverviewService } from "./developer.js";
 import { databaseReadiness } from "./database-diagnostics.js";
 import {
   ResponsesController,
@@ -27,8 +32,9 @@ import {
   ReviewsController,
   ReviewGuard,
 } from "./responses.js";
-import { AuthController, HrGuard, SessionGuard } from "./auth.js";
+import { AuthController, DeveloperGuard, HrGuard, SessionGuard } from "./auth.js";
 import { FormsController, FormsService } from "./forms.js";
+import { MyPacksController, PacksController, PacksService } from "./packs.js";
 import { Sessions } from "./sessions.js";
 import { SupabaseAuth } from "./supabase-auth.js";
 import {
@@ -64,10 +70,14 @@ class HealthController {
 @Module({
   controllers: [
     HealthController,
+    DeveloperOverviewController,
+    HrInvitationExchangeController,
     ResponsesController,
     ReviewsController,
     AuthController,
     FormsController,
+    PacksController,
+    MyPacksController,
     EmployeesController,
     MyOnboardingController,
     InvitationsController,
@@ -79,6 +89,10 @@ class HealthController {
   ],
   providers: [
     Database,
+    DeveloperOverviewService,
+    HrInvitationExchangeService,
+    HrInvitationProofService,
+    DeveloperGuard,
     ResponsesService,
     ReviewGuard,
     Sessions,
@@ -86,6 +100,7 @@ class HealthController {
     SessionGuard,
     HrGuard,
     FormsService,
+    PacksService,
     EmployeesService,
     EmployeesGuard,
     InvitationsService,
@@ -96,6 +111,8 @@ class HealthController {
     ExternalSessions,
     ExternalSessionGuard,
     QueueWorkerService,
+    HrInvitationWorker,
+    HrInvitationDeliveryLedger,
   ],
 })
 export class AppModule {}

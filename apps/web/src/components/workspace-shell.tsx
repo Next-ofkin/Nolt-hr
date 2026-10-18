@@ -2,18 +2,20 @@
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { AccountMenu } from "./account-menu";
+import { brand } from "@/lib/brand";
 import {
   ArrowUpRight,
   ClipboardList,
   FileStack,
-  ShieldCheck,
+  PackageOpen,
+  LayoutDashboard,
 } from "lucide-react";
 export function WorkspaceShell({
   children,
   active = "forms",
 }: {
   children: React.ReactNode;
-  active?: "forms" | "tracker" | "employees";
+  active?: "forms" | "tracker" | "employees" | "packs";
 }) {
   const { session } = useAuth();
   return (
@@ -23,19 +25,22 @@ export function WorkspaceShell({
           <Link
             href="/"
             className="flex items-center gap-3"
-            aria-label="NOLT HR home"
+            aria-label={`${brand.name} ${brand.productName} home`}
           >
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-xl font-bold text-white">
-              N
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-primary text-xl font-bold text-white">
+              {brand.logoPath ? <img src={brand.logoPath} alt="" className="size-full object-contain" /> : brand.name.slice(0,1)}
             </span>
             <span className="text-xl font-bold tracking-tight">
-              NOLT
+              {brand.name}
               <span className="ml-2 border-l pl-2 text-sm font-normal text-muted-foreground">
-                People
+                {brand.tagline}
               </span>
             </span>
           </Link>
           <nav aria-label="Main navigation" className="flex gap-1 text-sm">
+            {session?.permissions.includes("hr.accounts.manage") && (
+              <Link href="/" aria-current={active === "forms" ? "page" : undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "forms" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}><LayoutDashboard size={16}/> Developer overview</Link>
+            )}
             {session?.permissions.includes("employees.manage") && (
               <Link
                 href="/employees"
@@ -44,7 +49,7 @@ export function WorkspaceShell({
                 Employees
               </Link>
             )}
-            <Link
+            {!session?.permissions.includes("hr.accounts.manage") && <Link
               href="/"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "forms" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
             >
@@ -52,19 +57,25 @@ export function WorkspaceShell({
               {session?.permissions.includes("profile.own")
                 ? "My onboarding"
                 : "Forms"}
-            </Link>
-            <Link
+            </Link>}
+            {session?.permissions.includes("forms.manage") && !session?.permissions.includes("hr.accounts.manage") && (
+              <Link href="/packs" aria-current={active === "packs" ? "page" : undefined}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "packs" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}>
+                <PackageOpen size={16} /> Packs
+              </Link>
+            )}
+            {!session?.permissions.includes("hr.accounts.manage") && <Link
               href="/tracker"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 ${active === "tracker" ? "bg-accent font-semibold text-primary" : "text-muted-foreground"}`}
             >
               <ClipboardList size={16} />
               Build tracker
-            </Link>
+            </Link>}
           </nav>
           <AccountMenu />
         </div>
       </header>
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
+      {!session?.permissions.includes("hr.accounts.manage") && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs leading-5 text-amber-900">
         Development workspace · HR review, signing and third-party requests are
         being built{" "}
         <Link
@@ -74,7 +85,7 @@ export function WorkspaceShell({
           View progress
           <ArrowUpRight size={12} />
         </Link>
-      </div>
+      </div>}
       <main className="mx-auto max-w-[1600px] px-4 py-7 sm:px-8 sm:py-9 lg:px-10">
         {children}
       </main>

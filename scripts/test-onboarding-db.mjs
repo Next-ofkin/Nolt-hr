@@ -1,4 +1,6 @@
 import { digest } from "../apps/api/dist/security.js";
+import { seal } from "../apps/api/dist/auth-crypto.js";
+import { runHrActivation } from "./hr-activation-runner.mjs";
 import { ExternalSessions } from "../apps/api/dist/external-sessions.js";
 // Domain/database verification only. This never starts an Auth provider or creates a login shortcut.
 import "reflect-metadata";
@@ -16,6 +18,9 @@ import {
 } from "../apps/api/dist/employees.js";
 import { InvitationsService } from "../apps/api/dist/invitations.js";
 import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
+import { HrInvitationDeliveryLedger } from "../apps/api/dist/hr-invitation-ledger.js";
+import { HrInvitationWorker } from "../apps/api/dist/hr-invitation-worker.js";
+import { DeveloperOverviewService } from "../apps/api/dist/developer.js";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { ResponsesService } from "../apps/api/dist/responses.js";
 import { ExternalContactsService } from "../apps/api/dist/external-contacts.js";
@@ -56,8 +61,10 @@ try {
     CREATE TABLE auth.sessions(id uuid,user_id uuid,not_after timestamptz);
     REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO nolt_app;
     GRANT SELECT ON public."User",public."Identity" TO nolt_app;
+    GRANT SELECT,INSERT,UPDATE ON public."Session" TO nolt_app;
     GRANT SELECT,INSERT ON public."AuditEvent",public."OutboxEvent" TO nolt_app;
-    GRANT SELECT ON public."Form",public."FormVersion" TO nolt_app;`);
+    GRANT SELECT ON public."Form" TO nolt_app;
+    GRANT SELECT,UPDATE ON public."FormVersion" TO nolt_app;`);
   await owner.query(
     readFileSync("database/supabase-auth-provisioning.sql", "utf8"),
   );
@@ -85,6 +92,29 @@ try {
     await runtime.authFlow.count({ where: { kind: "EXTERNAL" } }),
     1,
   );
+  const hrFlowCookie = [];
+  await flowAuth.start(
+    "HR_INVITATION",
+    { invitationId: randomUUID(), tokens: { access_token: "synthetic", refresh_token: "synthetic" } },
+    { headers: {} },
+    { cookie: (...args) => hrFlowCookie.push(args) },
+  );
+  assert.equal(hrFlowCookie.length, 1);
+  assert.equal(await runtime.authFlow.count({ where: { kind: "HR_INVITATION" } }), 1);
+  assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session"')).rows[0].n, 0);
+  await owner.query("BEGIN");
+  try {
+    await owner.query("SAVEPOINT hr_password_binding");
+    await assert.rejects(
+      owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=now() WHERE kind=\'HR_INVITATION\' AND "hrSubject" IS NULL'),
+      (error) => error.code === "23514",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT hr_password_binding");
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  console.log("PASS: PostgreSQL refuses confirmed HR password flow without bound invitation and subject.");
+  console.log("PASS: isolated encrypted HR_INVITATION flow passes DB kind constraint without creating workspace session or calling Supabase.");
   if (priorEncryptionKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
   else process.env.AUTH_ENCRYPTION_KEY = priorEncryptionKey;
   if (priorFlowLocal === undefined) delete process.env.LOCAL_DEVELOPMENT;
@@ -180,7 +210,18 @@ try {
       formVersionId: v2,
       required: true,
     }),
-    (e) => e.getStatus() === 400,
+    (e) => {
+      if (typeof e?.getStatus !== "function")
+        throw new Error(
+          "Expected a 400 rejection for a draft form assignment, but received " +
+            (e?.constructor?.name ?? typeof e) +
+            ": " +
+            (e?.message ?? "no error message"),
+          { cause: e },
+        );
+      assert.equal(e.getStatus(), 400);
+      return true;
+    },
   );
   const assignments = await Promise.allSettled(
     [1, 2].map(() =>
@@ -1019,8 +1060,16 @@ try {
     "PASS: file/signature domain rules, rejected headers, MIME detection, content binding, invalidation, immutability and download scoping (explicit storage/scanner test doubles; no hosted scanning claim).",
   );
 
+  // Suppress only the automatic background kick in isolated domain QA.
+  // Explicit deliverNext() calls still exercise the real invitation worker.
+  class DomainInvitations extends InvitationsService {
+    async deliverNext(onlyInvitationId) {
+      if (onlyInvitationId) return false;
+      return super.deliverNext();
+    }
+  }
   const auth = new SupabaseAuth(runtime),
-    invites = new InvitationsService(
+    invites = new DomainInvitations(
       runtime,
       auth,
       new Sessions(runtime, auth),
@@ -1044,6 +1093,13 @@ try {
   process.env.SUPABASE_PUBLISHABLE_KEY ??= "isolated-transport-only";
   class DomainExternalRequests extends ExternalRequestsService {
     sent = 0;
+    // Suppress the production fire-and-forget kick for deterministic isolated QA.
+    // Explicit deliverNext() calls below still exercise the real queue, leases,
+    // locking, sending, audit and state-transition implementation.
+    async deliverNext(onlyRequestId) {
+      if (onlyRequestId) return false;
+      return super.deliverNext();
+    }
     async sendEmail() {
       this.sent++;
       return null;
@@ -1402,6 +1458,425 @@ try {
   console.log(
     "PASS: a verified, already-linked invitee who lacks a password must still finish password setup after resend.",
   );
+
+  // Developer migration must protect the one-owner slot without touching
+  // existing HR or employee accounts. Everything below is isolated PostgreSQL.
+  const developerQa = randomUUID(),
+    competingDeveloperQa = randomUUID();
+  await owner.query(
+    "INSERT INTO auth.users(id,email,email_confirmed_at) VALUES ($1,'developer-owner-qa@example.invalid',now()),($2,'developer-second-qa@example.invalid',now())",
+    [developerQa, competingDeveloperQa],
+  );
+  const developerBaseline = await owner.query(
+    'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+    [developerQa],
+  );
+  assert.equal(developerBaseline.rows[0].role, "EMPLOYEE");
+  assert.equal(developerBaseline.rows[0].authVersion, 1);
+  const privileges = await owner.query(
+    "SELECT has_table_privilege('nolt_app','nolt_private.developer_bootstrap','SELECT') AS runtime_read, has_table_privilege('authenticated','nolt_private.developer_bootstrap','SELECT') AS auth_read",
+  );
+  assert.equal(privileges.rows[0].runtime_read, false);
+  assert.equal(privileges.rows[0].auth_read, false);
+
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO nolt_private.developer_bootstrap ("userId","providerSubject","approvedEmail") VALUES($1,$1,$2)',
+      [developerQa, "developer-owner-qa@example.invalid"],
+    );
+    await owner.query(
+      'UPDATE public."User" SET role=\'DEVELOPER\', permissions=ARRAY[]::text[] WHERE id=$1',
+      [developerQa],
+    );
+    const checked = await owner.query(
+      'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+      [developerQa],
+    );
+    assert.equal(checked.rows[0].role, "DEVELOPER");
+    assert.equal(checked.rows[0].authVersion, 2);
+    await owner.query("SAVEPOINT second_developer");
+    await assert.rejects(
+      owner.query(
+        'UPDATE public."User" SET role=\'DEVELOPER\' WHERE id=$1',
+        [competingDeveloperQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT second_developer");
+    await owner.query("SAVEPOINT second_bootstrap");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO nolt_private.developer_bootstrap ("userId","providerSubject","approvedEmail") VALUES($1,$1,$2)',
+        [competingDeveloperQa, "developer-second-qa@example.invalid"],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT second_bootstrap");
+  } finally {
+    // Verify a failed/rejected bootstrap leaves no Developer role or claim.
+    await owner.query("ROLLBACK");
+  }
+  const postRollback = await owner.query(
+    'SELECT role,"authVersion" FROM public."User" WHERE id=$1',
+    [developerQa],
+  );
+  assert.equal(postRollback.rows[0].role, "EMPLOYEE");
+  assert.equal(postRollback.rows[0].authVersion, 1);
+  assert.equal(
+    (await owner.query("SELECT count(*)::integer AS n FROM nolt_private.developer_bootstrap")).rows[0].n,
+    0,
+  );
+  console.log(
+    "PASS: Developer bootstrap single-role and one-time ledger uniqueness, protected runtime privileges, access-version trigger and complete transactional rollback (isolated PostgreSQL).",
+  );
+  // HR draft constraints are tested in the same temporary database.
+  const hrDraftId = randomUUID();
+  const hrDraftPrivileges = await owner.query(
+    "SELECT has_table_privilege('nolt_app','public.\"HrInvitation\"','DELETE') AS can_delete, has_table_privilege('anon','public.\"HrInvitation\"','SELECT') AS anon_read, has_table_privilege('nolt_app','public.\"HrInvitation\"','INSERT') AS can_insert",
+  );
+  assert.equal(hrDraftPrivileges.rows[0].can_delete, false);
+  assert.equal(hrDraftPrivileges.rows[0].anon_read, false);
+  assert.equal(hrDraftPrivileges.rows[0].can_insert, true);
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy") VALUES($1,$2,$3,$4)',
+      [hrDraftId, "new-hr-qa@example.invalid", "Temporary HR invitee", developerQa],
+    );
+    await owner.query("SAVEPOINT duplicate_hr_draft");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO public."HrInvitation"(email,name,"createdBy") VALUES($1,$2,$3)',
+        ["new-hr-qa@example.invalid", "Duplicate HR invitee", developerQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT duplicate_hr_draft");
+    const account = await owner.query(
+      'SELECT role FROM public."User" WHERE id=$1',
+      [developerQa],
+    );
+    assert.equal(account.rows[0].role, "EMPLOYEE");
+    await owner.query(
+      'UPDATE public."HrInvitation" SET state=\'REVOKED\',"revokedAt"=now() WHERE id=$1',
+      [hrDraftId],
+    );
+    assert.equal(
+      (await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[hrDraftId])).rows[0].state,
+      "REVOKED",
+    );
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  assert.equal(
+    (await owner.query('SELECT count(*)::int AS n FROM public."HrInvitation"')).rows[0].n,
+    0,
+  );
+  console.log("PASS: HR invitation drafts enforce unique pending email, restricted database privileges, revocation and full rollback without role changes (isolated PostgreSQL).");
+
+  // Simulate delivery states only in a rollback-only fixture. No Auth call or mail.
+  await owner.query("BEGIN");
+  try {
+    await owner.query(
+      'INSERT INTO public."HrInvitation"(id,email,name,"createdBy","expiresAt",state,"requestKey") VALUES($1,$2,$3,$4,now()+interval \'30 minutes\',\'QUEUED\',$5)',
+      [hrDraftId, "queued-hr-qa@example.invalid", "Queued HR", developerQa, randomUUID()],
+    );
+    await owner.query("SAVEPOINT duplicate_queued_hr");
+    await assert.rejects(
+      owner.query(
+        'INSERT INTO public."HrInvitation"(email,name,"createdBy") VALUES($1,$2,$3)',
+        ["queued-hr-qa@example.invalid", "Duplicate pending HR", developerQa],
+      ),
+      (e) => e.code === "23505",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT duplicate_queued_hr");
+    await owner.query("UPDATE public.\"HrInvitation\" SET state='REVOKED',\"revokedAt\"=now() WHERE id=$1", [hrDraftId]);
+    await owner.query("SAVEPOINT terminal_hr_state");
+    await assert.rejects(
+      owner.query("UPDATE public.\"HrInvitation\" SET state='QUEUED',\"revokedAt\"=NULL WHERE id=$1", [hrDraftId]),
+      (e) => e.code === "P0001",
+    );
+    await owner.query("ROLLBACK TO SAVEPOINT terminal_hr_state");
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1', [developerQa])).rows[0].role,"EMPLOYEE");
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  console.log("PASS: HR invitation queued-email uniqueness, terminal-state protection and zero account role changes (isolated PostgreSQL rollback).");
+
+  // Delivery ledger receives a fabricated provider response only. Disposable isolated DB.
+  const ledgerId = randomUUID(), ledgerSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
+    [ledgerId, "ledger-hr-qa@example.invalid", "Ledger QA", developerQa],
+  );
+  // Only a creation-time binding permits a successful delivery result.
+  const ledgerSecret = "a".repeat(64);
+  await owner.query('UPDATE public."HrInvitation" SET "creationSecretHash"=encode(sha256(convert_to($1,\'UTF8\')),\'hex\') WHERE id=$2',[ledgerSecret,ledgerId]);
+  await owner.query('INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,$3)',[ledgerSubject,"ledger-hr-qa@example.invalid",{nolt_hr_creation_secret:ledgerSecret}]);
+  const ledger = new HrInvitationDeliveryLedger(runtime);
+  assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),true);
+  assert.equal(await ledger.record(ledgerId,{status:"SENT",providerSubject:ledgerSubject}),false);
+  const recorded = await owner.query(
+    'SELECT state,"providerSubject","sentAt" FROM public."HrInvitation" WHERE id=$1',
+    [ledgerId],
+  );
+  assert.equal(recorded.rows[0].state,"SENT");
+  assert.equal(recorded.rows[0].providerSubject,ledgerSubject);
+  assert.ok(recorded.rows[0].sentAt);
+  await owner.query("BEGIN");
+  await owner.query("SAVEPOINT premature_acceptance");
+  await assert.rejects(
+    owner.query('UPDATE public."HrInvitation" SET state=\'ACCEPTED\' WHERE id=$1',[ledgerId]),
+    (e) => e.code === "23514",
+  );
+  await owner.query("ROLLBACK TO SAVEPOINT premature_acceptance");
+  await owner.query("ROLLBACK");
+  assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"SENT");
+
+  assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
+  assert.equal(
+    (await owner.query("SELECT count(*)::int AS n FROM public.\"AuditEvent\" WHERE \"targetId\"=$1 AND action='HR_INVITATION_SENT'",[ledgerId])).rows[0].n,
+    1,
+  );
+  console.log("PASS: HR invitation delivery ledger saves provider subject once, audits outcome and preserves account roles (disposable isolated PostgreSQL, no mail).");
+
+  // A restricted owner-only activation boundary is tested with reversible role changes.
+  const activationFlowId = randomUUID();
+  const activationGrants = await owner.query(
+    "SELECT has_function_privilege('nolt_app','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS runtime_execute, has_function_privilege('authenticated','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS web_execute",
+  );
+  assert.equal(activationGrants.rows[0].runtime_execute,false);
+  assert.equal(activationGrants.rows[0].web_execute,false);
+  assert.equal(
+    (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+    false,
+  );
+  await owner.query("BEGIN");
+  try {
+    await owner.query("UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1",[ledgerSubject]);
+    // Confirmed email alone is insufficient without a completed HR password flow.
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    await owner.query(
+      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt","hrInvitationId","hrSubject") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',now(),$5,$6)',
+      [activationFlowId,"confirmed-flow-"+activationFlowId,"csrf-"+activationFlowId,"encrypted-fixture",ledgerId,ledgerSubject],
+    );
+    await owner.query('UPDATE public."AuthFlow" SET "hrSubject"=$2 WHERE id=$1',[activationFlowId,randomUUID()]);
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    await owner.query('UPDATE public."AuthFlow" SET "hrSubject"=$2,"hrInvitationId"=$3 WHERE id=$1',[activationFlowId,ledgerSubject,randomUUID()]);
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    await owner.query('UPDATE public."AuthFlow" SET "hrInvitationId"=$2 WHERE id=$1',[activationFlowId,ledgerId]);
+    await owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=now()+interval \'1 hour\' WHERE id=$1',[activationFlowId]);
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    await owner.query('UPDATE public."AuthFlow" SET "hrPasswordConfirmedAt"=clock_timestamp() WHERE id=$1',[activationFlowId]);
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      true,
+    );
+    assert.equal(
+      (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,
+      false,
+    );
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
+    assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"ACCEPTED");
+    assert.equal(
+      (await owner.query('SELECT count(*)::int AS n FROM public."AuditEvent" WHERE "targetId"=$1 AND action=\'HR_INVITATION_ACCEPTED\'',[ledgerId])).rows[0].n,
+      1,
+    );
+  } finally {
+    await owner.query("ROLLBACK");
+  }
+  assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
+  assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"SENT");
+  console.log("PASS: restricted HR activation function rejects unconfirmed identity, atomically consumes one invitation, denies replay and rolls back role change.");
+
+  // Separate transaction scope: the actual runner owns BEGIN/COMMIT/ROLLBACK.
+  // All records exist only inside the disposable embedded PostgreSQL cluster.
+  const runnerFlowId = randomUUID(), runnerSessionId = randomUUID();
+  const runnerKey = Buffer.alloc(32, 11).toString("base64");
+  const beforeRunnerKey = process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY = runnerKey;
+  try {
+    await owner.query("UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1",[ledgerSubject]);
+    const encryptedRunnerFlow = seal({
+      invitationId: ledgerId, hrSubject: ledgerSubject, hrPasswordStatus: "CONFIRMED",
+      tokens: { access_token: "isolated-provider-token", refresh_token: "isolated-refresh-token" },
+    });
+    await owner.query(
+      'INSERT INTO public."AuthFlow"(id,"tokenHash","csrfHash",kind,"encryptedState","expiresAt","hrPasswordConfirmedAt","hrInvitationId","hrSubject") VALUES($1,$2,$3,\'HR_INVITATION\',$4,now()+interval \'10 minutes\',clock_timestamp(),$5,$6)',
+      [runnerFlowId,"runner-flow-"+runnerFlowId,"runner-csrf-"+runnerFlowId,encryptedRunnerFlow,ledgerId,ledgerSubject],
+    );
+    await owner.query("INSERT INTO auth.sessions(id,user_id,not_after) VALUES($1,$2,now()+interval '10 minutes')",
+      [runnerSessionId,ledgerSubject]);
+    const fakeProvider = { auth: {
+      getUser: async () => ({ data: { user: {
+        id: ledgerSubject, email: "ledger-hr-qa@example.invalid",
+        email_confirmed_at: new Date().toISOString(),
+        factors: [{ factor_type: "totp", status: "verified" }],
+      } }, error: null }),
+      getClaims: async () => ({ data: { claims: {
+        sub: ledgerSubject, aal: "aal2", session_id: runnerSessionId,
+      } }, error: null }),
+    } };
+    const provisionalSessionId = randomUUID();
+    await owner.query(
+      'INSERT INTO public."Session"(id,"tokenHash","csrfHash","userId","expiresAt") VALUES($1,$2,$3,$4,now()+interval \'1 hour\')',
+      [provisionalSessionId,"pre-hr-"+randomUUID(),"pre-csrf-"+randomUUID(),ledgerSubject],
+    );
+    const dryRun = await runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: false,
+    });
+    assert.deepEqual(dryRun, { databasePrerequisitesMet: true, providerAal2Verified: true, activated: false });
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"EMPLOYEE");
+    assert.equal((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt,null);
+    const approved = await runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
+    });
+    assert.equal(approved.activated,true);
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[ledgerSubject])).rows[0].role,"HR");
+    assert.ok((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt);
+    assert.equal((await owner.query('SELECT count(*)::int AS n FROM public."Session" WHERE "userId"=$1 AND "revokedAt" IS NULL',[ledgerSubject])).rows[0].n,0);
+
+    // A session issued after activation is distinct from the revoked provisional session.
+    // Exercise the actual Sessions.issue implementation against isolated PostgreSQL.
+    const hrUser = await runtime.user.findUniqueOrThrow({ where: { id: ledgerSubject } });
+    assert.equal(hrUser.role,"HR");
+    const cookieWrites = [];
+    const newSession = await new Sessions(runtime, flowAuth).issue(
+      hrUser, "SUPABASE", true, { headers: {} },
+      { cookie: (...args) => cookieWrites.push(args) },
+      seal({ tokens: { access_token: "new-hr-login", refresh_token: "new-hr-refresh" } }),
+    );
+    assert.equal(newSession.role,"HR");
+    assert.equal(newSession.mfaVerified,true);
+    assert.ok(newSession.permissions.includes("forms.manage"));
+    assert.ok(newSession.permissions.includes("employees.manage"));
+    assert.ok(!newSession.permissions.includes("hr.accounts.manage"));
+    assert.equal(cookieWrites.length,1);
+    const newCookie = cookieWrites[0][1];
+    const persistedHrSession = await runtime.session.findUniqueOrThrow({
+      where: { tokenHash: digest(newCookie) },
+    });
+    assert.equal(persistedHrSession.userId,ledgerSubject);
+    assert.equal(persistedHrSession.authMethod,"SUPABASE");
+    assert.equal(persistedHrSession.mfaVerified,true);
+    assert.equal(persistedHrSession.revokedAt,null);
+    assert.notEqual(persistedHrSession.id,provisionalSessionId);
+    assert.equal((await owner.query('SELECT "revokedAt" FROM public."Session" WHERE id=$1',[provisionalSessionId])).rows[0].revokedAt !== null,true);
+    console.log("PASS: fresh HR workspace session is issued separately with AAL2-backed role permissions; provisional session remains revoked (isolated PostgreSQL, synthetic provider session).");
+
+    await assert.rejects(runHrActivation({
+      db: owner, auth: fakeProvider, invitationId: ledgerId, subjectId: ledgerSubject,
+      flowId: runnerFlowId, encryptionKey: runnerKey, apply: true, approve: async () => true,
+    }),/prerequisites failed/);
+    assert.equal((await owner.query('SELECT state FROM public."HrInvitation" WHERE id=$1',[ledgerId])).rows[0].state,"ACCEPTED");
+    console.log("PASS: real HR activation runner verifies synthetic AAL2 against disposable PostgreSQL, dry-run never promotes, approved activation consumes once and replay fails.");
+  } finally {
+    if (beforeRunnerKey === undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY = beforeRunnerKey;
+  }
+
+
+  // A fabricated successful provider response without a fresh INSERT claim is unsafe.
+  const forgedId = randomUUID(), forgedSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'SENDING\',now()+interval \'45 minutes\')',
+    [forgedId,"forged-hr-qa@example.invalid","Forged QA",developerQa],
+  );
+  assert.equal(await ledger.record(forgedId,{status:"SENT",providerSubject:forgedSubject}),true);
+  const denied = await owner.query('SELECT state,"providerSubject","creationSubject" FROM public."HrInvitation" WHERE id=$1',[forgedId]);
+  assert.equal(denied.rows[0].state,"UNCERTAIN");
+  assert.equal(denied.rows[0].providerSubject,null);
+  assert.equal(denied.rows[0].creationSubject,null);
+  console.log("PASS: HR ledger rejects fabricated provider success without new-account creation provenance (isolated PostgreSQL).");
+
+  // Two workers contend on real PostgreSQL locks. The test transport cannot send email.
+  const workerId = randomUUID(), workerSubject = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt") VALUES($1,$2,$3,$4,\'QUEUED\',now()+interval \'45 minutes\')',
+    [workerId, "worker-hr-qa@example.invalid", "Worker QA", developerQa],
+  );
+  let sendCalls = 0;
+  class FakeHrWorker extends HrInvitationWorker {
+    async send(invitation) {
+      assert.equal(invitation.email,"worker-hr-qa@example.invalid");
+      assert.match(invitation.creationSecret,/^[a-f0-9]{64}$/);
+      sendCalls++;
+      await owner.query('INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,$3)',[workerSubject,invitation.email,{nolt_hr_creation_secret:invitation.creationSecret}]);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return {status:"SENT",providerSubject:workerSubject};
+    }
+  }
+  const gateBefore = process.env.HR_INVITATION_DELIVERY_ENABLED;
+  const recipientsBefore = process.env.HR_INVITATION_TEST_RECIPIENTS;
+  process.env.HR_INVITATION_DELIVERY_ENABLED = "true";
+  process.env.HR_INVITATION_TEST_RECIPIENTS = "worker-hr-qa@example.invalid";
+  try {
+    const workerA = new FakeHrWorker(runtime,ledger), workerB = new FakeHrWorker(runtime,ledger);
+    const results = await Promise.all([workerA.deliverNext(),workerB.deliverNext()]);
+    assert.equal(results.filter(Boolean).length,1);
+    assert.equal(sendCalls,1);
+    const stored = await owner.query(
+      'SELECT state,"providerSubject","deliveryAttempts" FROM public."HrInvitation" WHERE id=$1',
+      [workerId],
+    );
+    assert.deepEqual(
+      [stored.rows[0].state,stored.rows[0].providerSubject,stored.rows[0].deliveryAttempts],
+      ["SENT",workerSubject,1],
+    );
+    assert.equal((await owner.query('SELECT role FROM public."User" WHERE id=$1',[developerQa])).rows[0].role,"EMPLOYEE");
+  } finally {
+    if (gateBefore === undefined) delete process.env.HR_INVITATION_DELIVERY_ENABLED;
+    else process.env.HR_INVITATION_DELIVERY_ENABLED = gateBefore;
+    if (recipientsBefore === undefined) delete process.env.HR_INVITATION_TEST_RECIPIENTS;
+    else process.env.HR_INVITATION_TEST_RECIPIENTS = recipientsBefore;
+  }
+  console.log("PASS: concurrent HR workers exclusively claim one queued invite, call synthetic transport once, bind subject and preserve roles (no email or Auth call).");
+
+  // Revocation and acceptance are mutually exclusive; no provider calls or promotion.
+  const revokeId = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy",state,"expiresAt","providerSubject","acceptedAt","acceptedBy") VALUES($1,$2,$3,$4,\'ACCEPTED\',now()+interval \'20 minutes\',$5,now(),$5)',
+    [revokeId, "accepted-hr-qa@example.invalid", "Accepted QA", developerQa, developerQa],
+  );
+  const developerService = new DeveloperOverviewService(runtime);
+  await assert.rejects(
+    developerService.revoke(developerQa,revokeId),
+    (e) => e?.status === 409,
+  );
+  assert.equal(
+    (await owner.query('SELECT state,"revokedAt" FROM public."HrInvitation" WHERE id=$1',[revokeId])).rows[0].state,
+    "ACCEPTED",
+  );
+  const draftToRevoke = randomUUID();
+  await owner.query(
+    'INSERT INTO public."HrInvitation"(id,email,name,"createdBy") VALUES($1,$2,$3,$4)',
+    [draftToRevoke, "revokable-hr-qa@example.invalid", "Revokable QA", developerQa],
+  );
+  assert.equal((await developerService.revoke(developerQa,draftToRevoke)).state,"REVOKED");
+  assert.equal((await developerService.revoke(developerQa,draftToRevoke)).state,"REVOKED");
+  assert.equal(
+    (await owner.query('SELECT count(*)::int AS n FROM public."AuditEvent" WHERE "targetId"=$1 AND action=\'HR_INVITATION_DRAFT_REVOKED\'',[draftToRevoke])).rows[0].n,
+    1,
+  );
+  console.log("PASS: locked HR revocation rejects accepted invitations, is idempotent for revoked drafts and emits one audit event (disposable PostgreSQL).");
+
+
+
 } finally {
   await runtime?.$disconnect();
   await owner?.end();
