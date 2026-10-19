@@ -89,7 +89,7 @@ export class HrInvitationExchangeService {
     if (!parsed.success) throw new BadRequestException("Choose a password of 12 to 128 characters.");
     const flow = await this.auth.flow(req, true);
     if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId || !flow.state.tokens ||
-        flow.state.hrPasswordSet === true || flow.state.hrPasswordStatus !== undefined)
+        flow.state.hrPasswordSet === true || flow.state.hrResume === true || flow.state.hrPasswordStatus !== undefined)
       throw new ForbiddenException("This HR password setup cannot be used.");
     const invitation = await this.db.hrInvitation.findUnique({ where: { id: flow.state.invitationId } });
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
