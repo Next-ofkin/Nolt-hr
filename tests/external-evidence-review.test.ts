@@ -50,6 +50,13 @@ test("employee role cannot read external guarantor evidence even with forms perm
   assert.equal(writes(), 0);
 });
 
+test("developer HR administrator with forms.manage may review evidence", async () => {
+  const { db } = fakeDb("DEVELOPER");
+  const service = new ExternalEvidenceReviewService(db as never);
+  const evidence = await service.detail(colleague, assignmentId);
+  assert.equal(evidence.items.length, 1);
+});
+
 test("HR case owner can read immutable evidence with original field labels", async () => {
   const { db } = fakeDb();
   const service = new ExternalEvidenceReviewService(db as never);
