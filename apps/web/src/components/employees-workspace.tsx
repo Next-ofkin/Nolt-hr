@@ -17,6 +17,7 @@ import {
 import { EmployeeInvitations } from "./employee-invitations";
 import { PackAssignmentPanel } from "./pack-assignment-panel";
 import { SubmissionReview } from "./submission-review";
+import { ExternalEvidenceReview } from "./external-evidence-review";
 type Detail = components["schemas"]["EmployeeDetailDto"];
 type Employee = components["schemas"]["EmployeeDto"];
 const empty = {
@@ -54,6 +55,7 @@ export function EmployeesWorkspace() {
   const [detail, setDetail] = useState<Detail | null>(null),
     [profile, setProfile] = useState(empty),
     [editing, setEditing] = useState(false);
+  const [externalReviewId, setExternalReviewId] = useState<string | null>(null);
   const [reviewingAssignmentId, setReviewingAssignmentId] = useState<
     string | null
   >(null);
@@ -495,10 +497,11 @@ export function EmployeesWorkspace() {
                   />
                   <ul className="space-y-3">
                     {c.assignments.map((a) => {
+                      const isExternal = a.recipient !== "EMPLOYEE";
                       const hasSubmission =
-                        a.status === "SUBMITTED" ||
+                        !isExternal && (a.status === "SUBMITTED" ||
                         a.status === "CHANGES_REQUIRED" ||
-                        a.status === "APPROVED";
+                        a.status === "APPROVED");
                       return (
                         <li
                           key={a.id}
@@ -543,6 +546,12 @@ export function EmployeesWorkspace() {
                               ) : null}
                             </div>
                           </div>
+                          {isExternal && ["EXTERNAL_SUBMITTED", "APPROVED", "CHANGES_REQUIRED"].includes(a.status) && (
+                            <Button type="button" size="sm" variant={a.status === "EXTERNAL_SUBMITTED" ? "default" : "outline"}
+                              onClick={() => setExternalReviewId(a.id)}>
+                              {a.status === "EXTERNAL_SUBMITTED" ? "Review guarantor evidence" : "View guarantor evidence"}
+                            </Button>
+                          )}
                           {hasSubmission && (
                             <Button
                               type="button"
@@ -573,6 +582,16 @@ export function EmployeesWorkspace() {
           )}
         </section>
       </div>
+      {externalReviewId && detail && (
+        <Dialog open onOpenChange={(open) => { if (!open) setExternalReviewId(null); }}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle className="sr-only">External evidence review</DialogTitle>
+            <DialogDescription className="sr-only">Review submitted guarantor or reference answers.</DialogDescription>
+            <ExternalEvidenceReview assignmentId={externalReviewId} csrfToken={session!.csrfToken}
+              onChanged={async () => { await select(detail.employee.id); }} />
+          </DialogContent>
+        </Dialog>
+      )}
       {reviewingAssignmentId && detail && (
         <Dialog
           open={!!reviewingAssignmentId}

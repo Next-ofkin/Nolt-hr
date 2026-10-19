@@ -50,6 +50,7 @@ import {
   AuthErrorDto,
   AuthNextDto,
   SessionGuard,
+  HrGuard,
   type AuthRequest,
 } from "./auth.js";
 import { Database } from "./database.js";
@@ -97,7 +98,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 const schema = (s: z.ZodType) =>
   z.toJSONSchema(s, { target: "openapi-3.0", io: "input" }) as SchemaObject;
 const options = { timeout: 15000, maxWait: 10000 };
-const terminal = ["REVOKED", "EXPIRED", "FAILED"];
+const terminal = ["REVOKED", "EXPIRED", "FAILED", "CHANGES_REQUIRED"];
 export class ExternalRequestDto {
   @ApiProperty({ type: String }) id!: string;
   @ApiProperty({ type: String }) assignmentId!: string;
@@ -105,6 +106,7 @@ export class ExternalRequestDto {
   @ApiProperty({ type: String }) expiresAt!: string;
   @ApiProperty({ type: String }) createdAt!: string;
   @ApiProperty({ type: String }) email!: string;
+  @ApiProperty({ type: String, nullable: true }) correctionReason!: string | null;
 }
 export class ExternalRequestsDto {
   @ApiProperty({ type: [ExternalRequestDto] }) items!: ExternalRequestDto[];
@@ -122,15 +124,16 @@ export class ExternalWorkspaceDto {
   })
   answers!: Record<string, string | boolean | null>;
 }
-function dto(r: ExternalRequest): ExternalRequestDto {
+function dto(r: ExternalRequest & { evidenceReview?: { reason: string | null } | null }): ExternalRequestDto {
   return {
     id: r.id,
     assignmentId: r.assignmentId,
     state:
-      !["SUBMITTED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
+      !["SUBMITTED", "APPROVED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
         ? "EXPIRED"
         : r.state,
     email: r.email,
+    correctionReason: r.evidenceReview?.reason ?? null,
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
   };
@@ -187,6 +190,7 @@ export class ExternalRequestsService {
           await tx.externalRequest.findMany({
             where: { assignmentId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            include: { evidenceReview: { select: { reason: true } } },
             take: 20,
           })
         ).map(dto),
@@ -222,9 +226,9 @@ export class ExternalRequestsService {
         where: { assignmentId, state: { notIn: terminal } },
       });
       if (current) {
-        if (current.state === "SUBMITTED")
+        if (["SUBMITTED", "APPROVED"].includes(current.state))
           throw new ConflictException(
-            "Submitted recipient evidence is locked. HR must manage any replacement.",
+            "Submitted or approved recipient evidence cannot be replaced. HR must review it.",
           );
         if (current.expiresAt > new Date() && p.replaceRequestId !== current.id)
           throw new ConflictException(
@@ -250,7 +254,7 @@ export class ExternalRequestsService {
         const old = await tx.externalRequest.findFirst({
           where: { id: p.replaceRequestId, assignmentId },
         });
-        if (!old || old.state === "SUBMITTED")
+        if (!old || ["SUBMITTED", "APPROVED"].includes(old.state))
           throw new ConflictException("Replacement target is invalid.");
       }
       const r = await tx.externalRequest.create({
@@ -283,9 +287,9 @@ export class ExternalRequestsService {
         where: { id, assignmentId },
       });
       if (!r) throw new NotFoundException();
-      if (r.state === "SUBMITTED")
+      if (["SUBMITTED", "APPROVED"].includes(r.state))
         throw new ConflictException(
-          "Submitted evidence cannot be revoked by the employee.",
+          "Submitted or approved evidence cannot be revoked by the employee.",
         );
       if (!terminal.includes(r.state)) {
         await tx.externalRequest.update({
@@ -898,5 +902,106 @@ export class ExternalWorkspaceController {
   @ApiCreatedResponse({ type: ExternalWorkspaceDto })
   submit(@Req() r: AuthRequest, @Body() b: unknown) {
     return this.service.submit(r, b);
+  }
+}
+
+const externalReviewSchema = z.object({
+  decision: z.enum(["APPROVED", "CHANGES_REQUIRED"]),
+  reason: z.string().trim().max(1000).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.decision === "CHANGES_REQUIRED" && (value.reason?.length ?? 0) < 10)
+    ctx.addIssue({ code: "custom", message: "Explain required corrections in at least 10 characters." });
+});
+@Injectable()
+export class ExternalEvidenceReviewService {
+  constructor(@Inject(Database) private db: Database) {}
+  private async authorised(tx: Prisma.TransactionClient, actorId: string, assignmentId: string) {
+    const a = await tx.formAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { formVersion: true, onboardingCase: true },
+    });
+    const reviewer = await tx.user.findUnique({ where: { id: actorId } });
+    if (!a || !reviewer?.active || reviewer.role !== "HR" ||
+        !reviewer.permissions.includes("forms.manage") ||
+        a.onboardingCase.createdBy !== actorId ||
+        !["GUARANTOR","REFERENCE"].includes(a.formVersion.recipient))
+      throw new NotFoundException("Assigned external evidence not found.");
+    return a;
+  }
+  async detail(actorId: string, assignmentId: string) {
+    return this.db.$transaction(async tx => {
+      const assignment = await this.authorised(tx, actorId, assignmentId);
+      const requests = await tx.externalRequest.findMany({
+        where: { assignmentId, submission: { isNot: null } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: { submission: true, evidenceReview: true },
+        take: 20,
+      });
+      return {
+        assignmentId,
+        title: assignment.formVersion.title,
+        recipient: assignment.formVersion.recipient,
+        fields: formContentSchema.parse(assignment.formVersion).fields.map(field => ({ id: field.id, label: field.label })),
+        items: requests.map(r => ({
+          id: r.id, email: r.email, fullName: r.fullName,
+          submittedAt: r.submission!.submittedAt.toISOString(),
+          answers: r.submission!.answers,
+          decision: r.evidenceReview?.decision ?? null,
+          reason: r.evidenceReview?.reason ?? null,
+          reviewedAt: r.evidenceReview?.reviewedAt.toISOString() ?? null,
+        })),
+      };
+    }, options);
+  }
+  async decide(actorId: string, assignmentId: string, requestId: string, input: unknown) {
+    const p = parse(externalReviewSchema, input);
+    return this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT c.id FROM public."OnboardingCase" c
+        JOIN public."FormAssignment" a ON a."caseId"=c.id
+        WHERE a.id=${assignmentId}::uuid FOR UPDATE OF c`;
+      const assignment = await this.authorised(tx, actorId, assignmentId);
+      if (assignment.onboardingCase.status !== "ACTIVE")
+        throw new ConflictException("The onboarding case is no longer active.");
+      const r = await tx.externalRequest.findFirst({
+        where: { id: requestId, assignmentId },
+        include: { submission: true, evidenceReview: true },
+      });
+      if (!r?.submission || r.evidenceReview || r.state !== "SUBMITTED")
+        throw new ConflictException("This submitted guarantor evidence is unavailable or already reviewed.");
+      const latest = await tx.externalRequest.findFirst({
+        where: { assignmentId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true },
+      });
+      if (latest?.id !== r.id)
+        throw new ConflictException("Only the latest external request can be reviewed.");
+      await tx.externalEvidenceReview.create({
+        data: { requestId: r.id, reviewedBy: actorId, decision: p.decision,
+          reason: p.decision === "CHANGES_REQUIRED" ? p.reason! : null },
+      });
+      await tx.externalRequest.update({ where: { id: r.id }, data: {
+        state: p.decision, updatedBy: actorId,
+      } });
+      await tx.auditEvent.create({ data: {
+        actorId, action: "EXTERNAL_EVIDENCE_" + p.decision, targetId: r.id,
+        metadata: { assignmentId, reason: p.decision === "CHANGES_REQUIRED" ? p.reason : null },
+      } });
+      await tx.outboxEvent.create({ data: { type: "EXTERNAL_EVIDENCE_" + p.decision, targetId: r.id } });
+      return { requestId: r.id, decision: p.decision };
+    }, options);
+  }
+}
+@ApiTags("HR external evidence review")
+@UseGuards(SessionGuard, HrGuard)
+@Controller("employees/assignments/:id/external-evidence")
+export class ExternalEvidenceReviewController {
+  constructor(@Inject(ExternalEvidenceReviewService) private review: ExternalEvidenceReviewService) {}
+  @Get()
+  read(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.review.detail(req.actor.id, id);
+  }
+  @Post(":requestId/decision")
+  decide(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
+    @Param("requestId", ParseUUIDPipe) requestId: string, @Body() body: unknown) {
+    return this.review.decide(req.actor.id, id, requestId, body);
   }
 }
