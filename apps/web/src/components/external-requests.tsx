@@ -4,6 +4,7 @@ import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 export function ExternalRequests({
   assignmentId,
   contactRevision,
@@ -61,6 +62,8 @@ export function ExternalRequests({
     };
   }, [load]);
   const active = items[0];
+  const approved = active?.state === "APPROVED";
+  const correction = active?.state === "CHANGES_REQUIRED";
   const canSendFresh = !active || ["REVOKED", "EXPIRED", "FAILED", "CHANGES_REQUIRED"].includes(active.state);
   const canReplace = !!active && ["SENT", "QUEUED", "SENDING", "UNCERTAIN", "ACTIVE"].includes(active.state);
   async function send(replace?: string) {
@@ -128,14 +131,11 @@ export function ExternalRequests({
       className="space-y-3 border-t pt-3"
       aria-label="External request status"
     >
-      <p className="text-sm">
-        Your recipient receives their own verification link and submits directly
-        to HR. You can track status here.
-      </p>
+
       {contactDirty && (
         <p className="text-sm">Save recipient changes before sending.</p>
       )}
-      <div className="flex flex-wrap gap-2">
+      {!approved && <div className="flex flex-wrap gap-2">
         {canSendFresh && (
           <Button
             type="button"
@@ -173,7 +173,7 @@ export function ExternalRequests({
         >
           Check now
         </Button>
-      </div>
+      </div>}
       {error && (
         <p role="alert" className="break-words text-sm text-red-700">
           {error}
@@ -185,11 +185,13 @@ export function ExternalRequests({
         </p>
       )}
       {!items.length && <p className="text-sm">Request status: Not sent</p>}
-      {active?.state === "CHANGES_REQUIRED" && <p role="status" className="text-sm text-amber-700">HR requested corrections. Review the reason below, then send your guarantor a new secure request. The original evidence is preserved.</p>}
-      {active?.state === "APPROVED" && <p role="status" className="text-sm text-green-700">Guarantor evidence approved by HR.</p>}
+      {correction && <p role="status" className="text-sm text-amber-800">The original answers are preserved. Send a new request after reviewing the feedback.</p>}
+      {correction && active?.correctionReason && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><p className="font-medium">HR feedback</p><p className="mt-1 whitespace-pre-wrap break-words">{active.correctionReason}</p></div>}
+
       {active?.state === "SUBMITTED" && <p role="status" className="text-sm">Guarantor submitted the form. Awaiting HR review.</p>}
-      <p className="text-xs text-muted-foreground">Request history updates automatically every 8 seconds while this page is open.</p>
-      <ul className="space-y-2">
+      {active && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Latest request:</span><Badge variant="secondary">{active.state.toLowerCase().replaceAll("_", " ")}</Badge></div>}
+      <details className="rounded-lg border p-3 text-sm"><summary className="cursor-pointer font-medium">View request history ({items.length})</summary>
+      <ul className="mt-3 space-y-2">
         {items.map((i) => (
           <li className="break-words rounded-md border p-3 text-sm" key={i.id}>
             {i.email} — {i.state.toLowerCase().replaceAll("_", " ")}
@@ -198,7 +200,7 @@ export function ExternalRequests({
             {(i as typeof i & { correctionReason?: string | null }).correctionReason && <p className="mt-1 text-sm text-amber-700">HR corrections: {(i as typeof i & { correctionReason?: string | null }).correctionReason}</p>}
           </li>
         ))}
-      </ul>
+      </ul></details>
     </section>
   );
 }
