@@ -106,6 +106,7 @@ export class ExternalRequestDto {
   @ApiProperty({ type: String }) expiresAt!: string;
   @ApiProperty({ type: String }) createdAt!: string;
   @ApiProperty({ type: String }) email!: string;
+  @ApiProperty({ type: String, nullable: true }) correctionReason!: string | null;
 }
 export class ExternalRequestsDto {
   @ApiProperty({ type: [ExternalRequestDto] }) items!: ExternalRequestDto[];
@@ -123,15 +124,16 @@ export class ExternalWorkspaceDto {
   })
   answers!: Record<string, string | boolean | null>;
 }
-function dto(r: ExternalRequest): ExternalRequestDto {
+function dto(r: ExternalRequest & { evidenceReview?: { reason: string | null } | null }): ExternalRequestDto {
   return {
     id: r.id,
     assignmentId: r.assignmentId,
     state:
-      !["SUBMITTED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
+      !["SUBMITTED", "APPROVED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
         ? "EXPIRED"
         : r.state,
     email: r.email,
+    correctionReason: r.evidenceReview?.reason ?? null,
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
   };
@@ -188,6 +190,7 @@ export class ExternalRequestsService {
           await tx.externalRequest.findMany({
             where: { assignmentId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            include: { evidenceReview: { select: { reason: true } } },
             take: 20,
           })
         ).map(dto),
@@ -284,9 +287,9 @@ export class ExternalRequestsService {
         where: { id, assignmentId },
       });
       if (!r) throw new NotFoundException();
-      if (r.state === "SUBMITTED")
+      if (["SUBMITTED", "APPROVED"].includes(r.state))
         throw new ConflictException(
-          "Submitted evidence cannot be revoked by the employee.",
+          "Submitted or approved evidence cannot be revoked by the employee.",
         );
       if (!terminal.includes(r.state)) {
         await tx.externalRequest.update({
