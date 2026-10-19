@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 type FormVersion = {
   id: string; formId: string; title: string; recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
@@ -31,6 +32,7 @@ async function readJson<T>(url: string): Promise<T> {
 export function PacksWorkspace() {
   const { session } = useAuth();
   const [packs, setPacks] = useState<Pack[]>([]);
+  const [confirmPublish, setConfirmPublish] = useState<Pack | null>(null);
   const [forms, setForms] = useState<FormVersion[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -141,7 +143,7 @@ export function PacksWorkspace() {
 
   async function publish(pack: Pack) {
     if (!session || busy || pack.status !== "DRAFT") return;
-    if (!window.confirm(`Publish "${pack.name}"? This pack will be locked against edits.`)) return;
+    setConfirmPublish(null);
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`/api/v1/packs/${encodeURIComponent(pack.id)}/publish`, {
@@ -193,6 +195,18 @@ export function PacksWorkspace() {
 
   return (
     <div className="space-y-7">
+      <Dialog open={confirmPublish !== null} onOpenChange={open => { if (!open && !busy) setConfirmPublish(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish onboarding pack?</DialogTitle>
+            <DialogDescription>{confirmPublish ? `Publish "${confirmPublish.name}"? This pack version will be locked against further edits.` : ""}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => setConfirmPublish(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={() => { if (confirmPublish) void publish(confirmPublish); }}>Publish pack</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-[0.15em] text-primary">PEOPLE OPERATIONS</p>
@@ -289,7 +303,7 @@ export function PacksWorkspace() {
             <Button type="button" variant="outline" size="sm" disabled={busy}
               onClick={() => startEdit(pack)}>Edit draft</Button>
             <Button type="button" size="sm" disabled={busy || pack.items.length === 0}
-              onClick={() => void publish(pack)}>Publish pack</Button>
+              onClick={() => setConfirmPublish(pack)}>Publish pack</Button>
           </div>}
           <ul className="mt-3 space-y-1 text-sm">{pack.items.map(item => <li key={item.id} className="text-muted-foreground">{item.position + 1}. {label(item)} {item.required ? "· required" : "· optional"}</li>)}</ul>
         </article>)}</div>)}</div>}
