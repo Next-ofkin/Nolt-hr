@@ -36,7 +36,7 @@ test("HR delivery requires transport gate and configured sender", async () => {
     status: "FAILED", errorCode: "DELIVERY_DISABLED_OR_INVALID_RECIPIENT", retryable: false,
   });
   assert.deepEqual(await deliverHrInvitationEmail(invitation, ready), {
-    status: "FAILED", errorCode: "RECIPIENT_NOT_APPROVED", retryable: false,
+    status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false,
   });
   assert.deepEqual(await deliverHrInvitationEmail({ ...invitation, email: "safe-hr@example.invalid" }, ready), {
     status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false,
