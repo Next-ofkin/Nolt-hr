@@ -185,7 +185,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
         {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>void approve(a.id)}>Approve completed pack</Button>}
         <ul className="mt-2 space-y-1">{a.forms.map(form=>
           <li key={form.assignmentId} className="text-xs text-muted-foreground">
-            {form.title} · {form.required ? "Required" : "Optional"} · {form.status}
+            {form.title} · {form.required ? "Required" : "Optional"} · {form.status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted — HR follow-up" : form.status}
           </li>)}</ul>
       </article>)}
     </div>}
