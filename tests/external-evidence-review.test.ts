@@ -46,8 +46,15 @@ function fakeDb(role = "HR", submitted = true) {
 test("employee role cannot read external guarantor evidence even with forms permission", async () => {
   const { db, writes } = fakeDb("EMPLOYEE");
   const service = new ExternalEvidenceReviewService(db as never);
-  await assert.rejects(() => service.detail(owner, assignmentId), /not found/i);
+  await assert.rejects(() => service.detail(owner, assignmentId), /HR evidence review access is required/i);
   assert.equal(writes(), 0);
+});
+
+test("developer HR administrator with forms.manage may review evidence", async () => {
+  const { db } = fakeDb("DEVELOPER");
+  const service = new ExternalEvidenceReviewService(db as never);
+  const evidence = await service.detail(colleague, assignmentId);
+  assert.equal(evidence.items.length, 1);
 });
 
 test("HR case owner can read immutable evidence with original field labels", async () => {
