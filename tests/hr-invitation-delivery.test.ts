@@ -9,7 +9,8 @@ const ready = {
 test("HR delivery requires enabled transport, not a per-address allowlist", () => {
   assert.equal(hrRecipientAllowed("safe-hr@example.invalid", {}), false);
   assert.equal(hrRecipientAllowed("safe-hr@example.invalid", { HR_INVITATION_DELIVERY_ENABLED: "true" }), true);
-  assert.equal(hrRecipientAllowed("unknown@example.invalid", ready), true);\n  assert.equal(hrRecipientAllowed("not-an-email", ready), false);
+  assert.equal(hrRecipientAllowed("unknown@example.invalid", ready), true);
+  assert.equal(hrRecipientAllowed("not-an-email", ready), false);
   assert.equal(hrRecipientAllowed("SAFE-HR@example.invalid", ready), true);
 });
 test("HR delivery failures classify retry, uncertainty and unsafe codes", () => {
