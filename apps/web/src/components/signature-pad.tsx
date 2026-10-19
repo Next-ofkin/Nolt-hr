@@ -123,6 +123,8 @@ export function SignaturePad({
   };
 
   const clearCanvas = () => {
+    activePointer.current = null;
+    lastPoint.current = null;
     strokes.current = [];
     setUndoCount(0);
     const canvas = canvasRef.current;
@@ -330,8 +332,8 @@ export function SignaturePad({
             onPointerMove={draw}
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
-            className="w-full touch-none rounded border border-dashed bg-white dark:bg-slate-950"
-            style={{ height: "140px" }}
+            className="block w-full touch-none rounded border border-dashed bg-white dark:bg-slate-950"
+            style={{ aspectRatio: "600 / 160" }}
             aria-label="Draw your signature using mouse or finger"
           />
           {hasDrawn && <button type="button" onClick={undoStroke} disabled={undoCount === 0} className="absolute left-2 top-2 rounded bg-muted/80 px-2 py-1 text-xs text-muted-foreground hover:bg-muted">Undo</button>}
