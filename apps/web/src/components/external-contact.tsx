@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
@@ -23,6 +23,11 @@ export function ExternalContact({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [requestState, setRequestState] = useState<{ hasRequest: boolean; latestState: string | null } | null>(null);
+  const canEdit = requestState !== null && (!requestState.hasRequest || requestState.latestState === "CHANGES_REQUIRED");
+  const onRequestStatus = useCallback((hasRequest: boolean, latestState: string | null) => {
+    setRequestState({ hasRequest, latestState });
+  }, []);
   async function load() {
     setBusy(true);
     setError("");
@@ -47,6 +52,7 @@ export function ExternalContact({
     }
   }
   useEffect(() => {
+    setRequestState(null);
     void load();
   }, [assignmentId]);
   return (
@@ -55,7 +61,7 @@ export function ExternalContact({
       aria-label={`${recipient.toLowerCase()} recipient details`}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!session || !loaded || busy) return;
+        if (!session || !loaded || busy || !canEdit) return;
         setBusy(true);
         setError("");
         setNotice("");
@@ -89,6 +95,7 @@ export function ExternalContact({
         Prepare your {recipient.toLowerCase()}’s details. They will complete
         their own form through a separate secure request.
       </p>
+      {!canEdit && requestState?.hasRequest && <p role="status" className="text-sm text-muted-foreground">Guarantor details are locked after the first request. HR must request corrections before you can edit them again.</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="min-w-0 space-y-1">
           <Label htmlFor={`external-name-${assignmentId}`}>
@@ -104,7 +111,7 @@ export function ExternalContact({
             }}
             required
             maxLength={160}
-            disabled={busy || !loaded}
+            disabled={busy || !loaded || !canEdit}
             autoComplete="off"
           />
         </div>
@@ -156,6 +163,7 @@ export function ExternalContact({
           assignmentId={assignmentId}
           contactRevision={revision}
           contactDirty={dirty || busy}
+          onRequestStatus={onRequestStatus}
         />
       )}
     </form>
