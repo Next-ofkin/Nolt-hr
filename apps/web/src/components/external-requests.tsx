@@ -139,7 +139,7 @@ export function ExternalRequests({
             disabled={busy || !contactRevision || contactDirty}
             onClick={() => void send()}
           >
-            Send request
+            {active?.state === "CHANGES_REQUIRED" ? "Send corrected guarantor request" : "Send request"}
           </Button>
         )}
         {canReplace && active && (
