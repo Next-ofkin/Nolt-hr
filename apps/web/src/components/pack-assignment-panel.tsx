@@ -11,7 +11,7 @@ type Progress = { id: string; packId: string; packName: string; totalForms: numb
   approvedAt: string | null; status: string; overdue: boolean; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
 
-export function PackAssignmentPanel({ caseId, employeeId, caseRevision, employmentType, csrfToken, onAssigned }: {
+export function PackAssignmentPanel({ caseId, employeeId, employmentType, csrfToken, onAssigned }: {
   employeeId: string;
   caseId: string; caseRevision: number; employmentType: string; csrfToken: string;
   onAssigned: () => Promise<void>;
