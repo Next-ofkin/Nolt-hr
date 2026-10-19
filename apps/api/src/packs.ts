@@ -13,7 +13,7 @@ const packAssignmentInclude = {
   forms: { orderBy: { position: "asc" as const },
     include: { formAssignment: { include: { formVersion: { select: { title: true } },
       response: { select: { status: true } },
-      externalRequests: { where: { state: "SUBMITTED" }, select: { id: true }, take: 1 } } } } },
+      externalRequests: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], select: { state: true, evidenceReview: { select: { decision: true } } }, take: 1 } } } } },
 } satisfies Prisma.PackAssignmentInclude;
 
 @Injectable()
@@ -258,8 +258,10 @@ export class PacksService {
       title: link.formAssignment.formVersion.title,
       required: link.formAssignment.required,
       position: link.position,
-      status: link.formAssignment.externalRequests.length > 0
-        ? "EXTERNAL_SUBMITTED" : link.formAssignment.response?.status ?? "NOT_STARTED",
+      status: link.formAssignment.externalRequests[0]?.evidenceReview?.decision === "APPROVED" ? "APPROVED"
+        : link.formAssignment.externalRequests[0]?.evidenceReview?.decision === "CHANGES_REQUIRED" ? "CHANGES_REQUIRED"
+        : link.formAssignment.externalRequests[0]?.state === "SUBMITTED" ? "EXTERNAL_SUBMITTED"
+        : link.formAssignment.response?.status ?? "NOT_STARTED",
     }));
     const required = forms.filter(form => form.required);
     const approvedRequired = required.filter(form => form.status === "APPROVED").length;
