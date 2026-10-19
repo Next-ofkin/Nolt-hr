@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "./ui/label";
+import { Badge } from "./ui/badge";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; rootPackId: string | null; versionNumber: number; items: { id: string }[] };
 type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
@@ -130,12 +131,13 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     } finally { setBusy(false); }
   }
 
-  return <section className="space-y-4 rounded-xl border bg-secondary/30 p-4">
+  return <section className="space-y-4 rounded-xl border bg-muted/20 p-4">
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
       <p className="mt-1 text-xs text-muted-foreground">Assign all forms from a published pack to this active onboarding case.</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
-    <div className="grid gap-3 sm:grid-cols-2">
+    <details className="rounded-lg border bg-background p-3"><summary className="cursor-pointer text-sm font-medium">Assign a new onboarding pack</summary>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <div className="space-y-1"><Label htmlFor="case-pack">Published pack</Label>
         <select id="case-pack" className="native-select w-full" value={packId} onChange={e=>setPackId(e.target.value)}>
           <option value="">Choose a published pack…</option>
@@ -156,12 +158,14 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     <Button type="button" disabled={!packId || busy} onClick={()=>void assign()}>
       {busy ? "Assigning…" : "Assign selected pack"}
     </Button>
+    </details>
     {existing.length > 0 && <div className="space-y-3 border-t pt-3">
       <p className="text-sm font-semibold">Assigned packs</p>
       {existing.map(a=><article key={a.id} className="rounded-lg border bg-white p-3">
         <p className="font-medium">{a.packName}</p>
         <p className="mt-1 text-xs text-muted-foreground">{a.totalForms} forms · {a.approvedRequired}/{a.requiredForms} required approved · Due {a.dueDate ?? "date not set"}</p>
-        <p className="mt-1 text-xs font-semibold">Pack status: {a.status.replaceAll("_"," ")}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant={a.approvedAt ? "default" : "secondary"}>{a.status.replaceAll("_"," ")}</Badge><span className="text-xs text-muted-foreground">{a.approvedRequired} of {a.requiredForms} required forms approved</span></div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${a.requiredForms ? (a.approvedRequired / a.requiredForms) * 100 : 0}%` }} /></div>
         {a.overdue && <p role="status" className="mt-1 text-xs font-bold text-red-700">Overdue — HR follow-up needed</p>}
         {!a.approvedAt && <div className="mt-2 space-y-2">
           <Button type="button" variant="outline" size="sm" disabled={busy}
@@ -183,10 +187,10 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
           </div>}
         </div>}
         {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>void approve(a.id)}>Approve completed pack</Button>}
-        <ul className="mt-2 space-y-1">{a.forms.map(form=>
+        <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-muted-foreground">View {a.forms.length} forms</summary><ul className="mt-2 space-y-1">{a.forms.map(form=>
           <li key={form.assignmentId} className="text-xs text-muted-foreground">
             {form.title} · {form.required ? "Required" : "Optional"} · {form.status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted — HR follow-up" : form.status}
-          </li>)}</ul>
+          </li>)}</ul></details>
       </article>)}
     </div>}
   </section>;
