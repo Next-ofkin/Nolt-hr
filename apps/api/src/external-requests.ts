@@ -125,14 +125,14 @@ export class ExternalWorkspaceDto {
   })
   answers!: Record<string, string | boolean | null>;
 }
-function dto(r: ExternalRequest & { evidenceReview?: { reason: string | null } | null }): ExternalRequestDto {
+function dto(r: ExternalRequest & { evidenceReview?: { decision: string; reason: string | null } | null }): ExternalRequestDto {
   return {
     id: r.id,
     assignmentId: r.assignmentId,
     state:
-      !["SUBMITTED", "APPROVED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
+      r.evidenceReview?.decision ?? (!["SUBMITTED", "APPROVED", ...terminal].includes(r.state) && r.expiresAt <= new Date()
         ? "EXPIRED"
-        : r.state,
+        : r.state),
     email: r.email,
     correctionReason: r.evidenceReview?.reason ?? null,
     createdAt: r.createdAt.toISOString(),
@@ -224,7 +224,8 @@ export class ExternalRequestsService {
           "Save and reload the recipient details before sending.",
         );
       const current = await tx.externalRequest.findFirst({
-        where: { assignmentId, state: { notIn: terminal } },
+        where: { assignmentId, state: { notIn: terminal },
+          OR: [{ evidenceReview: { is: null } }, { evidenceReview: { is: { decision: "APPROVED" } } }] },
       });
       if (current) {
         if (["SUBMITTED", "APPROVED"].includes(current.state))
