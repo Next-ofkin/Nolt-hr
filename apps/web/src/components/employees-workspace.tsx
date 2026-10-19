@@ -1,8 +1,9 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -93,12 +94,57 @@ export function EmployeesWorkspace() {
     },
     [q, department, employmentType, startFrom, startTo, caseStatus],
   );
-  const initiallyLoaded = useRef(false);
+  // Read-only background synchronization; mutations still use their explicit
+  // CSRF-protected actions and the selected employee does not change.
+  const directoryQuery = useQuery({
+    queryKey: ["hr-employees", session?.email, page, pageCursors[page], q, department, employmentType, caseStatus, startFrom, startTo],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const r = await api.GET("/api/v1/employees", {
+        params: { query: {
+          q, department, employmentType,
+          ...(caseStatus ? { caseStatus } : {}),
+          ...(startFrom ? { startFrom } : {}),
+          ...(startTo ? { startTo } : {}),
+          limit: 6,
+          ...(pageCursors[page] ? { cursor: pageCursors[page] } : {}),
+        } },
+      });
+      if (r.error) throw new Error(errorMessage(r.error));
+      return r.data;
+    },
+    refetchInterval: 15000,
+  });
   useEffect(() => {
-    if (initiallyLoaded.current) return;
-    initiallyLoaded.current = true;
-    void list();
-  }, []);
+    if (directoryQuery.data) {
+      setItems(directoryQuery.data.items);
+      setNext(directoryQuery.data.nextCursor);
+      setLoading(false);
+    }
+  }, [directoryQuery.data]);
+  useEffect(() => {
+    if (directoryQuery.error) {
+      setError(directoryQuery.error instanceof Error ? directoryQuery.error.message : "Unable to refresh employees.");
+      setLoading(false);
+    }
+  }, [directoryQuery.error]);
+  const selectedEmployeeQuery = useQuery({
+    queryKey: ["hr-employee-detail", session?.email, detail?.employee.id],
+    enabled: Boolean(session && detail?.employee.id && !editing && !reviewingAssignmentId),
+    queryFn: async () => {
+      const id = detail?.employee.id;
+      if (!id) throw new Error("No employee selected");
+      const r = await api.GET("/api/v1/employees/{id}", { params: { path: { id } } });
+      if (r.error) throw new Error(errorMessage(r.error));
+      return r.data;
+    },
+    refetchInterval: 12000,
+  });
+  useEffect(() => {
+    if (selectedEmployeeQuery.data && !editing && !reviewingAssignmentId &&
+        selectedEmployeeQuery.data.employee.id === detail?.employee.id)
+      setDetail(selectedEmployeeQuery.data);
+  }, [selectedEmployeeQuery.data, editing, reviewingAssignmentId, detail?.employee.id]);
   async function action(work: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -468,7 +514,9 @@ export function EmployeesWorkspace() {
                                 {a.required ? "Required" : "Optional"}
                               </span>
                               <span>·</span>
-                              {a.status === "APPROVED" ? (
+                              {a.status === "EXTERNAL_SUBMITTED" ? (
+                                <Badge variant="secondary" className="text-xs">Guarantor submitted — HR follow-up required</Badge>
+                              ) : a.status === "APPROVED" ? (
                                 <Badge className="bg-green-600 hover:bg-green-700 text-xs">
                                   Approved
                                 </Badge>
