@@ -61,6 +61,7 @@ import {
   clearCookie,
   digest,
   LoginLimiter,
+  permissionsFor,
 } from "./security.js";
 import { dto as formDto, FormDto } from "./forms.js";
 
@@ -926,7 +927,7 @@ export class ExternalEvidenceReviewService {
     // HR access is permission-based; account roles may have other names.
     // Never grant external evidence access to employee accounts.
     if (!reviewer?.active || reviewer.role === "EMPLOYEE" ||
-        !reviewer.permissions.includes("forms.manage"))
+        !permissionsFor(reviewer).includes("forms.manage"))
       throw new ForbiddenException("HR evidence review access is required.");
     return a;
   }
