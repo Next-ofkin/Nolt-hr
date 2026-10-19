@@ -4,13 +4,15 @@ import { Button } from "./ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; rootPackId: string | null; versionNumber: number; items: { id: string }[] };
 type Progress = { id: string; packId: string; packName: string; totalForms: number; dueDate: string | null;
   approvedAt: string | null; status: string; overdue: boolean; requiredForms: number; approvedRequired: number; readyForApproval: boolean;
   forms: { assignmentId: string; title: string; required: boolean; status: string }[] };
 
-export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrfToken, onAssigned }: {
+export function PackAssignmentPanel({ caseId, employeeId, caseRevision, employmentType, csrfToken, onAssigned }: {
+  employeeId: string;
   caseId: string; caseRevision: number; employmentType: string; csrfToken: string;
   onAssigned: () => Promise<void>;
 }) {
@@ -22,6 +24,8 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [confirmation, setConfirmation] = useState<"mismatch" | "approve" | null>(null);
+  const [approvalId, setApprovalId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -39,6 +43,10 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   }, [caseId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const timer = window.setInterval(() => { if (!busy) void refresh(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [refresh, busy]);
   const livePacks = useQuery({
     queryKey: ["hr-case-packs", caseId],
     queryFn: async () => {
@@ -72,18 +80,61 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   const selectedPack = options.find(pack => pack.id === packId);
   const mismatch = !!selectedPack && selectedPack.employmentType.trim().toLowerCase() !== employmentType.trim().toLowerCase();
 
-  async function assign() {
+  async function latestCaseRevision(): Promise<number> {
+    const response = await fetch(`/api/v1/employees/${encodeURIComponent(employeeId)}`, {
+      credentials: "same-origin", cache: "no-store",
+    });
+    if (!response.ok) throw new Error("Unable to refresh the employee's onboarding case.");
+    const detail = await response.json() as { onboardingCase: { id: string; revision: number; status: string } | null };
+    if (!detail.onboardingCase || detail.onboardingCase.id !== caseId || detail.onboardingCase.status !== "ACTIVE")
+      throw new Error("This onboarding case is no longer active. Reload the employee.");
+    return detail.onboardingCase.revision;
+  }
+
+  async function assign(confirmedMismatch = false) {
     if (!packId || busy) return;
-    if (mismatch && !window.confirm(`"${selectedPack!.name}" is for ${selectedPack!.employmentType}, but this employee is listed as ${employmentType}. Assign this pack anyway?`)) return;
+    if (mismatch && !confirmedMismatch) {
+      setConfirmation("mismatch");
+      return;
+    }
+    const requestedPackId = packId;
+    setConfirmation(null);
     setBusy(true); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/v1/packs/${encodeURIComponent(packId)}/assign`, {
-        method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-        body: JSON.stringify({ caseId, expectedCaseRevision: caseRevision, dueDate: dueDate || null, confirmEmploymentTypeMismatch: mismatch }),
-      });
-      if (!response.ok) throw new Error(response.status === 409 ?
-        "This case, pack or its forms have changed. Reload and try again." :
+      // Refresh the employee revision and published pack versions just before mutation.
+      const currentRevision = await latestCaseRevision();
+      const publishedResponse = await fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" });
+      if (!publishedResponse.ok) throw new Error("Unable to refresh the published packs.");
+      const published = await publishedResponse.json() as Pack[];
+      setPacks(published);
+      const chosen = published.find(p => p.id === requestedPackId && p.status === "PUBLISHED");
+      const newer = chosen && published.some(p =>
+        p.status === "PUBLISHED" &&
+        (p.rootPackId ?? p.id) === (chosen.rootPackId ?? chosen.id) &&
+        p.versionNumber > chosen.versionNumber);
+      if (!chosen || newer) {
+        setPackId("");
+        throw new Error("A newer pack version is available. Select the latest published pack and try again.");
+      }
+      let response: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const revision = attempt === 0 ? currentRevision : await latestCaseRevision();
+        response = await fetch(`/api/v1/packs/${encodeURIComponent(requestedPackId)}/assign`, {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+          body: JSON.stringify({ caseId, expectedCaseRevision: revision, dueDate: dueDate || null, confirmEmploymentTypeMismatch: confirmedMismatch }),
+        });
+        if (response.status !== 409) break;
+        // A 409 can also mean an already-assigned form or a changed pack.
+        // Refresh once and only retry if no pack assignment is now recorded.
+        await refresh();
+        const check = await fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, { credentials: "same-origin", cache: "no-store" });
+        if (!check.ok) break;
+        const current = await check.json() as Progress[];
+        if (current.some(p => p.packId === requestedPackId)) break;
+      }
+      if (!response?.ok) throw new Error(response?.status === 409 ?
+        "This pack or its forms changed, or some forms are already assigned. The latest data has been loaded; please review and try again." :
         "Could not assign the selected pack.");
       setPackId(""); setDueDate("");
       await onAssigned();
@@ -115,7 +166,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   }
 
   async function approve(id: string) {
-    if (busy || !window.confirm("Approve this pack? All required forms must already be approved.")) return;
+    if (busy) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`/api/v1/packs/assignments/${encodeURIComponent(id)}/approve`, {
@@ -131,7 +182,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     } finally { setBusy(false); }
   }
 
-  return <section className="space-y-4 rounded-xl border bg-muted/20 p-4">
+  return <section className="space-y-4 rounded-xl border bg-muted/20 p-4">\n    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>{confirmation === "mismatch" ? "Employment type mismatch" : "Approve onboarding pack?"}</DialogTitle><DialogDescription>{confirmation === "mismatch" ? `This pack is for ${selectedPack?.employmentType ?? "another employment type"}, but this employee is listed as ${employmentType}. Assigning it anyway will be recorded in the audit history.` : "Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (confirmation === "mismatch") void assign(true); else if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>{confirmation === "mismatch" ? "Assign anyway" : "Approve pack"}</Button></div></DialogContent></Dialog>
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
       <p className="mt-1 text-xs text-muted-foreground">Assign all forms from a published pack to this active onboarding case.</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -186,7 +237,7 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
             </div>
           </div>}
         </div>}
-        {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>void approve(a.id)}>Approve completed pack</Button>}
+        {a.readyForApproval && <Button className="mt-2" size="sm" type="button" disabled={busy} onClick={()=>{ setApprovalId(a.id); setConfirmation("approve"); }}>Approve completed pack</Button>}
         <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-muted-foreground">View {a.forms.length} forms</summary><ul className="mt-2 space-y-1">{a.forms.map(form=>
           <li key={form.assignmentId} className="text-xs text-muted-foreground">
             {form.title} · {form.required ? "Required" : "Optional"} · {form.status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted — HR follow-up" : form.status}
