@@ -153,7 +153,6 @@ export function FileUpload({
     } finally {
       setBusy(false);
       setPhase(null);
-      e.currentTarget.value = "";
     }
   };
 
