@@ -508,7 +508,9 @@ export function EmployeesWorkspace() {
                                 {a.required ? "Required" : "Optional"}
                               </span>
                               <span>·</span>
-                              {a.status === "APPROVED" ? (
+                              {a.status === "EXTERNAL_SUBMITTED" ? (
+                                <Badge variant="secondary" className="text-xs">Guarantor submitted — HR follow-up required</Badge>
+                              ) : a.status === "APPROVED" ? (
                                 <Badge className="bg-green-600 hover:bg-green-700 text-xs">
                                   Approved
                                 </Badge>
