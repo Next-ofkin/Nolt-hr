@@ -7,11 +7,9 @@ import { Button } from "./ui/button";
 export function EmployeeInvitations({
   employeeId,
   revision,
-  hasCase,
 }: {
   employeeId: string;
   revision: number;
-  hasCase: boolean;
 }) {
   const { session } = useAuth();
   const [items, setItems] = useState<components["schemas"]["InvitationDto"][]>(
@@ -48,6 +46,11 @@ export function EmployeeInvitations({
   }, [load]);
   const latest = items[0],
     accepted = items.some((i) => i.state === "ACCEPTED");
+  useEffect(() => {
+    if (!latest || !["QUEUED", "SENDING"].includes(latest.state)) return;
+    const interval = window.setInterval(() => { void load().catch(() => {}); }, 5000);
+    return () => window.clearInterval(interval);
+  }, [latest?.id, latest?.state, load]);
   async function send() {
     if (!session) return;
     const p = request ?? {
@@ -72,7 +75,8 @@ export function EmployeeInvitations({
       if (r.error) throw Error(errorMessage(r.error));
       setRequest(null);
       setItems([r.data, ...items.filter((i) => i.id !== r.data.id)]);
-      setNotice("Invitation queued. Refresh its status to check delivery.");
+      setNotice("Invitation queued. Delivery status updates automatically.");
+      void load().catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invitation request failed.");
     } finally {
@@ -83,8 +87,8 @@ export function EmployeeInvitations({
     <section className="space-y-3 border-t pt-5">
       <h3 className="font-semibold">Employee invitation</h3>
       <p className="text-sm text-muted-foreground">
-        The employee receives a secure email link, verifies their authenticator
-        and activates their own account. Resending replaces the old invitation.
+        Send an invitation as soon as the employee record is saved. The employee
+        verifies their email and MFA to activate Employee access; onboarding forms can come later.
       </p>
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -125,7 +129,7 @@ export function EmployeeInvitations({
       )}
       <div className="flex flex-wrap gap-2">
         <Button
-          disabled={busy || loading || !hasCase || accepted}
+          disabled={busy || loading || accepted}
           onClick={() => void send()}
         >
           {busy
@@ -175,11 +179,7 @@ export function EmployeeInvitations({
             </Button>
           )}
       </div>
-      {!hasCase && (
-        <p className="text-xs text-muted-foreground">
-          Open an onboarding case before sending an invitation.
-        </p>
-      )}
+
     </section>
   );
 }
