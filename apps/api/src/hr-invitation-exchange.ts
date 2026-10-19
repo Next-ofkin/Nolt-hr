@@ -180,6 +180,50 @@ export class HrInvitationExchangeService {
     return {next:"awaiting_activation" as const};
   }
 
+  /**
+   * Invitation-bound, one-time HR activation. The browser cannot choose a role.
+   * The database performs the atomic transition and revokes old sessions;
+   * this API first verifies the live AAL2 provider identity and CSRF-bound flow.
+   */
+  async activate(req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("Automatic HR activation is not enabled.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId ||
+        !flow.state.hrSubject || !flow.state.tokens ||
+        flow.state.hrPasswordStatus !== "CONFIRMED" ||
+        flow.row.hrInvitationId !== flow.state.invitationId ||
+        flow.row.hrSubject !== flow.state.hrSubject ||
+        !flow.row.hrPasswordConfirmedAt ||
+        flow.row.hrPasswordConfirmedAt < flow.row.createdAt ||
+        flow.row.hrPasswordConfirmedAt >= flow.row.expiresAt ||
+        flow.row.hrPasswordConfirmedAt > new Date())
+      throw new ForbiddenException("HR invitation verification is incomplete.");
+    const invitation = await this.db.hrInvitation.findUnique({
+      where: { id: flow.state.invitationId },
+    });
+    if (!invitation || invitation.state !== "SENT" || !invitation.expiresAt ||
+        invitation.expiresAt <= new Date() || invitation.revokedAt ||
+        !invitation.creationSubject ||
+        invitation.creationSubject !== invitation.providerSubject ||
+        invitation.creationSubject !== flow.state.hrSubject)
+      throw new ForbiddenException("This HR invitation can no longer be activated.");
+    const verified = await this.proof.verify(invitation, flow.state.tokens);
+    if (verified.subject !== flow.state.hrSubject || verified.email !== invitation.email)
+      throw new ForbiddenException("The authenticated account does not match the Developer invitation.");
+    // The privileged function rechecks invitation, account, and one-use flow
+    // under a row lock. It alone changes the role and consumes the invitation.
+    const rows = await this.db.$queryRaw<{ accepted: boolean }[]>`
+      SELECT nolt_private.accept_hr_invitation(
+        ${invitation.id}::uuid, ${verified.subject}::uuid, ${flow.row.id}::uuid
+      ) AS accepted
+    `;
+    if (rows[0]?.accepted !== true)
+      throw new ForbiddenException("Activation was not accepted. Reverify your invitation.");
+    return { next: "login" as const, role: "HR" as const };
+  }
+
   async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
     // This endpoint can check identity, but cannot grant access or create a
     // privileged flow until the HR-specific MFA and activation path is ready.
@@ -262,6 +306,12 @@ export class HrInvitationExchangeController {
     assertOrigin(req);
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
     return this.service.confirmResume(req);
+  }
+  @Post("activate")
+  activate(@Req() req: Request) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.activate(req);
   }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
