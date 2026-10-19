@@ -1,6 +1,6 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { Pen, Keyboard, Upload, CheckCircle2, RotateCcw } from "lucide-react";
+import { Pen, Upload, CheckCircle2, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { api, errorMessage } from "@nolt/api-client";
@@ -46,6 +46,8 @@ export function SignaturePad({
   >(existingSignatureId || null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const strokes = useRef<ImageData[]>([]);
+  const [undoCount, setUndoCount] = useState(0);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -69,6 +71,8 @@ export function SignaturePad({
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const ctx = e.currentTarget.getContext("2d");
     if (!ctx) return;
+    strokes.current.push(ctx.getImageData(0, 0, e.currentTarget.width, e.currentTarget.height));
+    setUndoCount(strokes.current.length);
     activePointer.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
     const point = getCanvasCoordinates(e);
@@ -109,7 +113,18 @@ export function SignaturePad({
     lastPoint.current = null;
   };
 
+  const undoStroke = () => {
+    const canvas = canvasRef.current;
+    const previous = strokes.current.pop();
+    if (!canvas || !previous) return;
+    canvas.getContext("2d")?.putImageData(previous, 0, 0);
+    setUndoCount(strokes.current.length);
+    setHasDrawn(strokes.current.length > 0);
+  };
+
   const clearCanvas = () => {
+    strokes.current = [];
+    setUndoCount(0);
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (canvas && ctx) {
@@ -283,8 +298,7 @@ export function SignaturePad({
           </button>
         )}
         <p className="text-xs text-muted-foreground">
-          Keyboard users can attach a signature image when HR enables uploads.
-          Contact HR if this form requires drawing.
+          Use your finger, a stylus or mouse. You can clear or undo before confirming.
         </p>
         {(allowedMethod === "UPLOAD" || allowedMethod === "EITHER") && (
           <button
@@ -320,6 +334,7 @@ export function SignaturePad({
             style={{ height: "140px" }}
             aria-label="Draw your signature using mouse or finger"
           />
+          {hasDrawn && <button type="button" onClick={undoStroke} disabled={undoCount === 0} className="absolute left-2 top-2 rounded bg-muted/80 px-2 py-1 text-xs text-muted-foreground hover:bg-muted">Undo</button>}
           {hasDrawn && (
             <button
               type="button"
@@ -384,8 +399,7 @@ export function SignaturePad({
           className="mt-0.5 size-4 rounded border-gray-300 accent-primary"
         />
         <span>
-          I confirm that I am providing this signature for the saved answers.
-          This development confirmation does not establish legal equivalence.
+          I confirm this is my signature and I approve the answers saved in this form.
         </span>
       </label>
 
