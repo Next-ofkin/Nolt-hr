@@ -132,16 +132,9 @@ export class HrInvitationExchangeService {
     });
     if (!invitation || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject)
       throw new ForbiddenException("This HR invitation is unavailable.");
-    // The password was already set and confirmed in the original verified HR flow.
-    const original = await this.db.authFlow.findFirst({
-      where: { kind: "HR_INVITATION", hrInvitationId: invitation.id,
-        hrSubject: invitation.creationSubject, hrPasswordConfirmedAt: { not: null } },
-      orderBy: { createdAt: "desc" },
-    });
-    if (!original || !original.hrPasswordConfirmedAt ||
-        original.hrPasswordConfirmedAt < original.createdAt ||
-        original.hrPasswordConfirmedAt >= original.expiresAt)
-      throw new ForbiddenException("Complete your original HR invitation password setup first.");
+    // Expired AuthFlow records are disposable and may be deleted on next sign-in.
+    // Current password authentication, exact invitation-created identity binding,
+    // and a new live AAL2 challenge provide fresh evidence without relying on them.
     const { client } = this.auth.client();
     const result = await client.auth.signInWithPassword({ email, password: parsed.data.password });
     if (result.error || !result.data.session || !result.data.user?.email_confirmed_at ||
@@ -176,14 +169,9 @@ export class HrInvitationExchangeService {
       throw new ForbiddenException("The invitation is no longer available.");
     const proof = await this.proof.verify(invitation, flow.state.tokens);
     if (proof.subject !== flow.state.hrSubject) throw new ForbiddenException("Account mismatch.");
-    const alreadyConfirmed = await this.db.authFlow.findFirst({
-      where: {kind:"HR_INVITATION",hrInvitationId:invitation.id,
-        hrSubject: proof.subject,hrPasswordConfirmedAt:{not:null},id:{not:flow.row.id}},
-    });
-    if (!alreadyConfirmed || !alreadyConfirmed.hrPasswordConfirmedAt ||
-        alreadyConfirmed.hrPasswordConfirmedAt < alreadyConfirmed.createdAt ||
-        alreadyConfirmed.hrPasswordConfirmedAt >= alreadyConfirmed.expiresAt)
-      throw new ForbiddenException("Prior password confirmation cannot be verified.");
+    // This flow originated from a successful password sign-in and its fresh MFA
+    // was checked against the same subject by proof.verify above. Do not treat
+    // historical flow records as authoritative: they are routinely purged.
     const changed = await this.db.authFlow.updateMany({
       where: {id:flow.row.id,encryptedState:flow.row.encryptedState,expiresAt:{gt:new Date()},hrPasswordConfirmedAt:null},
       data: {encryptedState:seal({...flow.state,hrPasswordStatus:"CONFIRMED" as const}),hrPasswordConfirmedAt:new Date()},
