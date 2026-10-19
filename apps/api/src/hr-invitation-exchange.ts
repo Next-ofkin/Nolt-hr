@@ -23,6 +23,7 @@ const payload = z.object({
 export class HrVerificationDto {
   @ApiProperty({ type: Boolean }) verified!: boolean;
   @ApiProperty({ type: Boolean }) activationAllowed!: boolean;
+  @ApiProperty({ type: Boolean }) resuming!: boolean;
 }
 
 export class HrPasswordResultDto {
@@ -53,7 +54,7 @@ export class HrInvitationExchangeService {
     });
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
     await this.proof.verify(invitation, flow.state.tokens);
-    return { verified: true, activationAllowed: false };
+    return { verified: true, activationAllowed: false, resuming: flow.state.hrResume === true };
   }
 
   async activationReadiness(req: Request) {
@@ -117,6 +118,78 @@ export class HrInvitationExchangeService {
     });
     if (confirmed.count !== 1) throw new ForbiddenException("Password confirmation failed.");
     return { next: "awaiting_activation" };
+  }
+
+  /** Reauthenticate an already invited account; never issue an application session. */
+  async resume(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation verification is not available.");
+    const parsed = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(128) }).strict().safeParse(input);
+    if (!parsed.success) throw new BadRequestException("Enter your invitation email and existing password.");
+    const email = parsed.data.email.trim().toLowerCase();
+    const invitation = await this.db.hrInvitation.findFirst({
+      where: { email, state: "SENT", expiresAt: { gt: new Date() }, revokedAt: null },
+    });
+    if (!invitation || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject)
+      throw new ForbiddenException("This HR invitation is unavailable.");
+    // The password was already set and confirmed in the original verified HR flow.
+    const original = await this.db.authFlow.findFirst({
+      where: { kind: "HR_INVITATION", hrInvitationId: invitation.id,
+        hrSubject: invitation.creationSubject, hrPasswordConfirmedAt: { not: null } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!original || !original.hrPasswordConfirmedAt ||
+        original.hrPasswordConfirmedAt < original.createdAt ||
+        original.hrPasswordConfirmedAt >= original.expiresAt)
+      throw new ForbiddenException("Complete your original HR invitation password setup first.");
+    const { client } = this.auth.client();
+    const result = await client.auth.signInWithPassword({ email, password: parsed.data.password });
+    if (result.error || !result.data.session || !result.data.user?.email_confirmed_at ||
+        result.data.user.id !== invitation.creationSubject)
+      throw new ForbiddenException("Could not verify the invited account.");
+    const account = await this.db.user.findUnique({ where: { id: result.data.user.id } });
+    const employee = await this.db.employee.findFirst({
+      where: { OR: [{ userId: result.data.user.id }, { email }] }, select: { id: true },
+    });
+    if (!account || !account.active || account.role !== "EMPLOYEE" || employee)
+      throw new ForbiddenException("This account is not eligible for HR activation.");
+    await this.auth.start("HR_INVITATION", {
+      invitationId: invitation.id, hrSubject: result.data.user.id,
+      hrResume: true, tokens: this.auth.tokens(result.data.session),
+    }, req, res, Math.min(600000, invitation.expiresAt.getTime() - Date.now()));
+    return { next: "mfa" };
+  }
+
+  /** Fresh password possession + current AAL2; records readiness only, NOT an HR grant. */
+  async confirmResume(req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR verification is not available.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || flow.state.hrResume !== true ||
+        flow.state.hrPasswordStatus !== undefined || !flow.state.invitationId ||
+        !flow.state.hrSubject || !flow.state.tokens ||
+        flow.row.hrInvitationId !== flow.state.invitationId ||
+        flow.row.hrSubject !== flow.state.hrSubject)
+      throw new ForbiddenException("This re-verification cannot be completed.");
+    const invitation = await this.db.hrInvitation.findUnique({where: {id: flow.state.invitationId}});
+    if (!invitation || invitation.state !== "SENT")
+      throw new ForbiddenException("The invitation is no longer available.");
+    const proof = await this.proof.verify(invitation, flow.state.tokens);
+    if (proof.subject !== flow.state.hrSubject) throw new ForbiddenException("Account mismatch.");
+    const alreadyConfirmed = await this.db.authFlow.findFirst({
+      where: {kind:"HR_INVITATION",hrInvitationId:invitation.id,
+        hrSubject: proof.subject,hrPasswordConfirmedAt:{not:null},id:{not:flow.row.id}},
+    });
+    if (!alreadyConfirmed || !alreadyConfirmed.hrPasswordConfirmedAt ||
+        alreadyConfirmed.hrPasswordConfirmedAt < alreadyConfirmed.createdAt ||
+        alreadyConfirmed.hrPasswordConfirmedAt >= alreadyConfirmed.expiresAt)
+      throw new ForbiddenException("Prior password confirmation cannot be verified.");
+    const changed = await this.db.authFlow.updateMany({
+      where: {id:flow.row.id,encryptedState:flow.row.encryptedState,expiresAt:{gt:new Date()},hrPasswordConfirmedAt:null},
+      data: {encryptedState:seal({...flow.state,hrPasswordStatus:"CONFIRMED" as const}),hrPasswordConfirmedAt:new Date()},
+    });
+    if (changed.count !== 1) throw new ForbiddenException("Verification already completed or expired.");
+    return {next:"awaiting_activation" as const};
   }
 
   async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
@@ -188,6 +261,19 @@ export class HrInvitationExchangeController {
     assertOrigin(req);
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
     return this.service.setPassword(value, req);
+  }
+  @Post("resume")
+  @ApiCreatedResponse({ type: HrExchangeResultDto })
+  resume(@Body() value:unknown, @Req() req:Request, @Res({passthrough:true}) res:Response) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.resume(value,req,res);
+  }
+  @Post("resume-confirm")
+  confirmResume(@Req() req:Request) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.confirmResume(req);
   }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
