@@ -923,10 +923,10 @@ export class ExternalEvidenceReviewService {
     const reviewer = await tx.user.findUnique({ where: { id: actorId } });
     if (!a || !["GUARANTOR","REFERENCE"].includes(a.formVersion.recipient))
       throw new NotFoundException("External evidence assignment not found.");
-    // Match the central HrGuard's forms.manage authorisation rather than
-    // requiring ownership or one exact HR role label.
-    if (!reviewer?.active || !reviewer.permissions.includes("forms.manage") ||
-        !["HR", "DEVELOPER"].includes(reviewer.role))
+    // HR access is permission-based; account roles may have other names.
+    // Never grant external evidence access to employee accounts.
+    if (!reviewer?.active || reviewer.role === "EMPLOYEE" ||
+        !reviewer.permissions.includes("forms.manage"))
       throw new ForbiddenException("HR evidence review access is required.");
     return a;
   }
