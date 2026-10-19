@@ -13,7 +13,7 @@ const packAssignmentInclude = {
   forms: { orderBy: { position: "asc" as const },
     include: { formAssignment: { include: { formVersion: { select: { title: true } },
       response: { select: { status: true } },
-      externalRequests: { where: { state: "SUBMITTED" }, select: { id: true }, take: 1 } } } } } },
+      externalRequests: { where: { state: "SUBMITTED" }, select: { id: true }, take: 1 } } } } },
 } satisfies Prisma.PackAssignmentInclude;
 
 @Injectable()
