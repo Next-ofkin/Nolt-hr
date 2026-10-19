@@ -64,6 +64,21 @@ test("signatures and signed-document fields preserve HR configuration", () => {
   );
 });
 
+test("passport photograph is a valid attachment field without changing existing forms", () => {
+  const passport = { ...createField("passport_photo", randomUUID()), required: true };
+  assert.equal(passport.attachmentPurpose, "SUPPORTING_DOCUMENT");
+  const content = publishContentSchema.parse({
+    title: "Employee identity",
+    recipient: "EMPLOYEE",
+    fields: [passport],
+  });
+  assert.equal(content.fields[0].type, "passport_photo");
+  assert.equal(formContentSchema.safeParse({
+    ...content,
+    fields: [createField("file", randomUUID()), passport],
+  }).success, true);
+});
+
 // Keep these rules executable independently of hosted Supabase.
 import { canDeleteUnpublishedDraft } from "../apps/api/src/forms.js";
 test("only a never-published, never-assigned single draft is deletable", () => {
