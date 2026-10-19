@@ -455,7 +455,8 @@ function FormEditor({
     ),
     [busy, setBusy] = useState(false),
     [preview, setPreview] = useState(false),
-    [confirmAction, setConfirmAction] = useState<"delete" | "unpublish" | null>(null);
+    [confirmAction, setConfirmAction] = useState<"delete" | "unpublish" | null>(null),
+    [confirmLeave, setConfirmLeave] = useState(false);
   const published = record.status !== "DRAFT",
     dirty =
       JSON.stringify(content) !==
@@ -499,11 +500,8 @@ function FormEditor({
     });
   }
   function leave() {
-    if (
-      !dirty ||
-      window.confirm("You have unsaved changes. Leave without saving?")
-    )
-      onBack();
+    if (dirty) setConfirmLeave(true);
+    else onBack();
   }
   async function save(): Promise<FormRecord | null> {
     const result = formContentSchema.safeParse(content);
@@ -631,6 +629,17 @@ function FormEditor({
   }
   return (
     <>
+      <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Discard unsaved changes?</DialogTitle>
+            <DialogDescription>Your draft edits have not been saved. Leaving will discard these changes.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmLeave(false)}>Keep editing</Button>
+            <Button variant="destructive" onClick={() => { setConfirmLeave(false); onBack(); }}>Discard changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirmAction !== null} onOpenChange={(open) => { if (!open && !busy) setConfirmAction(null); }}>
         <DialogContent>
           <DialogHeader>

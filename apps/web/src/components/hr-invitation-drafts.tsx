@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { ClipboardCheck, Clock3, Loader2, UserPlus, XCircle } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 type Draft = { id: string; name: string; email: string; state: string; createdAt: string; revokedAt: string | null };
 const endpoint = "/api/v1/developer/hr-invitation-drafts";
@@ -17,6 +18,7 @@ export function HrInvitationDrafts() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [confirmSendId, setConfirmSendId] = useState<string | null>(null);
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -84,7 +86,7 @@ export function HrInvitationDrafts() {
   }
   async function sendInvitation(id: string) {
     if (!session || busy || !sendAvailable) return;
-    if (!window.confirm("Send this HR invitation email? HR access is granted only after the recipient completes email, password and MFA verification.")) return;
+    setConfirmSendId(null);
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`${endpoint}/${encodeURIComponent(id)}/queue`, {
@@ -122,6 +124,7 @@ export function HrInvitationDrafts() {
   }
   return (
     <section className="rounded-2xl border border-[#dbe9e4] bg-[#eff8f3] p-6">
+      <Dialog open={confirmSendId !== null} onOpenChange={open => { if (!open) setConfirmSendId(null); }}><DialogContent><DialogHeader><DialogTitle>Send HR invitation?</DialogTitle><DialogDescription>HR access will only be granted once the recipient completes email, password and MFA verification.</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmSendId(null)}>Cancel</Button><Button disabled={busy} onClick={() => { const id = confirmSendId; if (id) void sendInvitation(id); }}>Send email</Button></div></DialogContent></Dialog>
       <span className="flex size-11 items-center justify-center rounded-xl bg-[#dcefe5] text-[#146f56]"><UserPlus size={22}/></span>
       <h2 className="mt-5 text-xl font-semibold tracking-tight">Prepare an HR invitation</h2>
       <p className="mt-2 text-sm leading-6 text-[#526a62]">Invite a new HR colleague in one step. We will email their invitation; HR access activates automatically after they verify their email, set their password and complete MFA.</p>
@@ -134,7 +137,7 @@ export function HrInvitationDrafts() {
       {notice && <p role="status" className="mt-3 text-sm text-[#146f56]">{notice}</p>}
       <div className="mt-5 border-t border-[#d1e5da] pt-4">
         <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent invitations</h3><span className="text-xs text-[#526a62]">Latest 25</span></div>
-        {loading ? <p role="status" className="mt-3 text-xs text-muted-foreground">Loading drafts…</p> : items.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">No drafts created yet.</p> : <div className="mt-3 space-y-2">{items.map(item=><div key={item.id} className="rounded-xl border border-[#dbe9e4] bg-white px-3 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{item.name}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div><span className="shrink-0 text-[11px] font-semibold text-[#526a62]">{item.state === "DRAFT" ? "Draft" : item.state.toLowerCase().replaceAll("_", " ")}</span></div>{item.state === "DRAFT" && sendAvailable && <button type="button" disabled={busy} className="mt-2 mr-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50" onClick={() => void sendInvitation(item.id)}><UserPlus size={13}/> Send invitation email</button>}{item.state === "DRAFT" && <button type="button" disabled={busy} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline disabled:opacity-50" onClick={()=>void revoke(item.id)}><XCircle size={13}/> Revoke draft</button>}</div>)}</div>}
+        {loading ? <p role="status" className="mt-3 text-xs text-muted-foreground">Loading drafts…</p> : items.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">No drafts created yet.</p> : <div className="mt-3 space-y-2">{items.map(item=><div key={item.id} className="rounded-xl border border-[#dbe9e4] bg-white px-3 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{item.name}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div><span className="shrink-0 text-[11px] font-semibold text-[#526a62]">{item.state === "DRAFT" ? "Draft" : item.state.toLowerCase().replaceAll("_", " ")}</span></div>{item.state === "DRAFT" && sendAvailable && <button type="button" disabled={busy} className="mt-2 mr-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50" onClick={() => setConfirmSendId(item.id)}><UserPlus size={13}/> Send invitation email</button>}{item.state === "DRAFT" && <button type="button" disabled={busy} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline disabled:opacity-50" onClick={()=>void revoke(item.id)}><XCircle size={13}/> Revoke draft</button>}</div>)}</div>}
       </div>
       <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#cae2d7] bg-white/70 px-3 py-3 text-xs font-medium text-[#276450]"><Clock3 size={16}/> {sendAvailable ? "Invitations can be emailed to eligible new users. HR access activates automatically after verified registration and MFA." : "HR email delivery is currently unavailable. Please refresh or contact the administrator if the service remains unavailable."}</div>
     </section>
