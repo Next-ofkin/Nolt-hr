@@ -430,14 +430,11 @@ export class InvitationsService {
         const e = await tx.employee.findUniqueOrThrow({
           where: { id: i.employeeId },
         });
-        if (
-          e.userId !== checked.user.id ||
-          !(await tx.onboardingCase.findFirst({
-            where: { employeeId: e.id, status: "ACTIVE" },
-          }))
-        )
+        // An employee's invitation is valid independently of onboarding cases.
+        // HR may assign onboarding forms later; never block account activation.
+        if (e.userId !== checked.user.id)
           throw new ConflictException(
-            "The employee's onboarding case changed. Contact HR.",
+            "This invitation is no longer linked to your employee record. Contact HR.",
           );
         const consumed = await tx.authFlow.deleteMany({
           where: { id: f.row.id, encryptedState: f.row.encryptedState },
