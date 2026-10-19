@@ -35,7 +35,6 @@ export function SignaturePad({
   );
   const [typedName, setTypedName] = useState("");
   const [consentConfirmed, setConsentConfirmed] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [uploadedImageBase64, setUploadedImageBase64] = useState<string | null>(
     null,
@@ -53,49 +52,60 @@ export function SignaturePad({
     setConfirmedSignatureId(existingSignatureId || null);
   }, [existingSignatureId]);
 
-  // Canvas drawing setup
-  const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+  // Pointer events cover finger, stylus and mouse with one consistent path.
+  // Coordinates are normalized to the canvas backing resolution.
+  const activePointer = useRef<number | null>(null);
+  const getCanvasCoordinates = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = e.currentTarget;
     const rect = canvas.getBoundingClientRect();
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
     return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height),
     };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (disabled || confirmedSignatureId) return;
-    setIsDrawing(true);
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (disabled || confirmedSignatureId || activePointer.current !== null) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const ctx = e.currentTarget.getContext("2d");
+    if (!ctx) return;
+    activePointer.current = e.pointerId;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const point = getCanvasCoordinates(e);
     lastPoint.current = point;
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    setHasDrawn(true);
   };
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || disabled || confirmedSignatureId) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointer.current !== e.pointerId || disabled || confirmedSignatureId) return;
+    const canvas = e.currentTarget;
+    const ctx = canvas.getContext("2d");
     if (!ctx || !lastPoint.current) return;
-
     const current = getCanvasCoordinates(e);
     ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = e.pointerType === "pen" && e.pressure > 0
+      ? Math.max(1.5, Math.min(4.5, e.pressure * 4))
+      : 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-
     ctx.beginPath();
     ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
     ctx.lineTo(current.x, current.y);
     ctx.stroke();
-
     lastPoint.current = current;
     setHasDrawn(true);
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointer.current !== e.pointerId) return;
+    activePointer.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
     lastPoint.current = null;
   };
 
@@ -302,13 +312,10 @@ export function SignaturePad({
             ref={canvasRef}
             width={600}
             height={160}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={startDrawing}
-            onTouchMove={draw}
-            onTouchEnd={stopDrawing}
+            onPointerDown={startDrawing}
+            onPointerMove={draw}
+            onPointerUp={stopDrawing}
+            onPointerCancel={stopDrawing}
             className="w-full touch-none rounded border border-dashed bg-white dark:bg-slate-950"
             style={{ height: "140px" }}
             aria-label="Draw your signature using mouse or finger"
