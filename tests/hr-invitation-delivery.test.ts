@@ -6,10 +6,11 @@ const ready = {
   HR_INVITATION_DELIVERY_ENABLED: "true",
   HR_INVITATION_TEST_RECIPIENTS: "safe-hr@example.invalid, second@example.invalid",
 } as NodeJS.ProcessEnv;
-test("HR email delivery is disabled unless explicitly enabled and recipient is approved", () => {
+test("HR delivery requires enabled transport, not a per-address allowlist", () => {
   assert.equal(hrRecipientAllowed("safe-hr@example.invalid", {}), false);
-  assert.equal(hrRecipientAllowed("safe-hr@example.invalid", { HR_INVITATION_DELIVERY_ENABLED: "true" }), false);
-  assert.equal(hrRecipientAllowed("unknown@example.invalid", ready), false);
+  assert.equal(hrRecipientAllowed("safe-hr@example.invalid", { HR_INVITATION_DELIVERY_ENABLED: "true" }), true);
+  assert.equal(hrRecipientAllowed("unknown@example.invalid", ready), true);
+  assert.equal(hrRecipientAllowed("not-an-email", ready), false);
   assert.equal(hrRecipientAllowed("SAFE-HR@example.invalid", ready), true);
 });
 test("HR delivery failures classify retry, uncertainty and unsafe codes", () => {
@@ -25,17 +26,17 @@ test("HR delivery requires a valid creation proof before any send", async () => 
     });
   }
 });
-test("HR delivery transport cannot send while disabled or recipient missing from allowlist", async () => {
+test("HR delivery requires transport gate and configured sender", async () => {
   const invitation = {
     id: "e4b703d5-bf2c-4555-bfb1-6e63d452af3a",
     email: "unapproved@example.invalid", name: "Test",
     creationSecret: "a".repeat(64),
   };
   assert.deepEqual(await deliverHrInvitationEmail(invitation, {}), {
-    status: "FAILED", errorCode: "RECIPIENT_NOT_APPROVED", retryable: false,
+    status: "FAILED", errorCode: "DELIVERY_DISABLED_OR_INVALID_RECIPIENT", retryable: false,
   });
   assert.deepEqual(await deliverHrInvitationEmail(invitation, ready), {
-    status: "FAILED", errorCode: "RECIPIENT_NOT_APPROVED", retryable: false,
+    status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false,
   });
   assert.deepEqual(await deliverHrInvitationEmail({ ...invitation, email: "safe-hr@example.invalid" }, ready), {
     status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false,

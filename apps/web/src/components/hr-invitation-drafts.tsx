@@ -54,7 +54,7 @@ export function HrInvitationDrafts() {
   }, []);
   async function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || busy) return;
+    if (!session || busy || !sendAvailable) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(endpoint, {
@@ -64,15 +64,27 @@ export function HrInvitationDrafts() {
         body: JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase() }),
       });
       if (!response.ok) throw new Error(response.status === 409 ? "This email already has an account or active invitation draft." : "Could not prepare this invitation. Check the details and try again.");
+      const draft: Draft = await response.json();
+      // Queue the just-created draft as part of the same user action. If queue
+      // fails, retain the saved draft for retry; never claim an email was sent.
+      const queued = await fetch(`${endpoint}/${encodeURIComponent(draft.id)}/queue`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "x-csrf-token": session.csrfToken },
+        body: JSON.stringify({ requestKey: crypto.randomUUID() }),
+      });
       setName(""); setEmail("");
-      setNotice("HR invitation draft saved. No email has been sent and no permissions were granted.");
+      if (!queued.ok) {
+        setError("The invitation was saved but could not be queued. Use Send invitation email under Recent invitations to retry.");
+      } else {
+        setNotice("HR invitation queued for email delivery. The recipient will receive HR access automatically after verifying their email, password and MFA.");
+      }
       await load();
     } catch(e) { setError(e instanceof Error ? e.message : "Could not save draft."); }
     finally { setBusy(false); }
   }
   async function sendInvitation(id: string) {
     if (!session || busy || !sendAvailable) return;
-    if (!window.confirm("Queue this HR invitation for email delivery? This does not grant HR access; MFA and administrator approval are still required.")) return;
+    if (!window.confirm("Send this HR invitation email? HR access is granted only after the recipient completes email, password and MFA verification.")) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`${endpoint}/${encodeURIComponent(id)}/queue`, {
@@ -83,12 +95,12 @@ export function HrInvitationDrafts() {
       });
       if (!response.ok) {
         throw new Error(response.status === 503
-          ? "Sending is disabled by the administrator."
+          ? "HR invitation delivery is unavailable. Refresh and try again."
           : response.status === 409
             ? "This invitation cannot be queued. Check the recipient and current status."
             : "Could not queue this invitation. No delivery is confirmed.");
       }
-      setNotice("Invitation queued. Its status will update automatically; HR access is not granted automatically.");
+      setNotice("Invitation queued. HR access activates automatically after email, password and MFA verification.");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not queue the invitation."); }
     finally { setBusy(false); }
@@ -112,19 +124,19 @@ export function HrInvitationDrafts() {
     <section className="rounded-2xl border border-[#dbe9e4] bg-[#eff8f3] p-6">
       <span className="flex size-11 items-center justify-center rounded-xl bg-[#dcefe5] text-[#146f56]"><UserPlus size={22}/></span>
       <h2 className="mt-5 text-xl font-semibold tracking-tight">Prepare an HR invitation</h2>
-      <p className="mt-2 text-sm leading-6 text-[#526a62]">Save drafts securely. Saving a draft never sends email. When administrator-approved delivery is enabled, you can queue a draft separately; HR activation still requires MFA and operator approval.</p>
+      <p className="mt-2 text-sm leading-6 text-[#526a62]">Invite a new HR colleague in one step. We will email their invitation; HR access activates automatically after they verify their email, set their password and complete MFA.</p>
       <form onSubmit={e=>void prepare(e)} className="mt-5 space-y-3">
         <label className="block text-xs font-semibold text-[#315d52]">Full name<input value={name} onChange={e=>setName(e.target.value)} maxLength={160} minLength={2} required autoComplete="off" placeholder="e.g. Alex Morgan" className="mt-1.5 h-10 w-full rounded-xl border bg-white px-3 text-sm font-normal text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"/></label>
         <label className="block text-xs font-semibold text-[#315d52]">Work email<input value={email} onChange={e=>setEmail(e.target.value)} type="email" maxLength={254} required autoComplete="off" placeholder="alex@company.com" className="mt-1.5 h-10 w-full rounded-xl border bg-white px-3 text-sm font-normal text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"/></label>
-        <Button type="submit" className="w-full rounded-xl" disabled={busy || !session}>{busy ? <Loader2 className="animate-spin"/> : <ClipboardCheck/>} Save invitation draft</Button>
+        <Button type="submit" className="w-full rounded-xl" disabled={busy || !session || !sendAvailable}>{busy ? <Loader2 className="animate-spin"/> : <ClipboardCheck/>} Send HR invitation</Button>
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="mt-3 text-sm text-[#146f56]">{notice}</p>}
       <div className="mt-5 border-t border-[#d1e5da] pt-4">
-        <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent drafts</h3><span className="text-xs text-[#526a62]">Latest 25</span></div>
+        <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent invitations</h3><span className="text-xs text-[#526a62]">Latest 25</span></div>
         {loading ? <p role="status" className="mt-3 text-xs text-muted-foreground">Loading drafts…</p> : items.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">No drafts created yet.</p> : <div className="mt-3 space-y-2">{items.map(item=><div key={item.id} className="rounded-xl border border-[#dbe9e4] bg-white px-3 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{item.name}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div><span className="shrink-0 text-[11px] font-semibold text-[#526a62]">{item.state === "DRAFT" ? "Draft" : item.state.toLowerCase().replaceAll("_", " ")}</span></div>{item.state === "DRAFT" && sendAvailable && <button type="button" disabled={busy} className="mt-2 mr-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50" onClick={() => void sendInvitation(item.id)}><UserPlus size={13}/> Send invitation email</button>}{item.state === "DRAFT" && <button type="button" disabled={busy} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline disabled:opacity-50" onClick={()=>void revoke(item.id)}><XCircle size={13}/> Revoke draft</button>}</div>)}</div>}
       </div>
-      <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#cae2d7] bg-white/70 px-3 py-3 text-xs font-medium text-[#276450]"><Clock3 size={16}/> {sendAvailable ? "Email queue enabled for approved recipients; HR role activation remains a separate MFA-verified operator action." : "Email sending disabled. An administrator must enable controlled delivery and approve recipient addresses. Drafts do not send email."}</div>
+      <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#cae2d7] bg-white/70 px-3 py-3 text-xs font-medium text-[#276450]"><Clock3 size={16}/> {sendAvailable ? "Invitations can be emailed to eligible new users. HR access activates automatically after verified registration and MFA." : "HR email delivery is currently unavailable. Please refresh or contact the administrator if the service remains unavailable."}</div>
     </section>
   );
 }

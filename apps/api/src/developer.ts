@@ -6,7 +6,6 @@ import { z } from "zod";
 import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
 import { canQueueHrInvitation, canRevokeHrInvitation } from "./hr-invitation-rules.js";
-import { hrRecipientAllowed } from "./hr-invitation-delivery.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
 
 const draftInput = z.object({
@@ -107,9 +106,15 @@ export class DeveloperOverviewService {
       await tx.$queryRaw`SELECT id FROM public."HrInvitation" WHERE id=${id}::uuid FOR UPDATE`;
       const invite = await tx.hrInvitation.findUnique({ where: { id } });
       if (!invite) throw new NotFoundException("Invitation not found.");
-      if (!hrRecipientAllowed(invite.email))
-        throw new ServiceUnavailableException("This recipient is not approved for HR invitation testing.");
       if (invite.requestKey === requestKey && invite.state === "QUEUED") return invite;
+      // Bound email sends from a compromised Developer session without requiring
+      // a per-address allowlist. Enforce the limit inside the same transaction.
+      const attemptsToday = await tx.hrInvitation.count({
+        where: { createdBy: actorId, state: { in: ["QUEUED", "SENDING", "SENT", "UNCERTAIN", "ACCEPTED"] },
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      });
+      if (attemptsToday >= 25)
+        throw new ConflictException("Daily HR invitation limit reached. Try again tomorrow.");
       if (!canQueueHrInvitation(invite.state as Parameters<typeof canQueueHrInvitation>[0]))
         throw new ConflictException("Only invitation drafts may be queued.");
       if (await tx.user.findUnique({ where: { email: invite.email }, select: { id: true } }))
@@ -175,10 +180,10 @@ export class DeveloperOverviewService {
         ...a,
         createdAt: a.createdAt.toISOString(),
       })),
-      // Never advertise a live invitation action until acceptance is implemented.
+      // Developer invitations are ready only when delivery and automatic activation are on.
       inviteEnabled: process.env.HR_INVITATION_DELIVERY_ENABLED === "true" &&
         process.env.HR_INVITATION_ACCEPTANCE_ENABLED === "true" &&
-        Boolean(process.env.HR_INVITATION_TEST_RECIPIENTS?.trim()),
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED === "true",
     };
   }
 }
