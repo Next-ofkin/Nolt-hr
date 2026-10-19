@@ -476,6 +476,7 @@ export function EmployeesWorkspace() {
                   <PackAssignmentPanel
                     key={c.id}
                     caseId={c.id}
+                    employeeId={detail.employee.id}
                     caseRevision={c.revision}
                     employmentType={detail.employee.employmentType}
                     csrfToken={session!.csrfToken}
