@@ -39,7 +39,9 @@ const labels = {
 export function EmployeesWorkspace() {
   const { session } = useAuth();
   const [items, setItems] = useState<Employee[]>([]),
-    [next, setNext] = useState<string | null>(null);
+    [next, setNext] = useState<string | null>(null),
+    [page, setPage] = useState(0),
+    [pageCursors, setPageCursors] = useState<(string | null)[]>([null]);
   const [q, setQ] = useState(""),
     [department, setDepartment] = useState(""),
     [employmentType, setEmploymentType] = useState(""),
@@ -60,7 +62,7 @@ export function EmployeesWorkspace() {
     [notice, setNotice] = useState("");
   const headers = { "x-csrf-token": session!.csrfToken };
   const list = useCallback(
-    async (cursor?: string) => {
+    async (cursor?: string | null, pageNumber = 0) => {
       setLoading(true);
       setError("");
       try {
@@ -73,6 +75,7 @@ export function EmployeesWorkspace() {
               ...(caseStatus ? { caseStatus } : {}),
               ...(startFrom ? { startFrom } : {}),
               ...(startTo ? { startTo } : {}),
+              limit: 6,
               ...(cursor ? { cursor } : {}),
             },
           },
@@ -80,6 +83,8 @@ export function EmployeesWorkspace() {
         if (r.error) throw new Error(errorMessage(r.error));
         setItems(r.data.items);
         setNext(r.data.nextCursor);
+        setPage(pageNumber);
+        if (pageNumber === 0) setPageCursors([null]);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not load employees.");
       } finally {
@@ -253,15 +258,19 @@ export function EmployeesWorkspace() {
               ))}
             </ul>
           )}
-          {next && (
-            <Button
-              variant="outline"
-              disabled={loading}
-              onClick={() => void list(next)}
-            >
-              Next page
-            </Button>
-          )}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+            <p className="text-sm text-muted-foreground">Page {page + 1} · 6 employees per page</p>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" disabled={loading || busy || page === 0}
+                onClick={() => void list(pageCursors[page - 1] ?? null, page - 1)}>Previous</Button>
+              <Button type="button" variant="outline" disabled={loading || busy || !next}
+                onClick={() => {
+                  if (!next) return;
+                  setPageCursors(previous => [...previous.slice(0, page + 1), next]);
+                  void list(next, page + 1);
+                }}>Next</Button>
+            </div>
+          </div>
         </section>
         <section className="min-w-0 space-y-5 rounded-xl border bg-white p-4 sm:p-6">
           {!detail && !editing && (

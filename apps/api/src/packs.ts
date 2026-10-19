@@ -180,7 +180,7 @@ export class PacksService {
   async assign(actorId: string, packId: string, input: unknown) {
     const parsed = assignPackSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException("Select an active case, its revision and an optional valid due date.");
-    const { caseId, expectedCaseRevision, dueDate } = parsed.data;
+    const { caseId, expectedCaseRevision, dueDate, confirmEmploymentTypeMismatch } = parsed.data;
     try {
       return await this.db.$transaction(async tx => {
         // Serialize against form assignment, case closure and other pack assignments.
@@ -209,8 +209,8 @@ export class PacksService {
         });
         if (!newestPublished || newestPublished.id !== pack.id)
           throw new ConflictException("A newer published version exists. Select the latest Pack version.");
-        if (pack.employmentType.trim().toLowerCase() !== activeCase.employee.employmentType.trim().toLowerCase())
-          throw new BadRequestException("Pack employment type must match the employee.");
+        if (pack.employmentType.trim().toLowerCase() !== activeCase.employee.employmentType.trim().toLowerCase() && !confirmEmploymentTypeMismatch)
+          throw new BadRequestException("This pack is for a different employment type. Confirm the mismatch to assign it.");
         if (await tx.packAssignment.findUnique({ where: { packId_caseId: { packId, caseId } } }))
           throw new ConflictException("This pack is already assigned to the case.");
         await this.lockAndVerifyVersions(tx, pack.items);
@@ -236,7 +236,7 @@ export class PacksService {
         await tx.onboardingCase.update({ where: { id: caseId }, data: { revision: { increment: 1 } } });
         await tx.auditEvent.create({
           data: { actorId, action: "PACK_ASSIGNED", targetId: assignment.id,
-            metadata: { caseId, packId, formCount: pack.items.length, dueDate } },
+            metadata: { caseId, packId, formCount: pack.items.length, dueDate, employmentTypeMismatch: pack.employmentType.trim().toLowerCase() !== activeCase.employee.employmentType.trim().toLowerCase() } },
         });
         await tx.outboxEvent.create({ data: { type: "PACK_ASSIGNED", targetId: assignment.id } });
         return { id: assignment.id, caseId, packId, dueDate,

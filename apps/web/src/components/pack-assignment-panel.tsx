@@ -47,19 +47,24 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
       latestPublished.set(root, pack);
   }
   const options = [...latestPublished.values()].filter(pack =>
-    pack.items.length > 0 &&
-    pack.employmentType.trim().toLowerCase() === employmentType.trim().toLowerCase() &&
-    !existing.some(assigned => assigned.packId === pack.id),
-  );
+    pack.items.length > 0 && !existing.some(assigned => assigned.packId === pack.id),
+  ).sort((a,b) => {
+    const aMatch = a.employmentType.trim().toLowerCase() === employmentType.trim().toLowerCase();
+    const bMatch = b.employmentType.trim().toLowerCase() === employmentType.trim().toLowerCase();
+    return Number(bMatch) - Number(aMatch) || a.name.localeCompare(b.name);
+  });
+  const selectedPack = options.find(pack => pack.id === packId);
+  const mismatch = !!selectedPack && selectedPack.employmentType.trim().toLowerCase() !== employmentType.trim().toLowerCase();
 
   async function assign() {
     if (!packId || busy) return;
+    if (mismatch && !window.confirm(`"${selectedPack!.name}" is for ${selectedPack!.employmentType}, but this employee is listed as ${employmentType}. Assign this pack anyway?`)) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(`/api/v1/packs/${encodeURIComponent(packId)}/assign`, {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-        body: JSON.stringify({ caseId, expectedCaseRevision: caseRevision, dueDate: dueDate || null }),
+        body: JSON.stringify({ caseId, expectedCaseRevision: caseRevision, dueDate: dueDate || null, confirmEmploymentTypeMismatch: mismatch }),
       });
       if (!response.ok) throw new Error(response.status === 409 ?
         "This case, pack or its forms have changed. Reload and try again." :
@@ -118,8 +123,8 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1"><Label htmlFor="case-pack">Published pack</Label>
         <select id="case-pack" className="native-select w-full" value={packId} onChange={e=>setPackId(e.target.value)}>
-          <option value="">Choose matching pack…</option>
-          {options.map(pack=><option value={pack.id} key={pack.id}>{pack.name} · v{pack.versionNumber} ({pack.items.length} forms)</option>)}
+          <option value="">Choose a published pack…</option>
+          {options.map(pack=><option value={pack.id} key={pack.id}>{pack.name} · v{pack.versionNumber} · {pack.employmentType} ({pack.items.length} forms)</option>)}
         </select>
       </div>
       <div className="space-y-1"><Label htmlFor="case-pack-due">Due date (optional)</Label>
@@ -127,9 +132,11 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
       </div>
     </div>
     {options.length === 0 && !error && <p className="text-xs text-muted-foreground">
-      No available published pack matches this employee's employment type ({employmentType}).
-      Publish a pack for this employment type in the Packs workspace, or choose an employee
-      with the matching employment type. Already assigned pack versions are excluded.
+      No available published packs. Publish a pack with forms in the Packs workspace; already assigned pack versions are hidden.
+    </p>}
+    {mismatch && <p role="status" className="text-xs text-amber-700">
+      This pack is for {selectedPack!.employmentType}; the employee's employment type is {employmentType}.
+      Confirm the mismatch when assigning. The selection is recorded in the audit history.
     </p>}
     <Button type="button" disabled={!packId || busy} onClick={()=>void assign()}>
       {busy ? "Assigning…" : "Assign selected pack"}
