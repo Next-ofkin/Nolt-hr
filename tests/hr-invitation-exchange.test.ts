@@ -438,6 +438,8 @@ test("fresh HR resume confirmation records the time-bound proof once",async()=>{
 test("resume confirmation cannot run on an ordinary HR invitation flow",async()=>{
   const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const previousActivation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
   const auth={flow:async()=>({row:{kind:"HR_INVITATION"},state:{invitationId:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a"}})};
   const forbidden=new Proxy({},{get(){throw Error("No writes or calls allowed")}});
   try {
@@ -445,6 +447,8 @@ test("resume confirmation cannot run on an ordinary HR invitation flow",async()=
     await assert.rejects(service.confirmResume({} as never),
       (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
   } finally {
+    if(previousActivation===undefined) delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=previousActivation;
     if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
   }
