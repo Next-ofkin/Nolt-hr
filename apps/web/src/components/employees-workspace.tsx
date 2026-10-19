@@ -122,6 +122,12 @@ export function EmployeesWorkspace() {
       setLoading(false);
     }
   }, [directoryQuery.data]);
+  useEffect(() => {
+    if (directoryQuery.error) {
+      setError(directoryQuery.error instanceof Error ? directoryQuery.error.message : "Unable to refresh employees.");
+      setLoading(false);
+    }
+  }, [directoryQuery.error]);
   const selectedEmployeeQuery = useQuery({
     queryKey: ["hr-employee-detail", session?.email, detail?.employee.id],
     enabled: Boolean(session && detail?.employee.id && !editing && !reviewingAssignmentId),
