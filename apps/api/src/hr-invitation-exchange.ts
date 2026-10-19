@@ -131,7 +131,7 @@ export class HrInvitationExchangeService {
     const invitation = await this.db.hrInvitation.findFirst({
       where: { email, state: "SENT", expiresAt: { gt: new Date() }, revokedAt: null },
     });
-    if (!invitation || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject)
+    if (!invitation || !invitation.expiresAt || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject)
       throw new ForbiddenException("This HR invitation is unavailable.");
     // Expired AuthFlow records are disposable and may be deleted on next sign-in.
     // Current password authentication, exact invitation-created identity binding,
