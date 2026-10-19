@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { useQuery } from "@tanstack/react-query";
 import { Label } from "./ui/label";
 
 type Pack = { id: string; name: string; employmentType: string; status: string; rootPackId: string | null; versionNumber: number; items: { id: string }[] };
@@ -37,6 +38,20 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
   }, [caseId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  const livePacks = useQuery({
+    queryKey: ["hr-case-packs", caseId],
+    queryFn: async () => {
+      const r = await fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, {
+        credentials: "same-origin", cache: "no-store",
+      });
+      if (!r.ok) throw new Error("Could not refresh pack progress");
+      return await r.json() as Progress[];
+    },
+    refetchInterval: 12000,
+  });
+  useEffect(() => {
+    if (livePacks.data) setExisting(livePacks.data);
+  }, [livePacks.data]);
 
   const latestPublished = new Map<string, Pack>();
   for (const pack of packs) {
