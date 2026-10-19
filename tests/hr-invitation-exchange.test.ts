@@ -437,3 +437,74 @@ test("resume confirmation cannot run on an ordinary HR invitation flow",async()=
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
   }
 });
+
+test("automatic Developer HR activation fails closed while disabled", async () => {
+  const acceptance=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const activation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  try {
+    const unavailable=new Proxy({}, { get() { throw Error("Disabled path must not access provider or database"); } });
+    const service=new HrInvitationExchangeService(unavailable as never,unavailable as never,unavailable as never);
+    await assert.rejects(service.activate({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+  } finally {
+    if(acceptance===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=acceptance;
+    if(activation===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=activation;
+  }
+});
+
+test("automatic HR activation requires confirmed, unexpired MFA invitation flow", async () => {
+  const acceptance=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const activation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const db=new Proxy({}, { get() { throw Error("Unverified request must never touch database"); } });
+  const auth={flow: async()=>({row:{kind:"HR_INVITATION",hrPasswordConfirmedAt:null},
+    state:{invitationId:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",hrPasswordStatus:"CLAIMED"}})};
+  try {
+    const service=new HrInvitationExchangeService(db as never,auth as never,db as never);
+    await assert.rejects(service.activate({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  } finally {
+    if(acceptance===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=acceptance;
+    if(activation===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=activation;
+  }
+});
+
+test("successful HR activation checks live identity before a single atomic database grant",async()=>{
+  const prior=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const flag=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const invitationId="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email="hr-test@example.invalid";
+  const now=Date.now();
+  const row={id:"9b30468b-2e65-4518-bd84-825de0ca7495",kind:"HR_INVITATION",
+    createdAt:new Date(now-30000),expiresAt:new Date(now+30000),
+    hrInvitationId:invitationId,hrSubject:subject,hrPasswordConfirmedAt:new Date(now-10000)};
+  const state={invitationId,hrSubject:subject,hrPasswordStatus:"CONFIRMED",tokens:{access_token:"a",refresh_token:"b"}};
+  let liveVerified=false, calls=0;
+  const db={
+    hrInvitation:{findUnique:async()=>({id:invitationId,email,state:"SENT",expiresAt:new Date(now+60000),
+      revokedAt:null,creationSubject:subject,providerSubject:subject})},
+    $queryRaw:async()=>{assert.equal(liveVerified,true);calls++;return [{accepted:true}];},
+  };
+  const auth={flow:async()=>({row,state})};
+  const proof={verify:async()=>{liveVerified=true;return {subject,email};}};
+  try {
+    const service=new HrInvitationExchangeService(db as never,auth as never,proof as never);
+    assert.deepEqual(await service.activate({} as never),{next:"login",role:"HR"});
+    assert.equal(calls,1);
+  } finally {
+    if(prior===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=prior;
+    if(flag===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=flag;
+  }
+});
