@@ -223,9 +223,9 @@ export class ExternalRequestsService {
         where: { assignmentId, state: { notIn: terminal } },
       });
       if (current) {
-        if (current.state === "SUBMITTED")
+        if (["SUBMITTED", "APPROVED"].includes(current.state))
           throw new ConflictException(
-            "Submitted recipient evidence is locked. HR must manage any replacement.",
+            "Submitted or approved recipient evidence cannot be replaced. HR must review it.",
           );
         if (current.expiresAt > new Date() && p.replaceRequestId !== current.id)
           throw new ConflictException(
@@ -251,7 +251,7 @@ export class ExternalRequestsService {
         const old = await tx.externalRequest.findFirst({
           where: { id: p.replaceRequestId, assignmentId },
         });
-        if (!old || old.state === "SUBMITTED")
+        if (!old || ["SUBMITTED", "APPROVED"].includes(old.state))
           throw new ConflictException("Replacement target is invalid.");
       }
       const r = await tx.externalRequest.create({
@@ -938,6 +938,7 @@ export class ExternalEvidenceReviewService {
         assignmentId,
         title: assignment.formVersion.title,
         recipient: assignment.formVersion.recipient,
+        fields: formContentSchema.parse(assignment.formVersion).fields.map(field => ({ id: field.id, label: field.label })),
         items: requests.map(r => ({
           id: r.id, email: r.email, fullName: r.fullName,
           submittedAt: r.submission!.submittedAt.toISOString(),
