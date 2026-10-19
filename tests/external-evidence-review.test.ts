@@ -31,7 +31,7 @@ function fakeDb(role = "HR", submitted = true) {
           id: requestId, state: "SUBMITTED",
           submission: { answers: {} }, evidenceReview: null,
         } : null,
-      update: async () => { writes++; },
+      update: async () => { throw new Error("Submitted requests must remain immutable"); },
     },
     externalEvidenceReview: { create: async () => { writes++; } },
     auditEvent: { create: async () => { writes++; } },
@@ -85,7 +85,7 @@ test("another authorised HR user can approve evidence with audit attribution", a
   const service = new ExternalEvidenceReviewService(db as never);
   const result = await service.decide(colleague, assignmentId, requestId, { decision: "APPROVED" });
   assert.equal(result.decision, "APPROVED");
-  assert.equal(writes(), 4);
+  assert.equal(writes(), 3);
 });
 
 test("cannot approve unsubmitted evidence, and no audit or review is written", async () => {
