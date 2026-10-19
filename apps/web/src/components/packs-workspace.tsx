@@ -195,6 +195,18 @@ export function PacksWorkspace() {
 
   return (
     <div className="space-y-7">
+      <Dialog open={confirmPublish !== null} onOpenChange={open => { if (!open && !busy) setConfirmPublish(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish onboarding pack?</DialogTitle>
+            <DialogDescription>{confirmPublish ? `Publish "${confirmPublish.name}"? This pack version will be locked against further edits.` : ""}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => setConfirmPublish(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={() => { if (confirmPublish) void publish(confirmPublish); }}>Publish pack</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-[0.15em] text-primary">PEOPLE OPERATIONS</p>
