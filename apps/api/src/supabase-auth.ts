@@ -28,6 +28,7 @@ type FlowState = {
   externalRequestId?: string;
   invitationId?: string;
   hrPasswordSet?: boolean;
+  hrResume?: boolean;
   hrPasswordStatus?: "CLAIMED" | "CONFIRMED";
   hrSubject?: string;
   tokens?: Tokens;
