@@ -413,7 +413,6 @@ export function EmployeesWorkspace() {
                 key={detail.employee.id}
                 employeeId={detail.employee.id}
                 revision={detail.employee.revision}
-                hasCase={!!c}
               />
               {!c ? (
                 <div>
