@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ExternalRequests } from "./external-requests";
+import { CheckCircle2, LockKeyhole } from "lucide-react";
 
 export function ExternalContact({
   assignmentId,
@@ -25,6 +26,8 @@ export function ExternalContact({
   const [dirty, setDirty] = useState(false);
   const [requestState, setRequestState] = useState<{ hasRequest: boolean; latestState: string | null } | null>(null);
   const canEdit = requestState !== null && (!requestState.hasRequest || requestState.latestState === "CHANGES_REQUIRED");
+  const approved = requestState?.latestState === "APPROVED";
+  const needsCorrections = requestState?.latestState === "CHANGES_REQUIRED";
   const onRequestStatus = useCallback((hasRequest: boolean, latestState: string | null) => {
     setRequestState({ hasRequest, latestState });
   }, []);
@@ -57,7 +60,7 @@ export function ExternalContact({
   }, [assignmentId]);
   return (
     <form
-      className="space-y-3 border-t pt-3"
+      className="space-y-4 border-t pt-4"
       aria-label={`${recipient.toLowerCase()} recipient details`}
       onSubmit={async (e) => {
         e.preventDefault();
@@ -91,12 +94,27 @@ export function ExternalContact({
         }
       }}
     >
-      <p className="text-sm text-muted-foreground">
-        Prepare your {recipient.toLowerCase()}’s details. They will complete
-        their own form through a separate secure request.
-      </p>
-      {!canEdit && requestState?.hasRequest && <p role="status" className="text-sm text-muted-foreground">Guarantor details are locked after the first request. HR must request corrections before you can edit them again.</p>}
-      <div className="grid gap-3 sm:grid-cols-2">
+      {approved ? (
+        <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <div className="space-y-1">
+            <p className="font-semibold">Guarantor approved</p>
+            <p className="text-sm">HR has approved this evidence. No further action is required, and recipient details are locked.</p>
+          </div>
+        </div>
+      ) : needsCorrections ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="font-semibold text-amber-950">Action required: update and resend</p>
+          <p className="mt-1 text-sm text-amber-900">HR has requested corrections. Review the feedback below, update the recipient details if necessary, and send a fresh secure link.</p>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {requestState?.hasRequest
+            ? "Your guarantor request is in progress. Recipient details are locked while you wait for HR's decision."
+            : `Enter your ${recipient.toLowerCase()}’s details to send them a secure form.`}
+        </p>
+      )}
+      {!approved && <div className="grid gap-3 sm:grid-cols-2">
         <div className="min-w-0 space-y-1">
           <Label htmlFor={`external-name-${assignmentId}`}>
             Recipient full name
@@ -130,13 +148,13 @@ export function ExternalContact({
             }}
             required
             maxLength={254}
-            disabled={busy || !loaded}
+            disabled={busy || !loaded || !canEdit}
             autoComplete="off"
           />
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || !loaded}>
+      </div>}
+      {!approved && <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={busy || !loaded || !canEdit}>
           {busy ? "Please wait…" : "Save recipient details"}
         </Button>
         <Button
@@ -145,9 +163,10 @@ export function ExternalContact({
           onClick={() => void load()}
           disabled={busy}
         >
-          Reload saved details
+          Reload details
         </Button>
-      </div>
+      </div>}
+      {approved && <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-4 w-4" aria-hidden="true" /> Submitted recipient details are securely retained.</p>}
       {error && (
         <p role="alert" className="break-words text-sm text-red-700">
           {error}
