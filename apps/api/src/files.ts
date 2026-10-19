@@ -243,11 +243,11 @@ export class FilesService {
       const a = await this.assignment(tx, userId, assignmentId);
       const fields = formContentSchema.parse(a.formVersion).fields;
       const field = fields.find((f) => f.id === p.fieldId);
-      if (!field || (field.type !== "file" && field.type !== "signature")) {
+      if (!field || !["file", "passport_photo", "signature"].includes(field.type)) {
         throw new BadRequestException("Invalid field for upload.");
       }
 
-      if (field.type !== "file" || p.purpose !== field.attachmentPurpose)
+      if ((field.type !== "file" && field.type !== "passport_photo") || p.purpose !== (field.type === "passport_photo" ? "SUPPORTING_DOCUMENT" : field.attachmentPurpose))
         throw new BadRequestException(
           "Upload purpose does not match the field.",
         );
