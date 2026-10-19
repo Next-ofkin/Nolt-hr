@@ -10,6 +10,7 @@ export default function HrInvitationCompletePage() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [completed, setCompleted] = useState(false);
   useEffect(() => {
     void (async () => {
       const flow = await fetch("/api/v1/auth/flow", { credentials: "same-origin", cache: "no-store" });
@@ -29,6 +30,11 @@ export default function HrInvitationCompletePage() {
       setMessage("Choose a password for your verified HR invitation. Account activation will remain pending.");
     })().catch(e => setMessage(e instanceof Error ? e.message : "Verification unavailable."));
   }, []);
+  useEffect(() => {
+    if (!completed) return;
+    const redirect = window.setTimeout(() => window.location.replace("/login"), 2500);
+    return () => window.clearTimeout(redirect);
+  }, [completed]);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (password !== confirm) { setMessage("Passwords do not match."); return; }
@@ -43,7 +49,8 @@ export default function HrInvitationCompletePage() {
       setReady(false);
       setPassword("");
       setConfirm("");
-      setMessage("Your password has been set. HR account activation remains pending administrator approval.");
+      setCompleted(true);
+      setMessage("Password saved successfully. Your account remains an Employee until HR activation is separately approved. Redirecting you to sign in…");
     } catch(e) {
       setMessage(e instanceof Error ? e.message : "Password setup unavailable.");
     } finally { setBusy(false); }
@@ -60,7 +67,7 @@ export default function HrInvitationCompletePage() {
           <button type="submit" disabled={busy} className="w-full rounded-md bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save password"}</button>
         </form>
       )}
-      <Link href="/login" className="mt-5 block text-sm text-primary underline">Back to sign in</Link>
+      <Link href="/login" className={completed ? "mt-5 inline-flex rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground" : "mt-5 block text-sm text-primary underline"}>{completed ? "Sign in now" : "Back to sign in"}</Link>
     </AuthFrame>
   );
 }
