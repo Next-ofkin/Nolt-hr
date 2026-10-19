@@ -9,6 +9,8 @@ import {
   ExternalRequestsController,
   ExternalWorkspaceController,
   ExternalRequestsService,
+  ExternalEvidenceReviewController,
+  ExternalEvidenceReviewService,
 } from "./external-requests.js";
 import {
   ExternalContactsController,
@@ -85,6 +87,7 @@ class HealthController {
     FilesController,
     ExternalContactsController,
     ExternalRequestsController,
+    ExternalEvidenceReviewController,
     ExternalWorkspaceController,
   ],
   providers: [
@@ -108,6 +111,7 @@ class HealthController {
     FilesStorage,
     ExternalContactsService,
     ExternalRequestsService,
+    ExternalEvidenceReviewService,
     ExternalSessions,
     ExternalSessionGuard,
     QueueWorkerService,
