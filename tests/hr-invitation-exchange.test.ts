@@ -349,6 +349,8 @@ test("HR resume and confirmation are disabled without provider or database calls
 test("HR resume accepts fresh password and starts a limited MFA flow without historical records",async()=>{
   const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
   const id="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
   const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
   const email="test@example.invalid";
@@ -371,6 +373,8 @@ test("HR resume accepts fresh password and starts a limited MFA flow without his
     assert.equal((started?.[1] as {hrResume:boolean}).hrResume,true);
     assert.ok((started?.[4] as number)<=60000);
   }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
     if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
   }
@@ -379,6 +383,8 @@ test("HR resume accepts fresh password and starts a limited MFA flow without his
 test("HR resume rejects authenticated identity mismatch before any flow starts",async()=>{
   const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
   const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
   const db={hrInvitation:{findFirst:async()=>({id:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",email:"test@example.invalid",state:"SENT",creationSubject:subject,providerSubject:subject,expiresAt:new Date(Date.now()+60000)})}};
   const auth={client:()=>({client:{auth:{signInWithPassword:async()=>({error:null,data:{session:{access_token:"a",refresh_token:"b"},user:{id:"wrong-subject",email_confirmed_at:new Date().toISOString()}}})}}}),start:async()=>{throw Error("Must not open a flow");}};
@@ -387,6 +393,8 @@ test("HR resume rejects authenticated identity mismatch before any flow starts",
     await assert.rejects(service.resume({email:"test@example.invalid",password:"existing-password"},{} as never,{} as never),
       (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
   }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
     if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
   }
@@ -396,6 +404,8 @@ test("fresh HR resume confirmation records the time-bound proof once",async()=>{
   const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   const previousKey=process.env.AUTH_ENCRYPTION_KEY;
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
   process.env.AUTH_ENCRYPTION_KEY=Buffer.alloc(32,12).toString("base64");
   const invitationId="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
   const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
@@ -416,6 +426,8 @@ test("fresh HR resume confirmation records the time-bound proof once",async()=>{
     const {unseal}=await import("../apps/api/src/auth-crypto.js");
     assert.equal(unseal<{hrPasswordStatus:string}>(payload.data.encryptedState).hrPasswordStatus,"CONFIRMED");
   }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
     if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
     if(previousKey===undefined)delete process.env.AUTH_ENCRYPTION_KEY;
