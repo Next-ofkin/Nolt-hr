@@ -31,7 +31,7 @@ export class HrInvitationWorker {
           !hrRecipientAllowed(invitation.email)) {
         await tx.hrInvitation.update({
           where: { id: invitation.id },
-          data: { state: "FAILED", deliveryError: "RECIPIENT_NOT_APPROVED_OR_EXPIRED" },
+          data: { state: "FAILED", deliveryError: "DELIVERY_DISABLED_OR_EXPIRED" },
         });
         return { skipped: true as const };
       }
