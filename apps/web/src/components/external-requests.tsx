@@ -186,7 +186,7 @@ export function ExternalRequests({
       )}
       {!items.length && <p className="text-sm">Request status: Not sent</p>}
       {correction && <p role="status" className="text-sm text-amber-800">The original answers are preserved. Send a new request after reviewing the feedback.</p>}
-      {correction && active?.correctionReason && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><p className="font-medium">HR feedback</p><p className="mt-1 whitespace-pre-wrap break-words">{active.correctionReason}</p></div>}
+      {correction && (active as typeof active & { correctionReason?: string | null })?.correctionReason && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><p className="font-medium">HR feedback</p><p className="mt-1 whitespace-pre-wrap break-words">{(active as typeof active & { correctionReason?: string | null }).correctionReason}</p></div>}
 
       {active?.state === "SUBMITTED" && <p role="status" className="text-sm">Guarantor submitted the form. Awaiting HR review.</p>}
       {active && <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Latest request:</span><Badge variant="secondary">{active.state.toLowerCase().replaceAll("_", " ")}</Badge></div>}
