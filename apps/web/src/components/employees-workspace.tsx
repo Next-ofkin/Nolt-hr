@@ -18,7 +18,6 @@ import { PackAssignmentPanel } from "./pack-assignment-panel";
 import { SubmissionReview } from "./submission-review";
 type Detail = components["schemas"]["EmployeeDetailDto"];
 type Employee = components["schemas"]["EmployeeDto"];
-type Published = components["schemas"]["FormDto"];
 const empty = {
   fullName: "",
   email: "",
@@ -52,12 +51,6 @@ export function EmployeesWorkspace() {
   const [detail, setDetail] = useState<Detail | null>(null),
     [profile, setProfile] = useState(empty),
     [editing, setEditing] = useState(false);
-  const [versions, setVersions] = useState<Published[]>([]),
-    [versionCursor, setVersionCursor] = useState<string | null>(null),
-    [versionQuery, setVersionQuery] = useState(""),
-    [versionId, setVersionId] = useState(""),
-    [required, setRequired] = useState(true),
-    [dueDate, setDueDate] = useState("");
   const [reviewingAssignmentId, setReviewingAssignmentId] = useState<
     string | null
   >(null);
@@ -125,17 +118,6 @@ export function EmployeesWorkspace() {
       setEditing(false);
     });
   }
-  async function loadVersions(cursor?: string) {
-    await action(async () => {
-      const r = await api.GET("/api/v1/published-form-versions", {
-        params: { query: { q: versionQuery, ...(cursor ? { cursor } : {}) } },
-      });
-      if (r.error) throw new Error(errorMessage(r.error));
-      setVersions(cursor ? [...versions, ...r.data.items] : r.data.items);
-      setVersionCursor(r.data.nextCursor);
-      if (!cursor) setVersionId("");
-    });
-  }
   const c = detail?.onboardingCase;
   return (
     <div className="space-y-6">
@@ -143,8 +125,7 @@ export function EmployeesWorkspace() {
         <p className="text-sm text-muted-foreground">People and onboarding</p>
         <h1 className="text-3xl font-semibold">Employee directory</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create employment records and assign published forms. Invitations and
-          submissions are being built.
+          Create employee records, send invitations and assign published onboarding packs.
         </p>
       </div>
       {error && (
@@ -525,113 +506,10 @@ export function EmployeesWorkspace() {
                   </ul>
                   {!c.assignments.length && (
                     <p className="text-sm text-muted-foreground">
-                      No forms assigned yet.
+                      No onboarding forms assigned yet. Choose a published pack above to assign its forms together.
                     </p>
                   )}
-                  <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void loadVersions();
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <Label htmlFor="version-search">
-                        Published form title
-                      </Label>
-                      <Input
-                        id="version-search"
-                        value={versionQuery}
-                        onChange={(e) => setVersionQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button
-                      disabled={busy}
-                      className="self-end"
-                      variant="outline"
-                    >
-                      Find forms
-                    </Button>
-                  </form>
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void action(async () => {
-                        const r = await api.POST(
-                          "/api/v1/onboarding-cases/{id}/assignments",
-                          {
-                            headers,
-                            params: { path: { id: c.id } },
-                            body: {
-                              expectedRevision: c.revision,
-                              formVersionId: versionId,
-                              required,
-                              dueDate: dueDate || null,
-                            },
-                          },
-                        );
-                        if (r.error) throw new Error(errorMessage(r.error));
-                        setDetail({ ...detail, onboardingCase: r.data });
-                        setNotice(
-                          "Published version assigned. Future form edits will not change it.",
-                        );
-                        setVersionId("");
-                      });
-                    }}
-                  >
-                    <Label htmlFor="published-version">
-                      Exact published version
-                    </Label>
-                    <select
-                      id="published-version"
-                      className="native-select w-full min-w-0"
-                      required
-                      value={versionId}
-                      onChange={(e) => setVersionId(e.target.value)}
-                    >
-                      <option value="">Select a published version</option>
-                      {versions.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.title} · v{v.version} · {v.recipient.toLowerCase()}
-                        </option>
-                      ))}
-                    </select>
-                    {versionCursor && (
-                      <Button
-                        type="button"
-                        disabled={busy}
-                        variant="outline"
-                        onClick={() => void loadVersions(versionCursor)}
-                      >
-                        More published versions
-                      </Button>
-                    )}
-                    <Label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={required}
-                        onChange={(e) => setRequired(e.target.checked)}
-                      />
-                      Required item
-                    </Label>
-                    <div>
-                      <Label htmlFor="due-date">Due date (optional)</Label>
-                      <Input
-                        id="due-date"
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Guarantor and reference forms belong to their recipient.
-                      Employees cannot complete them on that person's behalf.
-                    </p>
-                    <Button disabled={busy || !versionId}>
-                      Assign published form
-                    </Button>
-                  </form>
+
                 </div>
               )}
             </>

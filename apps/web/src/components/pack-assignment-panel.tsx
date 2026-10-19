@@ -126,6 +126,11 @@ export function PackAssignmentPanel({ caseId, caseRevision, employmentType, csrf
         <input className="h-10 w-full rounded-lg border bg-white px-3 text-sm" id="case-pack-due" type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/>
       </div>
     </div>
+    {options.length === 0 && !error && <p className="text-xs text-muted-foreground">
+      No available published pack matches this employee's employment type ({employmentType}).
+      Publish a pack for this employment type in the Packs workspace, or choose an employee
+      with the matching employment type. Already assigned pack versions are excluded.
+    </p>}
     <Button type="button" disabled={!packId || busy} onClick={()=>void assign()}>
       {busy ? "Assigning…" : "Assign selected pack"}
     </Button>
