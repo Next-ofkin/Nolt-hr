@@ -6,6 +6,7 @@ import type { Answers } from "@nolt/form-schemas";
 import { useAuth } from "./auth-provider";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 type Response = components["schemas"]["ResponseDto"];
 export function EmployeeResponse({
   assignmentId,
@@ -23,7 +24,8 @@ export function EmployeeResponse({
     [dirty, setDirty] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [errors, setErrors] = useState<Record<string, string>>({});
+    [errors, setErrors] = useState<Record<string, string>>({}),
+    [confirmDiscard, setConfirmDiscard] = useState<"close" | "reload" | null>(null);
   const started = useRef(false),
     section = useRef<HTMLElement>(null),
     request = useRef<{ revision: number; key: string } | null>(null);
@@ -153,6 +155,7 @@ export function EmployeeResponse({
       className="space-y-5 rounded-xl border bg-white p-5"
       aria-label="Employee form response"
     >
+      <Dialog open={confirmDiscard !== null} onOpenChange={open => { if (!open) setConfirmDiscard(null); }}><DialogContent><DialogHeader><DialogTitle>Discard unsaved answers?</DialogTitle><DialogDescription>Your changes have not been saved. Do you want to discard them?</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmDiscard(null)}>Keep editing</Button><Button variant="destructive" onClick={() => { const choice = confirmDiscard; setConfirmDiscard(null); if (choice === "close") onClose(); else if (choice === "reload") void load(); }}>Discard changes</Button></div></DialogContent></Dialog>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">
           {approved
@@ -167,8 +170,8 @@ export function EmployeeResponse({
           variant="outline"
           disabled={busy}
           onClick={() => {
-            if (!dirty || window.confirm("Discard your unsaved changes?"))
-              onClose();
+            if (dirty) setConfirmDiscard("close");
+            else onClose();
           }}
         >
           Close form
@@ -185,11 +188,8 @@ export function EmployeeResponse({
             disabled={busy}
             variant="outline"
             onClick={() => {
-              if (
-                !dirty ||
-                window.confirm("Reload and discard your unsaved changes?")
-              )
-                void load();
+              if (dirty) setConfirmDiscard("reload");
+              else void load();
             }}
           >
             Reload saved response
