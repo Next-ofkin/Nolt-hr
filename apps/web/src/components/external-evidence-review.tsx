@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Textarea } from "./ui/textarea";
 
 type Submission = {
   id: string; email: string; fullName: string; submittedAt: string;
@@ -20,6 +22,7 @@ export function ExternalEvidenceReview({
   const [notice, setNotice] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingDecision, setPendingDecision] = useState<{ id: string; decision: "APPROVED" | "CHANGES_REQUIRED" } | null>(null);
   async function load() {
     const result = await fetch(`/api/v1/employees/assignments/${encodeURIComponent(assignmentId)}/external-evidence`,
       { credentials: "same-origin", cache: "no-store" });
@@ -37,9 +40,6 @@ export function ExternalEvidenceReview({
     if (decision === "CHANGES_REQUIRED" && reason.trim().length < 10) {
       setError("Explain the corrections needed in at least 10 characters."); return;
     }
-    if (!window.confirm(decision === "APPROVED"
-      ? "Approve this guarantor evidence? The review decision is permanent."
-      : "Request corrections? A new secure guarantor request will be required.")) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(
@@ -55,12 +55,22 @@ export function ExternalEvidenceReview({
         ? "Evidence approved and included in pack progress."
         : "Corrections recorded. Ask the employee to send the guarantor a fresh secure request.");
       setReason("");
+      setPendingDecision(null);
       await load(); await onChanged();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Review failed");
     } finally { setBusy(false); }
   }
   const fieldLabels = new Map(detail?.fields.map(f => [f.id, f.label]) ?? []);
+  function confirmDecision(id: string, decision: "APPROVED" | "CHANGES_REQUIRED") {
+    if (busy) return;
+    if (decision === "CHANGES_REQUIRED" && reason.trim().length < 10) {
+      setError("Explain the corrections needed in at least 10 characters.");
+      return;
+    }
+    setError("");
+    setPendingDecision({ id, decision });
+  }
   return <section className="space-y-4" aria-label="Guarantor evidence review">
     <h3 className="text-lg font-semibold">Guarantor / reference evidence</h3>
     <p className="text-sm text-muted-foreground">Review answers sent directly by the verified recipient.
@@ -84,15 +94,37 @@ export function ExternalEvidenceReview({
       </div>}
       {!item.decision && index === 0 && <div className="space-y-2">
         <label className="block text-sm font-medium">Corrections needed (required if returning)</label>
-        <textarea className="w-full rounded-lg border p-3 text-sm" value={reason}
+        <Textarea value={reason}
           onChange={e => setReason(e.target.value)} maxLength={1000} rows={3}
           placeholder="Tell the employee exactly what the guarantor needs to correct" />
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={busy} onClick={() => void decide(item.id, "APPROVED")}>Approve evidence</Button>
+          <Button type="button" disabled={busy} onClick={() => confirmDecision(item.id, "APPROVED")}>Approve evidence</Button>
           <Button type="button" variant="outline" disabled={busy || reason.trim().length < 10}
-            onClick={() => void decide(item.id, "CHANGES_REQUIRED")}>Request corrections</Button>
+            onClick={() => confirmDecision(item.id, "CHANGES_REQUIRED")}>Request corrections</Button>
         </div>
       </div>}
     </article>)}
+    <Dialog open={pendingDecision !== null} onOpenChange={open => { if (!open && !busy) setPendingDecision(null); }}>
+      <DialogContent onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}
+        onInteractOutside={event => { if (busy) event.preventDefault(); }}>
+        <DialogHeader>
+          <DialogTitle>{pendingDecision?.decision === "APPROVED" ? "Approve guarantor evidence?" : "Request corrections?"}</DialogTitle>
+          <DialogDescription>
+            {pendingDecision?.decision === "APPROVED"
+              ? "This approval is permanent. Confirm that you have reviewed the recipient's answers."
+              : "The decision will be recorded permanently. The employee must send the guarantor a new secure link to redo the form; previous evidence will be preserved."}
+          </DialogDescription>
+        </DialogHeader>
+        {pendingDecision?.decision === "CHANGES_REQUIRED" && (
+          <p className="whitespace-pre-wrap break-words rounded-md border p-3 text-sm">{reason.trim()}</p>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => setPendingDecision(null)}>Cancel</Button>
+          <Button type="button" disabled={busy || !pendingDecision} onClick={() => {
+            if (pendingDecision) void decide(pendingDecision.id, pendingDecision.decision);
+          }}>{busy ? "Saving decision…" : pendingDecision?.decision === "APPROVED" ? "Confirm approval" : "Confirm corrections"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </section>;
 }
