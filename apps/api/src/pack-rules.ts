@@ -63,6 +63,7 @@ export const publishPackSchema = z.object({
 export const assignPackSchema = z.object({
   caseId: z.string().uuid(),
   expectedCaseRevision: z.number().int().positive(),
+  confirmEmploymentTypeMismatch: z.boolean().optional().default(false),
   dueDate: z.iso.date().nullable().default(null),
 }).strict();
 
