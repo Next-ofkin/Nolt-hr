@@ -10,6 +10,7 @@ export const fieldTypes = [
   "select",
   "checkbox",
   "file",
+  "passport_photo",
   "signature",
 ] as const;
 export const recipientTypes = ["EMPLOYEE", "GUARANTOR", "REFERENCE"] as const;
@@ -188,7 +189,7 @@ export function validateAnswers(
       v === null ||
       (typeof v === "string" && v.trim() === "");
     const add = (message: string) => issues.push({ fieldId: f.id, message });
-    if (f.type === "file") {
+    if (f.type === "file" || f.type === "passport_photo") {
       if (empty) {
         if (final && f.required) add("This attachment is required.");
       } else if (
@@ -249,6 +250,7 @@ export function createField(type: FormField["type"], id: string): FormField {
     select: "Choose an option",
     checkbox: "Confirmation",
     file: "Attach a document",
+    passport_photo: "Passport photograph",
     signature: "Your signature",
   };
   return {

@@ -75,6 +75,7 @@ const icons = {
   select: ListOrdered,
   checkbox: CheckCircle2,
   file: FileUp,
+  passport_photo: FileUp,
   signature: PenLine,
 };
 const names = {
@@ -87,6 +88,7 @@ const names = {
   select: "Dropdown",
   checkbox: "Confirmation",
   file: "Attachment",
+  passport_photo: "Passport photo",
   signature: "Signature",
 };
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -751,8 +753,7 @@ function FormEditor({
             })}
           </div>
           <p className="mt-5 border-t pt-4 text-xs leading-5 text-muted-foreground">
-            Attachments and signatures are configured here. Response collection
-            and private file handling come next.
+            Attachments, passport photographs and signatures use secure private storage.
           </p>
         </aside>
         <section className="min-w-0 rounded-xl border bg-white p-5 sm:p-7">
