@@ -164,12 +164,14 @@ export function FormPreview({
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-5 text-center">
                   <FileUp size={20} className="text-primary" />
                   <p className="text-sm">
-                    {field.attachmentPurpose === "SIGNED_DOCUMENT"
-                      ? "Attach a signed document"
-                      : "Attach a supporting document"}
+                    {field.type === "passport_photo"
+                      ? "Take or upload a passport photograph"
+                      : field.attachmentPurpose === "SIGNED_DOCUMENT"
+                        ? "Attach a signed document"
+                        : "Attach a supporting document"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    File upload preview (interactive in respondent flow)
+                    {field.type === "passport_photo" ? "Camera and photo upload available to employees" : "File upload preview (interactive in respondent flow)"}
                   </p>
                 </div>
               )
