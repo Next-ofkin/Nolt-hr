@@ -338,8 +338,8 @@ test("HR resume and confirmation are disabled without provider or database calls
   try {
     const inaccessible = new Proxy({}, { get() { throw Error("No external access allowed"); } });
     const service = new HrInvitationExchangeService(inaccessible as never, inaccessible as never, inaccessible as never);
-    for (const request of [service.resume({}, {} as never, {} as never), service.confirmResume({} as never)])
-      await assert.rejects(request, (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+    await assert.rejects(service.resume({}, {} as never, {} as never), (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+    await assert.rejects(service.confirmResume({} as never), (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
   } finally {
     if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
