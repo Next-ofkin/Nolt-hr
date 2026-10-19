@@ -2442,7 +2442,7 @@ export interface operations {
                             /** Format: uuid */
                             id: string;
                             /** @enum {string} */
-                            type: "text" | "textarea" | "email" | "phone" | "number" | "date" | "select" | "checkbox" | "file" | "signature";
+                            type: "text" | "textarea" | "email" | "phone" | "number" | "date" | "select" | "checkbox" | "file" | "passport_photo" | "signature";
                             label: string;
                             /** @default  */
                             helpText: string;
