@@ -46,7 +46,7 @@ function fakeDb(role = "HR", submitted = true) {
 test("employee role cannot read external guarantor evidence even with forms permission", async () => {
   const { db, writes } = fakeDb("EMPLOYEE");
   const service = new ExternalEvidenceReviewService(db as never);
-  await assert.rejects(() => service.detail(owner, assignmentId), /not found/i);
+  await assert.rejects(() => service.detail(owner, assignmentId), /HR evidence review access is required/i);
   assert.equal(writes(), 0);
 });
 
