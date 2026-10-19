@@ -146,12 +146,13 @@ export function FormPreview({
                   </p>
                 </div>
               )
-            ) : field.type === "file" ? (
+            ) : field.type === "file" || field.type === "passport_photo" ? (
               assignmentId ? (
                 <FileUpload
                   assignmentId={assignmentId}
                   fieldId={field.id}
-                  purpose={field.attachmentPurpose}
+                  purpose={field.type === "passport_photo" ? "SUPPORTING_DOCUMENT" : field.attachmentPurpose}
+                  passportPhoto={field.type === "passport_photo"}
                   existingFileId={
                     answers?.[field.id] ? String(answers[field.id]) : null
                   }
