@@ -8,10 +8,12 @@ export function ExternalRequests({
   assignmentId,
   contactRevision,
   contactDirty,
+  onRequestStatus,
 }: {
   assignmentId: string;
   contactRevision: number;
   contactDirty: boolean;
+  onRequestStatus: (hasRequest: boolean, latestState: string | null) => void;
 }) {
   const { session } = useAuth();
   const [items, setItems] = useState<
@@ -33,6 +35,7 @@ export function ExternalRequests({
       });
       if (r.error) throw Error(errorMessage(r.error));
       setItems(r.data.items);
+      onRequestStatus(r.data.items.length > 0, r.data.items[0]?.state ?? null);
     } catch (e) {
       if (!silent) setError(
         e instanceof Error ? e.message : "Could not load request status.",
@@ -40,7 +43,7 @@ export function ExternalRequests({
     } finally {
       if (!silent) setBusy(false);
     }
-  }, [assignmentId]);
+  }, [assignmentId, onRequestStatus]);
   useEffect(() => {
     void load();
   }, [load]);
