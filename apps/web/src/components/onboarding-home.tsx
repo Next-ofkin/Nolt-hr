@@ -147,7 +147,9 @@ function EmployeeHome() {
                     </h2>
                     <p className="text-sm">
                       {a.required ? "Required" : "Optional"} ·{" "}
-                      {a.status === "APPROVED" ? (
+                      {a.status === "EXTERNAL_SUBMITTED" ? (
+                        <span>Guarantor submitted — awaiting HR follow-up</span>
+                      ) : a.status === "APPROVED" ? (
                         <span className="font-medium text-green-700">
                           Approved
                         </span>
