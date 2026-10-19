@@ -196,14 +196,6 @@ export class InvitationsService {
             "Invitations require an active employee account, not an HR or administrator account.",
           );
         if (
-          !(await tx.onboardingCase.findFirst({
-            where: { employeeId, status: "ACTIVE" },
-          }))
-        )
-          throw new BadRequestException(
-            "Open an onboarding case before inviting this employee.",
-          );
-        if (
           await tx.employeeInvitation.findFirst({
             where: { employeeId, state: "ACCEPTED" },
           })
@@ -553,23 +545,10 @@ export class InvitationsService {
       return j;
     });
     if (!job) return false;
-    const filter = process.env.INVITATION_TEST_RECIPIENTS;
-    const allowed =
-      filter !== undefined
-        ? filter
-            .split(",")
-            .map((v) => v.trim().toLowerCase())
-            .filter(Boolean)
-        : null;
     let code: string | null = null,
       uncertain = false,
       retry = false;
-    if (
-      allowed &&
-      !allowed.includes(job.invitation.employee.email.toLowerCase())
-    )
-      code = "RECIPIENT_NOT_APPROVED";
-    else if (!process.env.SUPABASE_SECRET_KEY) code = "SENDER_NOT_CONFIGURED";
+    if (!process.env.SUPABASE_SECRET_KEY) code = "SENDER_NOT_CONFIGURED";
     else
       try {
         const redirectTo =
