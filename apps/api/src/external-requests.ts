@@ -553,8 +553,30 @@ export class ExternalRequestsService {
 
   // Generates proof without sending Supabase's staff invitation template.
   async sendEmail(email: string, requestId: string) {
-    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL)
-      return { code: "SENDER_NOT_CONFIGURED", status: 400 };
+    // Use the configured custom sender when available. Otherwise let Supabase
+    // deliver the verification email using its existing Auth mail transport.
+    // Never generate a proof link that cannot be delivered.
+    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+      const client = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_PUBLISHABLE_KEY!,
+        {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: "implicit" },
+          global: { fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(25000) }) },
+        },
+      );
+      const response = await client.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: appOrigin() + "/external/accept?id=" + encodeURIComponent(requestId),
+        },
+      });
+      if (response.error)
+        return { code: /^[a-z0-9_]{1,64}$/i.test(response.error.code ?? "") ? response.error.code! : "PROVIDER_REJECTED",
+          status: response.error.status ?? 400 };
+      return null;
+    }
     const client = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SECRET_KEY!,
