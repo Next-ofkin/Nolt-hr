@@ -346,21 +346,80 @@ test("HR resume and confirmation are disabled without provider or database calls
   }
 });
 
-test("HR resume denies an account without original password confirmation before Supabase login",async()=>{
+test("HR resume accepts fresh password and starts a limited MFA flow without historical records",async()=>{
   const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
   process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const id="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email="test@example.invalid";
+  let started:unknown[]|undefined;
   const db={
-    hrInvitation:{findFirst:async()=>({id:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",email:"test@example.invalid",state:"SENT",creationSubject:"cbfab129-8d44-4ed3-82a2-d026b09fe902",providerSubject:"cbfab129-8d44-4ed3-82a2-d026b09fe902",expiresAt:new Date(Date.now()+60000)})},
-    authFlow:{findFirst:async()=>null},
+    hrInvitation:{findFirst:async()=>({id,email,state:"SENT",creationSubject:subject,providerSubject:subject,expiresAt:new Date(Date.now()+60000)})},
+    user:{findUnique:async()=>({id:subject,role:"EMPLOYEE",active:true})},
+    employee:{findFirst:async()=>null},
+    authFlow:{findFirst:async()=>{throw Error("Historical flows must not be queried");}},
   };
-  const forbidden=new Proxy({},{get(){throw Error("Must not touch Supabase")}});
-  try {
-    const service=new HrInvitationExchangeService(db as never,forbidden as never,forbidden as never);
+  const auth={
+    client:()=>({client:{auth:{signInWithPassword:async()=>({error:null,data:{session:{access_token:"access",refresh_token:"refresh"},user:{id:subject,email_confirmed_at:new Date().toISOString()}}})}}}),
+    tokens:(v:unknown)=>v,
+    start:async(...args:unknown[])=>{started=args;},
+  };
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,{} as never);
+    assert.deepEqual(await service.resume({email,password:"existing-password"},{} as never,{} as never),{next:"mfa"});
+    assert.equal(started?.[0],"HR_INVITATION");
+    assert.equal((started?.[1] as {hrResume:boolean}).hrResume,true);
+    assert.ok((started?.[4] as number)<=60000);
+  }finally{
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("HR resume rejects authenticated identity mismatch before any flow starts",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const db={hrInvitation:{findFirst:async()=>({id:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",email:"test@example.invalid",state:"SENT",creationSubject:subject,providerSubject:subject,expiresAt:new Date(Date.now()+60000)})}};
+  const auth={client:()=>({client:{auth:{signInWithPassword:async()=>({error:null,data:{session:{access_token:"a",refresh_token:"b"},user:{id:"wrong-subject",email_confirmed_at:new Date().toISOString()}}})}}}),start:async()=>{throw Error("Must not open a flow");}};
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,{} as never);
     await assert.rejects(service.resume({email:"test@example.invalid",password:"existing-password"},{} as never,{} as never),
       (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
-  } finally {
-    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  }finally{
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
     else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("fresh HR resume confirmation records the time-bound proof once",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const previousKey=process.env.AUTH_ENCRYPTION_KEY;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  process.env.AUTH_ENCRYPTION_KEY=Buffer.alloc(32,12).toString("base64");
+  const invitationId="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const state={hrResume:true,invitationId,hrSubject:subject,tokens:{access_token:"a",refresh_token:"b"}};
+  const row={id:"9b30468b-2e65-4518-bd84-825de0ca7495",kind:"HR_INVITATION",hrInvitationId:invitationId,hrSubject:subject,encryptedState:"prior"};
+  let wrote:unknown;
+  const db={hrInvitation:{findUnique:async()=>({id:invitationId,state:"SENT"})},
+    authFlow:{updateMany:async(arg:unknown)=>{wrote=arg;return {count:1};},findFirst:async()=>{throw Error("Historical flows must not be read");}}};
+  const auth={flow:async()=>({row,state})};
+  const proof={verify:async()=>({subject})};
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,proof as never);
+    assert.deepEqual(await service.confirmResume({} as never),{next:"awaiting_activation"});
+    const payload=wrote as {where:{encryptedState:string;hrPasswordConfirmedAt:null;expiresAt:{gt:Date}},data:{hrPasswordConfirmedAt:Date;encryptedState:string}};
+    assert.equal(payload.where.encryptedState,"prior");
+    assert.equal(payload.where.hrPasswordConfirmedAt,null);
+    assert.ok(payload.data.hrPasswordConfirmedAt instanceof Date);
+    const {unseal}=await import("../apps/api/src/auth-crypto.js");
+    assert.equal(unseal<{hrPasswordStatus:string}>(payload.data.encryptedState).hrPasswordStatus,"CONFIRMED");
+  }finally{
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+    if(previousKey===undefined)delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY=previousKey;
   }
 });
 
