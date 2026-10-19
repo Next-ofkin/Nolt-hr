@@ -25,6 +25,16 @@ export default function HrInvitationCompletePage() {
       if (!proof || typeof proof !== "object" || !("verified" in proof) ||
           proof.verified !== true || !("activationAllowed" in proof) || proof.activationAllowed !== false)
         throw Error("HR invitation verification could not be confirmed.");
+      if ("resuming" in proof && proof.resuming === true) {
+        const completed = await fetch("/api/v1/hr-invitations/resume-confirm",{
+          method:"POST",credentials:"same-origin",
+          headers:{"x-csrf-token":state.csrfToken},
+        });
+        if(!completed.ok) throw Error("Your re-verification could not be completed. Please restart with your existing password.");
+        setMessage("Fresh MFA verification complete. HR access is still pending owner approval. You will now return to sign in.");
+        setCompleted(true);
+        return;
+      }
       setCsrf(state.csrfToken);
       setReady(true);
       setMessage("Choose a password for your verified HR invitation. Account activation will remain pending.");
@@ -67,6 +77,7 @@ export default function HrInvitationCompletePage() {
           <button type="submit" disabled={busy} className="w-full rounded-md bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save password"}</button>
         </form>
       )}
+      {!ready && !completed && <Link href="/hr-invitations/resume" className="mt-4 block text-sm text-primary underline">Reverify an existing HR invitation</Link>}
       <Link href="/login" className={completed ? "mt-5 inline-flex rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground" : "mt-5 block text-sm text-primary underline"}>{completed ? "Sign in now" : "Back to sign in"}</Link>
     </AuthFrame>
   );
