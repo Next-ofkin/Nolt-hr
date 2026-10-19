@@ -23,6 +23,7 @@ const payload = z.object({
 export class HrVerificationDto {
   @ApiProperty({ type: Boolean }) verified!: boolean;
   @ApiProperty({ type: Boolean }) activationAllowed!: boolean;
+  @ApiProperty({ type: Boolean }) resuming!: boolean;
 }
 
 export class HrPasswordResultDto {
@@ -53,7 +54,7 @@ export class HrInvitationExchangeService {
     });
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
     await this.proof.verify(invitation, flow.state.tokens);
-    return { verified: true, activationAllowed: false };
+    return { verified: true, activationAllowed: false, resuming: flow.state.hrResume === true };
   }
 
   async activationReadiness(req: Request) {
@@ -88,7 +89,7 @@ export class HrInvitationExchangeService {
     if (!parsed.success) throw new BadRequestException("Choose a password of 12 to 128 characters.");
     const flow = await this.auth.flow(req, true);
     if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId || !flow.state.tokens ||
-        flow.state.hrPasswordSet === true || flow.state.hrPasswordStatus !== undefined)
+        flow.state.hrPasswordSet === true || flow.state.hrResume === true || flow.state.hrPasswordStatus !== undefined)
       throw new ForbiddenException("This HR password setup cannot be used.");
     const invitation = await this.db.hrInvitation.findUnique({ where: { id: flow.state.invitationId } });
     if (!invitation) throw new ForbiddenException("This HR invitation is unavailable.");
@@ -117,6 +118,112 @@ export class HrInvitationExchangeService {
     });
     if (confirmed.count !== 1) throw new ForbiddenException("Password confirmation failed.");
     return { next: "awaiting_activation" };
+  }
+
+  /** Reauthenticate an already invited account; never issue an application session. */
+  async resume(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation recovery is not enabled.");
+    const parsed = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(128) }).strict().safeParse(input);
+    if (!parsed.success) throw new BadRequestException("Enter your invitation email and existing password.");
+    const email = parsed.data.email.trim().toLowerCase();
+    const invitation = await this.db.hrInvitation.findFirst({
+      where: { email, state: "SENT", expiresAt: { gt: new Date() }, revokedAt: null },
+    });
+    if (!invitation || !invitation.expiresAt || !invitation.creationSubject || invitation.creationSubject !== invitation.providerSubject)
+      throw new ForbiddenException("This HR invitation is unavailable.");
+    // Expired AuthFlow records are disposable and may be deleted on next sign-in.
+    // Current password authentication, exact invitation-created identity binding,
+    // and a new live AAL2 challenge provide fresh evidence without relying on them.
+    const { client } = this.auth.client();
+    const result = await client.auth.signInWithPassword({ email, password: parsed.data.password });
+    if (result.error || !result.data.session || !result.data.user?.email_confirmed_at ||
+        result.data.user.id !== invitation.creationSubject)
+      throw new ForbiddenException("Could not verify the invited account.");
+    const account = await this.db.user.findUnique({ where: { id: result.data.user.id } });
+    const employee = await this.db.employee.findFirst({
+      where: { OR: [{ userId: result.data.user.id }, { email }] }, select: { id: true },
+    });
+    if (!account || !account.active || account.role !== "EMPLOYEE" || employee)
+      throw new ForbiddenException("This account is not eligible for HR activation.");
+    await this.auth.start("HR_INVITATION", {
+      invitationId: invitation.id, hrSubject: result.data.user.id,
+      hrResume: true, tokens: this.auth.tokens(result.data.session),
+    }, req, res, Math.min(600000, invitation.expiresAt.getTime() - Date.now()));
+    return { next: "mfa" };
+  }
+
+  /** Fresh password possession + current AAL2; records readiness only, NOT an HR grant. */
+  async confirmResume(req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation recovery is not enabled.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || flow.state.hrResume !== true ||
+        flow.state.hrPasswordStatus !== undefined || !flow.state.invitationId ||
+        !flow.state.hrSubject || !flow.state.tokens ||
+        flow.row.hrInvitationId !== flow.state.invitationId ||
+        flow.row.hrSubject !== flow.state.hrSubject)
+      throw new ForbiddenException("This re-verification cannot be completed.");
+    const invitation = await this.db.hrInvitation.findUnique({where: {id: flow.state.invitationId}});
+    if (!invitation || invitation.state !== "SENT")
+      throw new ForbiddenException("The invitation is no longer available.");
+    const proof = await this.proof.verify(invitation, flow.state.tokens);
+    if (proof.subject !== flow.state.hrSubject) throw new ForbiddenException("Account mismatch.");
+    // This flow originated from a successful password sign-in and its fresh MFA
+    // was checked against the same subject by proof.verify above. Do not treat
+    // historical flow records as authoritative: they are routinely purged.
+    const changed = await this.db.authFlow.updateMany({
+      where: {id:flow.row.id,encryptedState:flow.row.encryptedState,expiresAt:{gt:new Date()},hrPasswordConfirmedAt:null},
+      data: {encryptedState:seal({...flow.state,hrPasswordStatus:"CONFIRMED" as const}),hrPasswordConfirmedAt:new Date()},
+    });
+    if (changed.count !== 1) throw new ForbiddenException("Verification already completed or expired.");
+    return {next:"awaiting_activation" as const};
+  }
+
+  /**
+   * Invitation-bound, one-time HR activation. The browser cannot choose a role.
+   * The database performs the atomic transition and revokes old sessions;
+   * this API first verifies the live AAL2 provider identity and CSRF-bound flow.
+   */
+  async activate(req: Request) {
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("Automatic HR activation is not enabled.");
+    const flow = await this.auth.flow(req, true);
+    if (flow.row.kind !== "HR_INVITATION" || !flow.state.invitationId ||
+        !flow.state.hrSubject || !flow.state.tokens ||
+        flow.state.hrPasswordStatus !== "CONFIRMED" ||
+        flow.row.hrInvitationId !== flow.state.invitationId ||
+        flow.row.hrSubject !== flow.state.hrSubject ||
+        !flow.row.hrPasswordConfirmedAt ||
+        flow.row.hrPasswordConfirmedAt < flow.row.createdAt ||
+        flow.row.hrPasswordConfirmedAt >= flow.row.expiresAt ||
+        flow.row.hrPasswordConfirmedAt > new Date())
+      throw new ForbiddenException("HR invitation verification is incomplete.");
+    const invitation = await this.db.hrInvitation.findUnique({
+      where: { id: flow.state.invitationId },
+    });
+    if (!invitation || invitation.state !== "SENT" || !invitation.expiresAt ||
+        invitation.expiresAt <= new Date() || invitation.revokedAt ||
+        !invitation.creationSubject ||
+        invitation.creationSubject !== invitation.providerSubject ||
+        invitation.creationSubject !== flow.state.hrSubject)
+      throw new ForbiddenException("This HR invitation can no longer be activated.");
+    const verified = await this.proof.verify(invitation, flow.state.tokens);
+    if (verified.subject !== flow.state.hrSubject || verified.email !== invitation.email)
+      throw new ForbiddenException("The authenticated account does not match the Developer invitation.");
+    // The privileged function rechecks invitation, account, and one-use flow
+    // under a row lock. It alone changes the role and consumes the invitation.
+    const rows = await this.db.$queryRaw<{ accepted: boolean }[]>`
+      SELECT nolt_private.accept_hr_invitation(
+        ${invitation.id}::uuid, ${verified.subject}::uuid, ${flow.row.id}::uuid
+      ) AS accepted
+    `;
+    if (rows[0]?.accepted !== true)
+      throw new ForbiddenException("Activation was not accepted. Reverify your invitation.");
+    return { next: "login" as const, role: "HR" as const };
   }
 
   async exchange(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
@@ -188,6 +295,25 @@ export class HrInvitationExchangeController {
     assertOrigin(req);
     this.limiter.take(req.socket.remoteAddress ?? "unknown");
     return this.service.setPassword(value, req);
+  }
+  @Post("resume")
+  @ApiCreatedResponse({ type: HrExchangeResultDto })
+  resume(@Body() value:unknown, @Req() req:Request, @Res({passthrough:true}) res:Response) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.resume(value,req,res);
+  }
+  @Post("resume-confirm")
+  confirmResume(@Req() req:Request) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.confirmResume(req);
+  }
+  @Post("activate")
+  activate(@Req() req: Request) {
+    assertOrigin(req);
+    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    return this.service.activate(req);
   }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })

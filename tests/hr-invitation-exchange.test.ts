@@ -91,7 +91,7 @@ test("HR verification requires its own flow and never invokes activation", async
   try {
     const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
     assert.deepEqual(await service.verification({} as never), {
-      verified: true, activationAllowed: false,
+      verified: true, activationAllowed: false, resuming: false,
     });
     assert.deepEqual(calls, ["read invitation", "verify provider MFA"]);
   } finally {
@@ -329,5 +329,198 @@ test("HR proof requires the expected Supabase identity issuer", async () => {
   } finally {
     if (before === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = before;
+  }
+});
+
+test("HR resume and confirmation are disabled without provider or database calls", async () => {
+  const previous = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  try {
+    const inaccessible = new Proxy({}, { get() { throw Error("No external access allowed"); } });
+    const service = new HrInvitationExchangeService(inaccessible as never, inaccessible as never, inaccessible as never);
+    await assert.rejects(service.resume({}, {} as never, {} as never), (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+    await assert.rejects(service.confirmResume({} as never), (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+  } finally {
+    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("HR resume accepts fresh password and starts a limited MFA flow without historical records",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const id="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email="test@example.invalid";
+  let started:unknown[]|undefined;
+  const db={
+    hrInvitation:{findFirst:async()=>({id,email,state:"SENT",creationSubject:subject,providerSubject:subject,expiresAt:new Date(Date.now()+60000)})},
+    user:{findUnique:async()=>({id:subject,role:"EMPLOYEE",active:true})},
+    employee:{findFirst:async()=>null},
+    authFlow:{findFirst:async()=>{throw Error("Historical flows must not be queried");}},
+  };
+  const auth={
+    client:()=>({client:{auth:{signInWithPassword:async()=>({error:null,data:{session:{access_token:"access",refresh_token:"refresh"},user:{id:subject,email_confirmed_at:new Date().toISOString()}}})}}}),
+    tokens:(v:unknown)=>v,
+    start:async(...args:unknown[])=>{started=args;},
+  };
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,{} as never);
+    assert.deepEqual(await service.resume({email,password:"existing-password"},{} as never,{} as never),{next:"mfa"});
+    assert.equal(started?.[0],"HR_INVITATION");
+    assert.equal((started?.[1] as {hrResume:boolean}).hrResume,true);
+    assert.ok((started?.[4] as number)<=60000);
+  }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("HR resume rejects authenticated identity mismatch before any flow starts",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const db={hrInvitation:{findFirst:async()=>({id:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",email:"test@example.invalid",state:"SENT",creationSubject:subject,providerSubject:subject,expiresAt:new Date(Date.now()+60000)})}};
+  const auth={client:()=>({client:{auth:{signInWithPassword:async()=>({error:null,data:{session:{access_token:"a",refresh_token:"b"},user:{id:"wrong-subject",email_confirmed_at:new Date().toISOString()}}})}}}),start:async()=>{throw Error("Must not open a flow");}};
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,{} as never);
+    await assert.rejects(service.resume({email:"test@example.invalid",password:"existing-password"},{} as never,{} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("fresh HR resume confirmation records the time-bound proof once",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const previousKey=process.env.AUTH_ENCRYPTION_KEY;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const prevAuto=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  process.env.AUTH_ENCRYPTION_KEY=Buffer.alloc(32,12).toString("base64");
+  const invitationId="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const state={hrResume:true,invitationId,hrSubject:subject,tokens:{access_token:"a",refresh_token:"b"}};
+  const row={id:"9b30468b-2e65-4518-bd84-825de0ca7495",kind:"HR_INVITATION",hrInvitationId:invitationId,hrSubject:subject,encryptedState:"prior"};
+  let wrote:unknown;
+  const db={hrInvitation:{findUnique:async()=>({id:invitationId,state:"SENT"})},
+    authFlow:{updateMany:async(arg:unknown)=>{wrote=arg;return {count:1};},findFirst:async()=>{throw Error("Historical flows must not be read");}}};
+  const auth={flow:async()=>({row,state})};
+  const proof={verify:async()=>({subject})};
+  try{
+    const service=new HrInvitationExchangeService(db as never,auth as never,proof as never);
+    assert.deepEqual(await service.confirmResume({} as never),{next:"awaiting_activation"});
+    const payload=wrote as {where:{encryptedState:string;hrPasswordConfirmedAt:null;expiresAt:{gt:Date}},data:{hrPasswordConfirmedAt:Date;encryptedState:string}};
+    assert.equal(payload.where.encryptedState,"prior");
+    assert.equal(payload.where.hrPasswordConfirmedAt,null);
+    assert.ok(payload.data.hrPasswordConfirmedAt instanceof Date);
+    const {unseal}=await import("../apps/api/src/auth-crypto.js");
+    assert.equal(unseal<{hrPasswordStatus:string}>(payload.data.encryptedState).hrPasswordStatus,"CONFIRMED");
+  }finally{
+    if(prevAuto===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=prevAuto;
+    if(previous===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+    if(previousKey===undefined)delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY=previousKey;
+  }
+});
+
+test("resume confirmation cannot run on an ordinary HR invitation flow",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const previousActivation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const auth={flow:async()=>({row:{kind:"HR_INVITATION"},state:{invitationId:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a"}})};
+  const forbidden=new Proxy({},{get(){throw Error("No writes or calls allowed")}});
+  try {
+    const service=new HrInvitationExchangeService(forbidden as never,auth as never,forbidden as never);
+    await assert.rejects(service.confirmResume({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  } finally {
+    if(previousActivation===undefined) delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=previousActivation;
+    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("automatic Developer HR activation fails closed while disabled", async () => {
+  const acceptance=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const activation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  try {
+    const unavailable=new Proxy({}, { get() { throw Error("Disabled path must not access provider or database"); } });
+    const service=new HrInvitationExchangeService(unavailable as never,unavailable as never,unavailable as never);
+    await assert.rejects(service.activate({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+  } finally {
+    if(acceptance===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=acceptance;
+    if(activation===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=activation;
+  }
+});
+
+test("automatic HR activation requires confirmed, unexpired MFA invitation flow", async () => {
+  const acceptance=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const activation=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const db=new Proxy({}, { get() { throw Error("Unverified request must never touch database"); } });
+  const auth={flow: async()=>({row:{kind:"HR_INVITATION",hrPasswordConfirmedAt:null},
+    state:{invitationId:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",hrPasswordStatus:"CLAIMED"}})};
+  try {
+    const service=new HrInvitationExchangeService(db as never,auth as never,db as never);
+    await assert.rejects(service.activate({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  } finally {
+    if(acceptance===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=acceptance;
+    if(activation===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=activation;
+  }
+});
+
+test("successful HR activation checks live identity before a single atomic database grant",async()=>{
+  const prior=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  const flag=process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED="true";
+  const invitationId="e4b703d5-bf2c-4555-bfb1-6e63d452af3a";
+  const subject="cbfab129-8d44-4ed3-82a2-d026b09fe902";
+  const email="hr-test@example.invalid";
+  const now=Date.now();
+  const row={id:"9b30468b-2e65-4518-bd84-825de0ca7495",kind:"HR_INVITATION",
+    createdAt:new Date(now-30000),expiresAt:new Date(now+30000),
+    hrInvitationId:invitationId,hrSubject:subject,hrPasswordConfirmedAt:new Date(now-10000)};
+  const state={invitationId,hrSubject:subject,hrPasswordStatus:"CONFIRMED",tokens:{access_token:"a",refresh_token:"b"}};
+  let liveVerified=false, calls=0;
+  const db={
+    hrInvitation:{findUnique:async()=>({id:invitationId,email,state:"SENT",expiresAt:new Date(now+60000),
+      revokedAt:null,creationSubject:subject,providerSubject:subject})},
+    $queryRaw:async()=>{assert.equal(liveVerified,true);calls++;return [{accepted:true}];},
+  };
+  const auth={flow:async()=>({row,state})};
+  const proof={verify:async()=>{liveVerified=true;return {subject,email};}};
+  try {
+    const service=new HrInvitationExchangeService(db as never,auth as never,proof as never);
+    assert.deepEqual(await service.activate({} as never),{next:"login",role:"HR"});
+    assert.equal(calls,1);
+  } finally {
+    if(prior===undefined)delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=prior;
+    if(flag===undefined)delete process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED;
+    else process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED=flag;
   }
 });

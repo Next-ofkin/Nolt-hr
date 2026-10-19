@@ -98,6 +98,8 @@ export class DeveloperOverviewService {
       throw new ServiceUnavailableException("HR invitation sending is not enabled yet.");
     if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
       throw new ServiceUnavailableException("HR invitation verification is not enabled yet.");
+    if (process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("Automatic HR role activation is not enabled yet.");
     if (!z.string().uuid().safeParse(requestKey).success)
       throw new BadRequestException("A valid invitation request key is required.");
     const item = await this.db.$transaction(async (tx) => {
