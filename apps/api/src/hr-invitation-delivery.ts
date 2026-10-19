@@ -19,10 +19,10 @@ export type HrDeliveryResult =
 
 export function hrRecipientAllowed(email: string, env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.HR_INVITATION_DELIVERY_ENABLED !== "true") return false;
-  const entries = (env.HR_INVITATION_TEST_RECIPIENTS ?? "")
-    .split(",").map((v) => v.trim().toLowerCase()).filter(Boolean);
-  // An explicit recipient list is mandatory until an independently reviewed launch.
-  return entries.length > 0 && entries.includes(email.trim().toLowerCase());
+  // Delivery is authorised by the Developer-only, authenticated queue endpoint.
+  // Do not require a per-recipient deployment setting: the Developer may invite
+  // any previously unregistered, syntactically valid email address.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 export function hrDeliveryError(code: string | undefined, status: number | undefined): HrDeliveryResult {
@@ -42,7 +42,7 @@ export async function deliverHrInvitationEmail(
   if (!invitation.creationSecret || !/^[a-f0-9]{64}$/.test(invitation.creationSecret))
     return { status: "FAILED", errorCode: "CREATION_PROOF_MISSING", retryable: false };
   if (!hrRecipientAllowed(invitation.email, env))
-    return { status: "FAILED", errorCode: "RECIPIENT_NOT_APPROVED", retryable: false };
+    return { status: "FAILED", errorCode: "DELIVERY_DISABLED_OR_INVALID_RECIPIENT", retryable: false };
   if (!env.SUPABASE_SECRET_KEY || !env.SUPABASE_URL)
     return { status: "FAILED", errorCode: "SENDER_NOT_CONFIGURED", retryable: false };
   // The admin API is not exposed to browsers. The recipient proves possession of email later.
