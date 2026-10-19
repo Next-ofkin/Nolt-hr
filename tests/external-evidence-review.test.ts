@@ -17,7 +17,7 @@ function fakeDb(role = "HR", submitted = true) {
   const tx = {
     $queryRaw: async () => [{ id: assignmentId }],
     user: { findUnique: async () => ({
-      id: owner, active: true, role, permissions: ["forms.manage"],
+      id: owner, active: true, role, permissions: [],
     }) },
     formAssignment: { findUnique: async () => assignment },
     externalRequest: {
@@ -50,11 +50,10 @@ test("employee role cannot read external guarantor evidence even with forms perm
   assert.equal(writes(), 0);
 });
 
-test("developer HR administrator with forms.manage may review evidence", async () => {
+test("developer provisioning account cannot access evidence without HR role grant", async () => {
   const { db } = fakeDb("DEVELOPER");
   const service = new ExternalEvidenceReviewService(db as never);
-  const evidence = await service.detail(colleague, assignmentId);
-  assert.equal(evidence.items.length, 1);
+  await assert.rejects(() => service.detail(colleague, assignmentId), /HR evidence review access is required/i);
 });
 
 test("authorised HR administrator role can review colleague evidence", async () => {
