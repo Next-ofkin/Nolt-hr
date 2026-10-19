@@ -11,5 +11,8 @@ CREATE TABLE IF NOT EXISTS public."ExternalEvidenceReview" (
 );
 CREATE INDEX IF NOT EXISTS "ExternalEvidenceReview_reviewedBy_reviewedAt_idx"
  ON public."ExternalEvidenceReview" ("reviewedBy","reviewedAt");
+ALTER TABLE public."ExternalEvidenceReview" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY external_evidence_nolt_app ON public."ExternalEvidenceReview"
+  FOR ALL TO nolt_app USING (true) WITH CHECK (true);
 REVOKE ALL ON TABLE public."ExternalEvidenceReview" FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT ON TABLE public."ExternalEvidenceReview" TO nolt_app;
