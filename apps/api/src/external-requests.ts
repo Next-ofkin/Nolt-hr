@@ -191,7 +191,7 @@ export class ExternalRequestsService {
           await tx.externalRequest.findMany({
             where: { assignmentId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            include: { evidenceReview: { select: { reason: true } } },
+            include: { evidenceReview: { select: { decision: true, reason: true } } },
             take: 20,
           })
         ).map(dto),
