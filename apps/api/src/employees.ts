@@ -161,7 +161,8 @@ const employeeDto = (e: import("@prisma/client").Employee): EmployeeDto => ({
 const caseInclude = {
   assignments: {
     orderBy: { createdAt: "asc" as const },
-    include: { formVersion: true, response: { select: { status: true } } },
+    include: { formVersion: true, response: { select: { status: true } },
+      externalRequests: { where: { state: "SUBMITTED" }, select: { id: true }, take: 1 } },
   },
 };
 type CaseRow = Prisma.OnboardingCaseGetPayload<{ include: typeof caseInclude }>;
@@ -181,7 +182,8 @@ const caseDto = (c: CaseRow): CaseDto => ({
     recipient: a.formVersion.recipient,
     required: a.required,
     dueDate: a.dueDate?.toISOString().slice(0, 10) ?? null,
-    status: a.response?.status ?? "NOT_STARTED",
+    status: a.formVersion.recipient !== "EMPLOYEE" && a.externalRequests.length > 0
+      ? "EXTERNAL_SUBMITTED" : a.response?.status ?? "NOT_STARTED",
   })),
 });
 @Injectable()
