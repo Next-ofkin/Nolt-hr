@@ -17,17 +17,30 @@ export function HrInvitationDrafts() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error("Could not load HR invitation drafts.");
       const value: {items: Draft[]} = await response.json();
       setItems(value.items);
-    } catch(e) { setError(e instanceof Error ? e.message : "Could not load drafts."); }
-    finally { setLoading(false); }
+    } catch(e) { if (!silent) setError(e instanceof Error ? e.message : "Could not load drafts."); }
+    finally { if (!silent) setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // Server-driven delivery jobs finish asynchronously. Refresh visible dashboards
+  // without full-page reloads, and fetch immediately when the tab regains focus.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible" && !busy) void load(true); };
+    const interval = window.setInterval(refresh, 8000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load, busy]);
   useEffect(() => {
     let active = true;
     void fetch("/api/v1/developer/overview", { credentials: "same-origin", cache: "no-store" })
@@ -75,7 +88,7 @@ export function HrInvitationDrafts() {
             ? "This invitation cannot be queued. Check the recipient and current status."
             : "Could not queue this invitation. No delivery is confirmed.");
       }
-      setNotice("Invitation queued, not yet delivered. Refresh to check its status. HR access is not granted automatically.");
+      setNotice("Invitation queued. Its status will update automatically; HR access is not granted automatically.");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not queue the invitation."); }
     finally { setBusy(false); }
