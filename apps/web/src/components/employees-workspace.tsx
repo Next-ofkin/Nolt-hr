@@ -55,6 +55,7 @@ export function EmployeesWorkspace() {
   const [detail, setDetail] = useState<Detail | null>(null),
     [profile, setProfile] = useState(empty),
     [editing, setEditing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [externalReviewId, setExternalReviewId] = useState<string | null>(null);
   const [reviewingAssignmentId, setReviewingAssignmentId] = useState<
     string | null
@@ -172,6 +173,7 @@ export function EmployeesWorkspace() {
     });
   }
   const c = detail?.onboardingCase;
+  const pendingReviews = c?.assignments.filter(a => ["EXTERNAL_SUBMITTED", "SUBMITTED"].includes(a.status)).length ?? 0;
   return (
     <div className="space-y-6">
       <div>
@@ -194,9 +196,9 @@ export function EmployeesWorkspace() {
           {notice}
         </p>
       )}
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[1fr_1fr]">
-        <section className="min-w-0 space-y-4 rounded-xl border bg-white p-4 sm:p-6">
-          <h2 className="text-xl font-semibold">Find employees</h2>
+      <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.45fr)]">
+        <section className="min-w-0 space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-semibold">Employees</h2><p className="text-xs text-muted-foreground">Choose a colleague to manage onboarding.</p></div><Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => { setDetail(null); setEditing(true); setProfile(empty); setNotice(""); }}>+ New employee</Button></div>
           <form
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -214,7 +216,7 @@ export function EmployeesWorkspace() {
                 onChange={(e) => setQ(e.target.value)}
               />
             </div>
-            <div>
+            {showFilters && <><div>
               <Label htmlFor="department-filter">Department</Label>
               <Input
                 id="department-filter"
@@ -264,20 +266,9 @@ export function EmployeesWorkspace() {
                 onChange={(e) => setStartTo(e.target.value)}
               />
             </div>
-            <Button disabled={loading || busy}>Search employees</Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
-                setDetail(null);
-                setEditing(true);
-                setProfile(empty);
-                setNotice("");
-              }}
-            >
-              New employee
-            </Button>
+            </>}
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-2"><Button disabled={loading || busy} size="sm">Search</Button><Button type="button" variant="ghost" size="sm" onClick={() => setShowFilters(value => !value)}>{showFilters ? "Hide filters" : "More filters"}</Button></div>
+
           </form>
           {loading ? (
             <p role="status">Loading employees…</p>
@@ -290,7 +281,7 @@ export function EmployeesWorkspace() {
                   <button
                     disabled={busy}
                     onClick={() => void select(e.id)}
-                    className="w-full min-w-0 rounded-lg p-3 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary"
+                    className={`w-full min-w-0 rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary ${detail?.employee.id === e.id ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-accent"}`} aria-current={detail?.employee.id === e.id ? "true" : undefined}
                   >
                     <span className="block break-words font-medium">
                       {e.fullName}
@@ -320,7 +311,7 @@ export function EmployeesWorkspace() {
             </div>
           </div>
         </section>
-        <section className="min-w-0 space-y-5 rounded-xl border bg-white p-4 sm:p-6">
+        <section className="min-w-0 space-y-5 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
           {!detail && !editing && (
             <p className="text-muted-foreground">
               Select an employee or create a record to get started.
@@ -409,7 +400,7 @@ export function EmployeesWorkspace() {
           )}
           {detail && !editing && (
             <>
-              <div>
+              <div className="rounded-lg border bg-muted/30 p-4">
                 <h2 className="break-words text-2xl font-semibold">
                   {detail.employee.fullName}
                 </h2>
@@ -447,6 +438,7 @@ export function EmployeesWorkspace() {
               >
                 Edit employment details
               </Button>
+              <div className="flex flex-wrap gap-2 border-y py-3 text-sm"><Badge variant="secondary">{c ? "Onboarding active" : "No onboarding case"}</Badge>{pendingReviews > 0 && <Badge variant="outline" className="border-amber-400 text-amber-800">{pendingReviews} awaiting HR review</Badge>}</div>
               <EmployeeInvitations
                 key={detail.employee.id}
                 employeeId={detail.employee.id}
@@ -480,7 +472,7 @@ export function EmployeesWorkspace() {
                 </div>
               ) : (
                 <div className="space-y-4 border-t pt-5">
-                  <h3 className="font-semibold">Onboarding · Pre-onboarding</h3>
+                  <div><h3 className="text-lg font-semibold">Onboarding checklist</h3><p className="text-xs text-muted-foreground">Review forms that need attention and track completed work.</p></div>
                   <PackAssignmentPanel
                     key={c.id}
                     caseId={c.id}
@@ -505,11 +497,11 @@ export function EmployeesWorkspace() {
                       return (
                         <li
                           key={a.id}
-                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3.5"
+                          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3.5 ${a.status === "APPROVED" ? "border-emerald-200 bg-emerald-50/40" : ["EXTERNAL_SUBMITTED","SUBMITTED"].includes(a.status) ? "border-amber-200 bg-amber-50/40" : ""}`}
                         >
                           <div className="min-w-0 space-y-1">
                             <p className="break-words font-medium">
-                              {a.title} · v{a.version}
+                              {a.title}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                               <span>
