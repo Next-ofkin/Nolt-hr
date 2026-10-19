@@ -57,9 +57,9 @@ export function ExternalRequests({
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [load]);
-  const active = items.find(
-    (i) => !["REVOKED", "EXPIRED", "FAILED"].includes(i.state),
-  );
+  const active = items[0];
+  const canSendFresh = !active || ["REVOKED", "EXPIRED", "FAILED", "CHANGES_REQUIRED"].includes(active.state);
+  const canReplace = !!active && ["SENT", "QUEUED", "SENDING", "UNCERTAIN", "ACTIVE"].includes(active.state);
   async function send(replace?: string) {
     if (!session) return;
     setBusy(true);
@@ -133,7 +133,7 @@ export function ExternalRequests({
         <p className="text-sm">Save recipient changes before sending.</p>
       )}
       <div className="flex flex-wrap gap-2">
-        {!active && (
+        {canSendFresh && (
           <Button
             type="button"
             disabled={busy || !contactRevision || contactDirty}
@@ -142,7 +142,7 @@ export function ExternalRequests({
             Send request
           </Button>
         )}
-        {active && active.state !== "SUBMITTED" && (
+        {canReplace && active && (
           <>
             <Button
               type="button"
@@ -182,6 +182,9 @@ export function ExternalRequests({
         </p>
       )}
       {!items.length && <p className="text-sm">Request status: Not sent</p>}
+      {active?.state === "CHANGES_REQUIRED" && <p role="status" className="text-sm text-amber-700">HR requested corrections. Review the reason below, then send your guarantor a new secure request. The original evidence is preserved.</p>}
+      {active?.state === "APPROVED" && <p role="status" className="text-sm text-green-700">Guarantor evidence approved by HR.</p>}
+      {active?.state === "SUBMITTED" && <p role="status" className="text-sm">Guarantor submitted the form. Awaiting HR review.</p>}
       <p className="text-xs text-muted-foreground">Request history updates automatically every 8 seconds while this page is open.</p>
       <ul className="space-y-2">
         {items.map((i) => (
@@ -189,6 +192,7 @@ export function ExternalRequests({
             {i.email} — {i.state.toLowerCase().replaceAll("_", " ")}
             <br />
             Link expires: {new Date(i.expiresAt).toLocaleString()}
+            {(i as typeof i & { correctionReason?: string | null }).correctionReason && <p className="mt-1 text-sm text-amber-700">HR corrections: {(i as typeof i & { correctionReason?: string | null }).correctionReason}</p>}
           </li>
         ))}
       </ul>
