@@ -122,8 +122,9 @@ export class HrInvitationExchangeService {
 
   /** Reauthenticate an already invited account; never issue an application session. */
   async resume(input: unknown, req: Request, res: Response): Promise<HrExchangeResultDto> {
-    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
-      throw new ServiceUnavailableException("HR invitation verification is not available.");
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation recovery is not enabled.");
     const parsed = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(128) }).strict().safeParse(input);
     if (!parsed.success) throw new BadRequestException("Enter your invitation email and existing password.");
     const email = parsed.data.email.trim().toLowerCase();
@@ -155,8 +156,9 @@ export class HrInvitationExchangeService {
 
   /** Fresh password possession + current AAL2; records readiness only, NOT an HR grant. */
   async confirmResume(req: Request) {
-    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true")
-      throw new ServiceUnavailableException("HR verification is not available.");
+    if (process.env.HR_INVITATION_ACCEPTANCE_ENABLED !== "true" ||
+        process.env.HR_INVITATION_AUTO_ACTIVATION_ENABLED !== "true")
+      throw new ServiceUnavailableException("HR invitation recovery is not enabled.");
     const flow = await this.auth.flow(req, true);
     if (flow.row.kind !== "HR_INVITATION" || flow.state.hrResume !== true ||
         flow.state.hrPasswordStatus !== undefined || !flow.state.invitationId ||
