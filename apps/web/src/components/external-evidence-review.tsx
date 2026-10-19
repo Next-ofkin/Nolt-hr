@@ -24,7 +24,7 @@ export function ExternalEvidenceReview({
     const result = await fetch(`/api/v1/employees/assignments/${encodeURIComponent(assignmentId)}/external-evidence`,
       { credentials: "same-origin", cache: "no-store" });
     if (!result.ok) throw new Error(result.status === 404
-      ? "This evidence is not assigned to your HR account."
+      ? "Evidence was not found or is unavailable to your HR account."
       : "Unable to load submitted evidence.");
     setDetail(await result.json() as Detail);
   }

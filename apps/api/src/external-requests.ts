@@ -923,7 +923,6 @@ export class ExternalEvidenceReviewService {
     const reviewer = await tx.user.findUnique({ where: { id: actorId } });
     if (!a || !reviewer?.active || reviewer.role !== "HR" ||
         !reviewer.permissions.includes("forms.manage") ||
-        a.onboardingCase.createdBy !== actorId ||
         !["GUARANTOR","REFERENCE"].includes(a.formVersion.recipient))
       throw new NotFoundException("Assigned external evidence not found.");
     return a;

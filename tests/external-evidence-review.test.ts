@@ -3,6 +3,7 @@ import test from "node:test";
 import { ExternalEvidenceReviewService } from "../apps/api/src/external-requests.js";
 
 const owner = "c1010101-0000-4000-8000-000000000001";
+const colleague = "c1010101-0000-4000-8000-000000000009";
 const assignmentId = "c1010101-0000-4000-8000-000000000002";
 const requestId = "c1010101-0000-4000-8000-000000000003";
 const assignment = {
@@ -56,6 +57,22 @@ test("HR case owner can read immutable evidence with original field labels", asy
   assert.equal(evidence.items.length, 1);
   assert.equal(evidence.fields[0].label, "Name");
   assert.equal(evidence.items[0].decision, null);
+});
+
+test("another authorised HR user can review evidence without being the case creator", async () => {
+  const { db } = fakeDb();
+  const service = new ExternalEvidenceReviewService(db as never);
+  const evidence = await service.detail(colleague, assignmentId);
+  assert.equal(evidence.items.length, 1);
+  assert.equal(evidence.items[0].decision, null);
+});
+
+test("another authorised HR user can approve evidence with audit attribution", async () => {
+  const { db, writes } = fakeDb();
+  const service = new ExternalEvidenceReviewService(db as never);
+  const result = await service.decide(colleague, assignmentId, requestId, { decision: "APPROVED" });
+  assert.equal(result.decision, "APPROVED");
+  assert.equal(writes(), 4);
 });
 
 test("cannot approve unsubmitted evidence, and no audit or review is written", async () => {
