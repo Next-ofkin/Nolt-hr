@@ -91,7 +91,7 @@ test("HR verification requires its own flow and never invokes activation", async
   try {
     const service = new HrInvitationExchangeService(db as never, auth as never, proof as never);
     assert.deepEqual(await service.verification({} as never), {
-      verified: true, activationAllowed: false,
+      verified: true, activationAllowed: false, resuming: false,
     });
     assert.deepEqual(calls, ["read invitation", "verify provider MFA"]);
   } finally {
@@ -329,5 +329,52 @@ test("HR proof requires the expected Supabase identity issuer", async () => {
   } finally {
     if (before === undefined) delete process.env.SUPABASE_URL;
     else process.env.SUPABASE_URL = before;
+  }
+});
+
+test("HR resume and confirmation are disabled without provider or database calls", async () => {
+  const previous = process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  try {
+    const inaccessible = new Proxy({}, { get() { throw Error("No external access allowed"); } });
+    const service = new HrInvitationExchangeService(inaccessible as never, inaccessible as never, inaccessible as never);
+    for (const request of [service.resume({}, {} as never, {} as never), service.confirmResume({} as never)])
+      await assert.rejects(request, (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===503));
+  } finally {
+    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("HR resume denies an account without original password confirmation before Supabase login",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const db={
+    hrInvitation:{findFirst:async()=>({id:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a",email:"test@example.invalid",state:"SENT",creationSubject:"cbfab129-8d44-4ed3-82a2-d026b09fe902",providerSubject:"cbfab129-8d44-4ed3-82a2-d026b09fe902",expiresAt:new Date(Date.now()+60000)})},
+    authFlow:{findFirst:async()=>null},
+  };
+  const forbidden=new Proxy({},{get(){throw Error("Must not touch Supabase")}});
+  try {
+    const service=new HrInvitationExchangeService(db as never,forbidden as never,forbidden as never);
+    await assert.rejects(service.resume({email:"test@example.invalid",password:"existing-password"},{} as never,{} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  } finally {
+    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
+  }
+});
+
+test("resume confirmation cannot run on an ordinary HR invitation flow",async()=>{
+  const previous=process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+  process.env.HR_INVITATION_ACCEPTANCE_ENABLED="true";
+  const auth={flow:async()=>({row:{kind:"HR_INVITATION"},state:{invitationId:"e4b703d5-bf2c-4555-bfb1-6e63d452af3a"}})};
+  const forbidden=new Proxy({},{get(){throw Error("No writes or calls allowed")}});
+  try {
+    const service=new HrInvitationExchangeService(forbidden as never,auth as never,forbidden as never);
+    await assert.rejects(service.confirmResume({} as never),
+      (e:unknown)=>Boolean(e&&typeof e==="object"&&"status" in e&&e.status===403));
+  } finally {
+    if(previous===undefined) delete process.env.HR_INVITATION_ACCEPTANCE_ENABLED;
+    else process.env.HR_INVITATION_ACCEPTANCE_ENABLED=previous;
   }
 });
