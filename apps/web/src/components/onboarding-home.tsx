@@ -95,7 +95,7 @@ function EmployeeHome() {
           </Button>
         </div>
       )}
-      {busy && <p role="status">Loading…</p>}
+      {(busy || (liveOnboarding.isPending && !data)) && <p role="status">Loading…</p>}
       {data && !data.employee && (
         <p className="rounded-xl border bg-white p-6">
           Your account is ready. HR will link your employment record using your
