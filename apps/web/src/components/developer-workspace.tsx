@@ -31,9 +31,8 @@ function DeveloperHome() {
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     try {
       const response = await fetch(`/api/v1/developer/overview?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(appliedSearch)}&status=${status}`, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your account does not have Developer administration access." : "We couldn't retrieve the account overview. Please try again.");
@@ -41,12 +40,23 @@ function DeveloperHome() {
       setData(overview);
       if (overview.hrPagination.page > overview.hrPagination.totalPages) setPage(overview.hrPagination.totalPages);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the Developer workspace.");
+      if (!silent) setError(e instanceof Error ? e.message : "Could not load the Developer workspace.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, pageSize, appliedSearch, status]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") void load(true); };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
 
   const greeting = session?.name?.trim().split(/\s+/)[0] || "Developer";
   const stats = [
