@@ -25,9 +25,8 @@ export function ExternalRequests({
     expectedContactRevision: number;
     replaceRequestId?: string;
   } | null>(null);
-  const load = useCallback(async () => {
-    setBusy(true);
-    setError("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setBusy(true); setError(""); }
     try {
       const r = await api.GET("/api/v1/me/assignments/{id}/external-requests", {
         params: { path: { id: assignmentId } },
@@ -35,15 +34,28 @@ export function ExternalRequests({
       if (r.error) throw Error(errorMessage(r.error));
       setItems(r.data.items);
     } catch (e) {
-      setError(
+      if (!silent) setError(
         e instanceof Error ? e.message : "Could not load request status.",
       );
     } finally {
-      setBusy(false);
+      if (!silent) setBusy(false);
     }
   }, [assignmentId]);
   useEffect(() => {
     void load();
+  }, [load]);
+  // Keep requests and delivery history up-to-date without manual refresh.
+  // Background reads never block editing or show an intrusive spinner.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") void load(true); };
+    const interval = window.setInterval(refresh, 8000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [load]);
   const active = items.find(
     (i) => !["REVOKED", "EXPIRED", "FAILED"].includes(i.state),
@@ -74,7 +86,7 @@ export function ExternalRequests({
       );
       if (r.error) throw Error(errorMessage(r.error));
       pending.current = null;
-      setNotice("Request queued. Refresh status to check email delivery.");
+      setNotice("Request queued. Email delivery status updates automatically.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not queue the request.");
@@ -156,7 +168,7 @@ export function ExternalRequests({
           disabled={busy}
           onClick={() => void load()}
         >
-          Refresh request status
+          Check now
         </Button>
       </div>
       {error && (
@@ -170,6 +182,7 @@ export function ExternalRequests({
         </p>
       )}
       {!items.length && <p className="text-sm">Request status: Not sent</p>}
+      <p className="text-xs text-muted-foreground">Request history updates automatically every 8 seconds while this page is open.</p>
       <ul className="space-y-2">
         {items.map((i) => (
           <li className="break-words rounded-md border p-3 text-sm" key={i.id}>
