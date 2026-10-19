@@ -981,9 +981,8 @@ export class ExternalEvidenceReviewService {
         data: { requestId: r.id, reviewedBy: actorId, decision: p.decision,
           reason: p.decision === "CHANGES_REQUIRED" ? p.reason! : null },
       });
-      await tx.externalRequest.update({ where: { id: r.id }, data: {
-        state: p.decision, updatedBy: actorId,
-      } });
+      // Submitted requests are immutable; the separate evidence review is the
+      // authoritative decision record used by case and pack progress.
       await tx.auditEvent.create({ data: {
         actorId, action: "EXTERNAL_EVIDENCE_" + p.decision, targetId: r.id,
         metadata: { assignmentId, reason: p.decision === "CHANGES_REQUIRED" ? p.reason : null },
