@@ -64,8 +64,8 @@ export function FileUpload({
     const file = e.target.files?.[0];
     if (!file || !session) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File exceeds 10MB limit.");
+    if (file.size > (file.type.startsWith("image/") ? 25 : 10) * 1024 * 1024) {
+      setError("Selected file is too large to process. Images may be up to 25MB before compression; other documents must be under 10MB.");
       return;
     }
 
@@ -201,7 +201,7 @@ export function FileUpload({
               : passportPhoto ? "Take or upload passport photograph" : "Attach document (PDF, PNG, JPEG)"}
         </span>
         <span className="text-[11px] text-muted-foreground">
-          Maximum file size 10MB
+          Up to 10MB after processing. Larger photos are compressed automatically.
         </span>
         <input
           type="file"
