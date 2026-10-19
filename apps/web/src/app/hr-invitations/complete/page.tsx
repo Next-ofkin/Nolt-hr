@@ -11,6 +11,22 @@ export default function HrInvitationCompletePage() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [retryActivation, setRetryActivation] = useState(false);
+  async function activate(token: string) {
+    const result = await fetch("/api/v1/hr-invitations/activate", {
+      method: "POST", credentials: "same-origin", headers: { "x-csrf-token": token },
+    });
+    if (!result.ok) {
+      setRetryActivation(true);
+      setMessage(result.status === 503
+        ? "Your password and MFA are verified. HR activation is not available yet; your access remains Employee. Try again later or contact the Developer."
+        : "HR activation was not completed. Retry while your verification is valid, or reverify the invitation.");
+      return;
+    }
+    setRetryActivation(false);
+    setMessage("HR administrator account activated! Redirecting to sign in with your HR permissions…");
+    setCompleted(true);
+  }
   useEffect(() => {
     void (async () => {
       const flow = await fetch("/api/v1/auth/flow", { credentials: "same-origin", cache: "no-store" });
@@ -31,13 +47,13 @@ export default function HrInvitationCompletePage() {
           headers:{"x-csrf-token":state.csrfToken},
         });
         if(!completed.ok) throw Error("Your re-verification could not be completed. Please restart with your existing password.");
-        setMessage("Fresh MFA verification complete. HR access is still pending owner approval. You will now return to sign in.");
-        setCompleted(true);
+        setCsrf(state.csrfToken);
+        await activate(state.csrfToken);
         return;
       }
       setCsrf(state.csrfToken);
       setReady(true);
-      setMessage("Choose a password for your verified HR invitation. Account activation will remain pending.");
+      setMessage("Choose a password. After successful MFA and password setup, this Developer invitation will activate your HR account.");
     })().catch(e => setMessage(e instanceof Error ? e.message : "Verification unavailable."));
   }, []);
   useEffect(() => {
@@ -59,14 +75,13 @@ export default function HrInvitationCompletePage() {
       setReady(false);
       setPassword("");
       setConfirm("");
-      setCompleted(true);
-      setMessage("Password saved successfully. Your account remains an Employee until HR activation is separately approved. Redirecting you to sign in…");
+      await activate(csrf);
     } catch(e) {
       setMessage(e instanceof Error ? e.message : "Password setup unavailable.");
     } finally { setBusy(false); }
   }
   return (
-    <AuthFrame title="HR invitation verification" description="HR account access is granted only after a separate approved activation step.">
+    <AuthFrame title="HR invitation verification" description="A verified Developer invitation grants HR access when MFA, password setup and activation checks succeed.">
       <p role="status" className="mt-6 text-sm">{message}</p>
       {ready && (
         <form className="mt-5 space-y-3" onSubmit={submit}>
@@ -77,6 +92,7 @@ export default function HrInvitationCompletePage() {
           <button type="submit" disabled={busy} className="w-full rounded-md bg-primary p-3 text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save password"}</button>
         </form>
       )}
+      {retryActivation && <button type="button" className="mt-4 w-full rounded-md border border-primary p-3 text-sm font-semibold text-primary" onClick={() => void activate(csrf)}>Retry HR activation</button>}
       {!ready && !completed && <Link href="/hr-invitations/resume" className="mt-4 block text-sm text-primary underline">Reverify an existing HR invitation</Link>}
       <Link href="/login" className={completed ? "mt-5 inline-flex rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground" : "mt-5 block text-sm text-primary underline"}>{completed ? "Sign in now" : "Back to sign in"}</Link>
     </AuthFrame>
