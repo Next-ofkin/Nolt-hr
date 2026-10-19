@@ -8,6 +8,7 @@ import {
 } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
+import { useQuery } from "@tanstack/react-query";
 import { DeveloperWorkspace } from "./developer-workspace";
 import { FormsWorkspace } from "./forms-workspace";
 import { WorkspaceAccess } from "./workspace-access";
@@ -45,6 +46,25 @@ function EmployeeHome() {
     [error, setError] = useState(""),
     [preview, setPreview] = useState<FormRecord | null>(null),
     [busy, setBusy] = useState(false);
+  // TanStack Query keeps the employee checklist up-to-date after HR reviews,
+  // guarantor submissions and pack assignments without interrupting editing.
+  const { session } = useAuth();
+  const liveOnboarding = useQuery({
+    queryKey: ["employee-onboarding", session?.email],
+    enabled: Boolean(session?.email),
+    queryFn: async () => {
+      const r = await api.GET("/api/v1/me/onboarding");
+      if (r.error) throw new Error(errorMessage(r.error));
+      return r.data;
+    },
+    refetchInterval: 10000,
+  });
+  useEffect(() => {
+    if (liveOnboarding.data) {
+      setData(liveOnboarding.data);
+      setPackRefresh(value => value + 1);
+    }
+  }, [liveOnboarding.data]);
   const load = useCallback(async () => {
     setError("");
     setBusy(true);
@@ -61,18 +81,15 @@ function EmployeeHome() {
       setBusy(false);
     }
   }, []);
-  useEffect(() => {
-    void load();
-  }, [load]);
   return (
     <section className="mx-auto max-w-4xl space-y-5">
       <div>
         <p className="text-sm text-muted-foreground">Your employee workspace</p>
         <h1 className="text-3xl font-semibold">My onboarding</h1>
       </div>
-      {error && (
+      {(error || liveOnboarding.error) && (
         <div role="alert" className="rounded-lg border p-4">
-          <p>{error}</p>
+          <p>{error || (liveOnboarding.error instanceof Error ? liveOnboarding.error.message : "Could not refresh your onboarding checklist.")}</p>
           <Button onClick={() => void load()} disabled={busy}>
             Try again
           </Button>
