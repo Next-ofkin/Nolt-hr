@@ -17,7 +17,7 @@ function fakeDb(role = "HR", submitted = true) {
   const tx = {
     $queryRaw: async () => [{ id: assignmentId }],
     user: { findUnique: async () => ({
-      id: owner, active: true, role, permissions: ["forms.manage"],
+      id: owner, active: true, role, permissions: [],
     }) },
     formAssignment: { findUnique: async () => assignment },
     externalRequest: {
