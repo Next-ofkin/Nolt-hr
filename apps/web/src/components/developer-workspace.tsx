@@ -67,46 +67,46 @@ function DeveloperHome() {
   ];
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#103c38] px-6 py-9 text-white shadow-[0_24px_70px_-44px_#0b4139] sm:px-10 sm:py-11">
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 size-80 rounded-full border border-white/15 bg-emerald-300/10" />
+      <section className="relative overflow-hidden rounded-[2rem] bg-navy px-6 py-9 text-white shadow-[0_24px_70px_-44px_#010b2f] sm:px-10 sm:py-11">
+        <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 size-80 rounded-full border border-white/15 bg-bright/10" />
         <div aria-hidden className="pointer-events-none absolute -bottom-48 right-28 size-96 rounded-full border border-white/10" />
         <div className="relative max-w-3xl space-y-5">
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/25 bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-emerald-100"><Sparkles size={14}/> NOLT PEOPLE · SYSTEM OWNER</span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-bright/30 bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-sky-100"><Sparkles size={14}/> NOLT PEOPLE · SYSTEM OWNER</span>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-[2.65rem] sm:leading-tight">Good to see you, {greeting}.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/80 sm:text-base">Your command centre for people, access and account governance. Everything you need to keep NOLT HR organised, secure and ready to grow.</p>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-sky-50/80 sm:text-base">Your command centre for people, access and account governance. Everything you need to keep NOLT HR organised, secure and ready to grow.</p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-300/15 px-3 py-2 text-xs font-medium text-emerald-100"><CheckCircle2 size={15}/> Signed in with Developer access and MFA</div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-bright/20 px-3 py-2 text-xs font-medium text-sky-100"><CheckCircle2 size={15}/> Signed in with Developer access and MFA</div>
         </div>
       </section>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#008777]">Workspace overview</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">People at a glance</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Workspace overview</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">People at a glance</h2></div>
         <Button variant="outline" className="rounded-xl" disabled={loading} onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""}/> Refresh overview</Button>
       </div>
       {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800"><span>{error}</span><Button size="sm" variant="outline" onClick={()=>void load()}>Retry</Button></div>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({label,value,icon:Icon,detail})=>(
-          <div key={label} className="rounded-2xl border border-[#e4eae8] bg-white p-5 shadow-[0_12px_35px_-28px_#183d38]">
-            <div className="flex items-center justify-between"><span className="text-sm font-medium text-muted-foreground">{label}</span><span className="flex size-10 items-center justify-center rounded-xl bg-[#eaf6f1] text-[#007665]"><Icon size={19}/></span></div>
+          <div key={label} className="rounded-2xl border border-border bg-white p-5 shadow-[0_12px_35px_-28px_#0a1a5c]">
+            <div className="flex items-center justify-between"><span className="text-sm font-medium text-muted-foreground">{label}</span><span className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary"><Icon size={19}/></span></div>
             <p className="mt-4 text-4xl font-semibold tracking-tight tabular-nums">{loading ? "—" : value ?? "—"}</p><p className="mt-2 text-xs text-muted-foreground">{detail}</p>
           </div>
         ))}
       </div>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
-        <section className="overflow-hidden rounded-2xl border border-[#e4eae8] bg-white shadow-[0_12px_35px_-28px_#183d38]">
+        <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-[0_12px_35px_-28px_#0a1a5c]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5 sm:p-6">
             <div><h2 className="text-lg font-semibold tracking-tight">HR administration</h2><p className="mt-1 text-sm text-muted-foreground">HR administrators and their account status</p></div>
-            <span className="rounded-full bg-[#e9f6f0] px-3 py-1 text-xs font-semibold text-[#126c58]">Read-only overview</span>
+            <span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">Read-only overview</span>
           </div>
-          <form className="flex flex-wrap items-center gap-3 border-b bg-[#fcfdfc] px-5 py-4 sm:px-6" onSubmit={e => { e.preventDefault(); setPage(1); setAppliedSearch(search.trim()); }}>
+          <form className="flex flex-wrap items-center gap-3 border-b bg-muted/40 px-5 py-4 sm:px-6" onSubmit={e => { e.preventDefault(); setPage(1); setAppliedSearch(search.trim()); }}>
             <label className="min-w-[12rem] flex-1"><span className="sr-only">Search HR administrators by name or email</span><input value={search} onChange={e=>setSearch(e.target.value)} maxLength={120} placeholder="Search name or email" className="h-10 w-full rounded-xl border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/></label>
             <label><span className="sr-only">Filter HR account status</span><select aria-label="HR account status" value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}} className="h-10 rounded-xl border bg-white px-3 text-sm"><option value="all">All accounts</option><option value="active">Active only</option><option value="inactive">Inactive only</option></select></label>
             <Button type="submit" variant="outline" className="h-10 rounded-xl">Search</Button>
           </form>
           {loading ? <p role="status" className="p-8 text-sm text-muted-foreground">Loading administrator accounts…</p> : !data ? <p className="p-8 text-sm text-muted-foreground">Account information is unavailable.</p> : data.hrAccounts.length===0 ? <div className="px-6 py-14 text-center"><Users className="mx-auto text-muted-foreground"/><p className="mt-3 font-medium">No HR administrators found</p><p className="mt-1 text-sm text-muted-foreground">HR accounts will appear here when configured.</p></div> : <div className="divide-y">{data.hrAccounts.map(person=><div key={person.id} className="flex items-center gap-3 px-5 py-4 sm:px-6"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eaf3f1] text-sm font-semibold text-[#1a665b]">{initials(person.name)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{person.name}</p><p className="truncate text-xs text-muted-foreground">{person.email}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${person.active?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"}`}>{person.active?"Active":"Inactive"}</span></div>)}</div>}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-[#fafcfb] px-5 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/40 px-5 py-4 sm:px-6">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span aria-live="polite">{data ? `Showing ${data.hrPagination.total === 0 ? 0 : (data.hrPagination.page-1)*data.hrPagination.pageSize+1}–${Math.min(data.hrPagination.page*data.hrPagination.pageSize,data.hrPagination.total)} of ${data.hrPagination.total}` : "—"} administrators</span>
               <label className="flex items-center gap-2">Rows per page
@@ -126,7 +126,7 @@ function DeveloperHome() {
         <aside className="space-y-5">
           <HrInvitationDrafts />
           <section className="rounded-2xl border bg-white p-6">
-            <div className="flex items-center gap-2 text-[#0a7466]"><LockKeyhole size={20}/><h2 className="font-semibold">Your access, protected</h2></div>
+            <div className="flex items-center gap-2 text-primary"><LockKeyhole size={20}/><h2 className="font-semibold">Your access, protected</h2></div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">Developer permissions manage technical configuration and HR account governance. Employee records and sensitive HR reviews stay separate.</p>
             <Link href="/account" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Review your account <ArrowRight size={16}/></Link>
           </section>

@@ -20,12 +20,14 @@ export function AuthFrame({
 }) {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="hidden flex-col justify-between bg-primary p-12 text-white lg:flex">
-        <Link href="/" className="text-2xl font-bold">
-          NOLT <span className="font-normal opacity-70">People</span>
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-navy via-[#010f4c] to-[#04228a] p-12 text-white lg:flex">
+        <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 size-[28rem] rounded-full bg-bright/20 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-24 size-[26rem] rounded-full bg-primary/30 blur-3xl" />
+        <Link href="/" className="relative text-2xl font-bold tracking-tight">
+          NOLT <span className="font-normal text-bright">People</span>
         </Link>
-        <div className="max-w-lg">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] opacity-70">
+        <div className="relative max-w-lg">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-bright">
             YOUR PEOPLE, YOUR PROCESS
           </p>
           <h1 className="mt-5 text-5xl font-semibold leading-tight tracking-tight">
@@ -37,8 +39,13 @@ export function AuthFrame({
             Your forms, approvals and employee journey, protected by verified
             access.
           </p>
+          <ul className="mt-8 flex flex-wrap gap-2 text-xs font-medium">
+            {["Fast", "Secure", "Verified access"].map((t) => (
+              <li key={t} className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur">{t}</li>
+            ))}
+          </ul>
         </div>
-        <p className="text-sm opacity-70">
+        <p className="relative text-sm opacity-70">
           NOLT Finance · Employee lifecycle portal
         </p>
       </section>

@@ -275,7 +275,7 @@ export function PackAssignmentPanel({
               <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar"
                 aria-valuemin={0} aria-valuemax={pack.requiredForms} aria-valuenow={pack.approvedRequired}
                 aria-label={`${pack.packName} required forms approved`}>
-                <div className="h-full rounded-full bg-emerald-600"
+                <div className="h-full rounded-full bg-primary"
                   style={{width: `${pack.requiredForms ? pack.approvedRequired / pack.requiredForms * 100 : 0}%`}} />
               </div>
               {pack.overdue && <p role="status" className="text-xs font-semibold text-red-700">Overdue — HR follow-up needed</p>}

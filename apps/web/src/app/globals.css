@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@fontsource-variable/lexend";
 
 @custom-variant dark (&:is(.dark *));
 @theme inline {
@@ -26,28 +27,33 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: "Lexend Variable", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --color-navy: var(--navy);
+  --color-bright: var(--bright);
 }
 :root {
-  --background: #f7f8fa;
-  --foreground: #172c2b;
+  /* NOLT Finance brand: deep navy + bright blue, sampled from noltfinance.com */
+  --navy: #010b2f;
+  --bright: #2aa3fc;
+  --background: #f4f8ff;
+  --foreground: #0a1433;
   --card: #fff;
-  --card-foreground: #172c2b;
+  --card-foreground: #0a1433;
   --popover: #fff;
-  --popover-foreground: #172c2b;
-  --primary: #006b5e;
+  --popover-foreground: #0a1433;
+  --primary: #0b63ce;
   --primary-foreground: #fff;
-  --secondary: #eef3f1;
-  --secondary-foreground: #26423b;
-  --muted: #f0f2f5;
-  --muted-foreground: #626d77;
-  --accent: #e5f3ef;
-  --accent-foreground: #005448;
+  --secondary: #eef3fa;
+  --secondary-foreground: #1b2a55;
+  --muted: #eff3f9;
+  --muted-foreground: #5a6685;
+  --accent: #e6f2ff;
+  --accent-foreground: #0a3f8f;
   --destructive: #b42318;
-  --border: #e0e5e8;
-  --input: #d5dddf;
-  --ring: #008878;
-  --radius: 0.65rem;
+  --border: #dde5f1;
+  --input: #ccd7e8;
+  --ring: #018ff5;
+  --radius: 0.75rem;
 }
 @layer base {
   * {

@@ -51,11 +51,11 @@ export function WorkspaceShell({
             href={href}
             onClick={() => setMenuOpen(false)}
             aria-current={selected ? "page" : undefined}
-            className={`group flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${selected ? "bg-white text-[#123b35] shadow-sm" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+            className={`group flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${selected ? "bg-bright text-navy shadow-sm" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
           >
             <Icon size={19} aria-hidden="true" className="shrink-0" />
             <span className="min-w-0 flex-1">{label}</span>
-            {selected && <ChevronRight size={15} aria-hidden="true" className="text-[#0a7165]" />}
+            {selected && <ChevronRight size={15} aria-hidden="true" className="text-navy" />}
           </Link>
         );
       })}
@@ -75,7 +75,7 @@ export function WorkspaceShell({
       <aside
         id="nolt-workspace-sidebar"
         aria-label="Workspace sidebar"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-[#123b35] text-white shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[260px] lg:shrink-0 lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-navy text-white shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-[260px] lg:shrink-0 lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-2 px-5 pb-6 pt-7">
           <Link
@@ -84,7 +84,7 @@ export function WorkspaceShell({
             aria-label={`${brand.name} ${brand.productName} home`}
             className="flex min-w-0 items-center gap-3"
           >
-            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/95 text-xl font-extrabold text-[#0c675e] shadow-sm">
+            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/95 text-xl font-extrabold text-navy shadow-sm">
               {brand.logoPath ? <img src={brand.logoPath} alt="" className="size-full object-contain" /> : brand.name.slice(0,1)}
             </span>
             <span className="min-w-0">
