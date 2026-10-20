@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { useQuery } from "@tanstack/react-query";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -43,24 +42,14 @@ export function PackAssignmentPanel({ caseId, employeeId, employmentType, csrfTo
   }, [caseId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  // Keep a single visibility-aware refresh timer. Avoid competing React Query
+  // polling and interval requests against the same case and pack endpoints.
   useEffect(() => {
-    const timer = window.setInterval(() => { if (!busy) void refresh(); }, 15000);
+    const timer = window.setInterval(() => {
+      if (!busy && document.visibilityState === "visible") void refresh();
+    }, 60000);
     return () => window.clearInterval(timer);
   }, [refresh, busy]);
-  const livePacks = useQuery({
-    queryKey: ["hr-case-packs", caseId],
-    queryFn: async () => {
-      const r = await fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, {
-        credentials: "same-origin", cache: "no-store",
-      });
-      if (!r.ok) throw new Error("Could not refresh pack progress");
-      return await r.json() as Progress[];
-    },
-    refetchInterval: 12000,
-  });
-  useEffect(() => {
-    if (livePacks.data) setExisting(livePacks.data);
-  }, [livePacks.data]);
 
   const latestPublished = new Map<string, Pack>();
   for (const pack of packs) {
