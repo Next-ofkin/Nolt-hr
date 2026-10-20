@@ -100,7 +100,7 @@ export function EmployeesWorkspace() {
   // Read-only background synchronization; mutations still use their explicit
   // CSRF-protected actions and the selected employee does not change.
   const directoryQuery = useQuery({
-    queryKey: ["hr-employees", session?.email, page, pageCursors[page], q, department, employmentType, caseStatus, startFrom, startTo],
+    queryKey: ["hr-employees", session?.id, page, pageCursors[page], q, department, employmentType, caseStatus, startFrom, startTo],
     enabled: Boolean(session),
     queryFn: async () => {
       const r = await api.GET("/api/v1/employees", {
@@ -116,7 +116,7 @@ export function EmployeesWorkspace() {
       if (r.error) throw new Error(errorMessage(r.error));
       return r.data;
     },
-    refetchInterval: 15000,
+    staleTime: 30_000,
   });
   useEffect(() => {
     if (directoryQuery.data) {
@@ -132,7 +132,7 @@ export function EmployeesWorkspace() {
     }
   }, [directoryQuery.error]);
   const selectedEmployeeQuery = useQuery({
-    queryKey: ["hr-employee-detail", session?.email, detail?.employee.id],
+    queryKey: ["hr-employee-detail", session?.id, detail?.employee.id],
     enabled: Boolean(session && detail?.employee.id && !editing && !reviewingAssignmentId),
     queryFn: async () => {
       const id = detail?.employee.id;
@@ -141,7 +141,7 @@ export function EmployeesWorkspace() {
       if (r.error) throw new Error(errorMessage(r.error));
       return r.data;
     },
-    refetchInterval: 12000,
+    staleTime: 20_000,
   });
   useEffect(() => {
     if (selectedEmployeeQuery.data && !editing && !reviewingAssignmentId &&
