@@ -130,7 +130,15 @@ export class HrExportService {
       if(raw===null || raw===undefined || raw==="") {doc.text("(Not answered)",10);continue;}
       if(["passport_photo","signature","file"].includes(f.type??"")) {
         if(typeof raw!=="string" || !/^[0-9a-f-]{36}$/i.test(raw)) {doc.text("(Attachment unavailable)",10);continue;}
-        const file=await this.files.downloadFile(userId,raw);
+        // Validate evidence belongs to this assignment and field, not merely to any HR-accessible case.
+        const stored = await this.db.storedFile.findFirst({where:{
+          assignmentId,
+          fieldId:f.id,
+          OR:[{id:raw},{signature:{is:{id:raw}}}],
+          status:"CONFIRMED",scanStatus:"CLEAN",
+        }});
+        if(!stored) {doc.text("(Verified attachment unavailable)",10);continue;}
+        const file=await this.files.downloadFile(userId,stored.id);
         if(f.type==="file") {
           const filename=safe(file.fileName);
           supporting.push({name:`Supporting_Documents/${safe(a.formVersion.title)}/${String(supporting.length+1).padStart(2,"0")}_${filename}`,bytes:file.buffer});
