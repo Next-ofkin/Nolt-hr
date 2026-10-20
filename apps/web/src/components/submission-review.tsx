@@ -246,9 +246,7 @@ export function SubmissionReview({
         >
           <h3 className="font-semibold">Assign review access</h3>
           <p className="text-sm text-muted-foreground">
-            Only the case owner can choose a reviewer and classify this form.
-            Health and financial permissions remain separate from this
-            assignment.
+            Assign the HR colleague who will approve this form or request changes. New HR accounts do not automatically receive access. The case creator must assign a reviewer, and health/financial permissions require separate authorisation.
           </p>
           <div className="space-y-2">
             <Label htmlFor="reviewer-email">Reviewer email</Label>
@@ -285,8 +283,7 @@ export function SubmissionReview({
             </select>
           </div>
           <p className="text-xs text-muted-foreground">
-            This initial review assignment is immutable. Reassignment
-            administration will be added separately.
+            Review access is locked after assignment for audit integrity. Check the reviewer email before saving.
           </p>
           <Button type="submit" disabled={busy || !sensitivity}>
             Save review access
@@ -295,8 +292,7 @@ export function SubmissionReview({
       )}
       {access && !access.canConfigure && !access.canReview && !loading && (
         <p role="status">
-          Review access is assigned to another account or requires additional
-          sensitive-data permissions.
+          You cannot approve or request changes yet. Ask the HR colleague who opened this onboarding case to assign you as the reviewer. If another reviewer is already assigned or sensitive-data access is missing, an authorised administrator must resolve this.
         </p>
       )}
 

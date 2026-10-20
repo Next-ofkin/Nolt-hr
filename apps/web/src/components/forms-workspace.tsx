@@ -212,6 +212,10 @@ export function FormsWorkspace() {
         />
       ) : (
         <>
+          <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+            <strong>Form workflow:</strong> Create draft → add fields → save and preview → publish → open Onboarding packs to group published forms → assign the pack from an employee's checklist.
+            <p className="mt-1 text-xs text-muted-foreground">Published forms are locked. For changes, create a new form version; employees already assigned an earlier version keep it for audit history.</p>
+          </div>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold tracking-[0.15em] text-primary">
@@ -221,8 +225,7 @@ export function FormsWorkspace() {
                 Form library
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                Create the forms your people need. Keep every question,
-                signature request and version in one place.
+                Start with a draft, add questions and preview it, then publish the form. Only published versions are available when building onboarding packs.
               </p>
             </div>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
