@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ArrowDown, ArrowUp, FileStack, Loader2, Plus, RefreshCw, Save, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "./auth-provider";
@@ -32,16 +32,12 @@ async function readJson<T>(url: string): Promise<T> {
 
 export function PacksWorkspace() {
   const { session } = useAuth();
-  const cache = useQueryClient();
-  const [packs, setPacks] = useState<Pack[]>([]);
   const [confirmPublish, setConfirmPublish] = useState<Pack | null>(null);
-  const [forms, setForms] = useState<FormVersion[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [employmentType, setEmploymentType] = useState("");
   const [selected, setSelected] = useState<Selected[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -49,6 +45,32 @@ export function PacksWorkspace() {
   const [editing, setEditing] = useState<{ id: string; revision: number } | null>(null);
 
   const [historyRoot, setHistoryRoot] = useState<string | null>(null);
+
+  const packKey = ["hr-pack-library", session?.id];
+  const formKey = ["hr-published-forms", session?.id];
+  const packQuery = useQuery({
+    queryKey: packKey,
+    enabled: Boolean(session),
+    queryFn: () => readJson<Pack[]>("/api/v1/packs"),
+  });
+  const formQuery = useQuery({
+    queryKey: formKey,
+    enabled: Boolean(session),
+    queryFn: () => readJson<FormVersion[]>("/api/v1/forms/published"),
+  });
+  const packs = packQuery.data ?? [];
+  const formRecords = formQuery.data;
+  const forms = useMemo(() => (formRecords ?? []).filter(form => form.status === "PUBLISHED"), [formRecords]);
+  const loading = packQuery.isLoading || formQuery.isLoading;
+  const { refetch: refetchPacks } = packQuery;
+  const { refetch: refetchForms } = formQuery;
+  const refresh = useCallback(async (_force = false) => {
+    await Promise.all([refetchPacks(), refetchForms()]);
+  }, [refetchPacks, refetchForms]);
+  const loadFailure = (packQuery.error ?? formQuery.error) as Error | null;
+  useEffect(() => {
+    if (loadFailure && !packQuery.data) setError(loadFailure.message || "Could not load the pack builder.");
+  }, [loadFailure, packQuery.data]);
   const families = useMemo(() => {
     const families = new Map<string, Pack[]>();
     for (const pack of packs) {
@@ -59,28 +81,6 @@ export function PacksWorkspace() {
       root, versions: versions.sort((a,b) => b.versionNumber - a.versionNumber),
     })).sort((a,b) => b.versions[0].createdAt.localeCompare(a.versions[0].createdAt));
   }, [packs]);
-
-  const refresh = useCallback(async (force = false) => {
-    if (!session) { setPacks([]); setForms([]); setLoading(false); return; }
-    setLoading(true); setError("");
-    try {
-      const packKey = ["hr-pack-library", session.id];
-      const formKey = ["hr-published-forms", session.id];
-      if (force) await Promise.all([
-        cache.invalidateQueries({queryKey: packKey, refetchType: "none"}),
-        cache.invalidateQueries({queryKey: formKey, refetchType: "none"}),
-      ]);
-      const [packRecords, formRecords] = await Promise.all([
-        cache.fetchQuery({queryKey: packKey, queryFn: () => readJson<Pack[]>("/api/v1/packs"), staleTime: 300_000}),
-        cache.fetchQuery({queryKey: formKey, queryFn: () => readJson<FormVersion[]>("/api/v1/forms/published"), staleTime: 300_000}),
-      ]);
-      setPacks(packRecords);
-      setForms(formRecords.filter(form => form.status === "PUBLISHED"));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the pack builder.");
-    } finally { setLoading(false); }
-  }, [cache, session?.id]);
-  useEffect(() => { if (session) void refresh(); }, [refresh, session?.id]);
 
   const available = useMemo(() => forms.filter(form =>
     !selected.some(item => item.formId === form.formId) &&

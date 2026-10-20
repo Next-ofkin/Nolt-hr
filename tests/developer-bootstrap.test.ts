@@ -34,7 +34,7 @@ test("developer bootstrap refuses unverified identities and accounts without TOT
 });
 
 test("developer bootstrap cannot convert existing HR accounts or assigned employees", () => {
-  for (const role of ["HR", "HR_REVIEWER", "SYSTEM_ADMIN", "DEVELOPER"])
+  for (const role of ["HR", "DEVELOPER"])
     assert.throws(() => assertEligibleDeveloper({ ...valid, role }, address, userId), /Only an unassigned/);
   assert.throws(() => assertEligibleDeveloper({ ...valid, has_employee_record: true }, address, userId), /Only an unassigned/);
   assert.throws(() => assertEligibleDeveloper({ ...valid, app_email: "another@example.test" }, address, userId), /do not match/);

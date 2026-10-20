@@ -197,7 +197,7 @@ test("real MFA HR session preserves form versions, stale writes, audit and concu
         ["FORM_CREATED", "FORM_DRAFT_SAVED", "FORM_PUBLISHED"].sort(),
       );
       await db.query('UPDATE public."User" SET role=$1 WHERE id=$2', [
-        "HR_REVIEWER",
+        "DEVELOPER",
         user.id,
       ]);
     } finally {

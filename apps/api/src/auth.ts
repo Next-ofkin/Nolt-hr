@@ -143,7 +143,7 @@ export class AuthController {
   ) {}
   private protect(req: Request) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
   }
   @Get("config") @ApiOkResponse({ type: AuthConfigDto }) config() {
     return {

@@ -57,7 +57,7 @@ test("developer provisioning account cannot access evidence without HR role gran
 });
 
 test("authorised HR administrator role can review colleague evidence", async () => {
-  const { db } = fakeDb("HR_ADMIN");
+  const { db } = fakeDb("HR");
   const service = new ExternalEvidenceReviewService(db as never);
   const evidence = await service.detail(colleague, assignmentId);
   assert.equal(evidence.items.length, 1);
