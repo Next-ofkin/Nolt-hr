@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -31,7 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pendingRefresh = useRef<Promise<void> | null>(null);
   const queryClient = useQueryClient();
   const cachedIdentity = useRef<string | null>(null);
-  useEffect(() => {
+  // Layout effect: runs before child queries start, so the cache clear on a new
+  // identity cannot cancel the first in-flight page requests (CancelledError).
+  useLayoutEffect(() => {
     // Memory-only HR data must never outlive a sign-out or user switch.
     // CSRF token is unique to the session, even when the same HR signs in again.
     const identity = session ? `${session.id}:${session.csrfToken}` : null;
