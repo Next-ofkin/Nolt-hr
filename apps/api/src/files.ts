@@ -663,8 +663,13 @@ export class FilesService {
     userId: string,
     fileId: string,
   ): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> {
+    // Signatures store a SignatureEvidence ID in form answers, not a StoredFile ID.
+    const signature = await this.db.signatureEvidence.findUnique({
+      where: { id: fileId }, select: { fileId: true },
+    });
+    const resolvedFileId = signature?.fileId ?? fileId;
     const file = await this.db.storedFile.findUnique({
-      where: { id: fileId },
+      where: { id: resolvedFileId },
       include: {
         assignment: {
           include: {
@@ -754,6 +759,24 @@ export class FilesController {
     @Body() b: unknown,
   ) {
     return this.service.captureSignature(r.actor.id, id, b);
+  }
+
+  @Get("files/:id/preview")
+  @ApiOkResponse({ description: "Authenticated inline preview of a clean PDF or image" })
+  async preview(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, fileName, mimeType } = await this.service.downloadFile(r.actor.id, id);
+    if (!["application/pdf", "image/png", "image/jpeg"].includes(mimeType))
+      throw new ForbiddenException("This attachment cannot be previewed.");
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.send(buffer);
   }
 
   @Get("files/:id/download")
