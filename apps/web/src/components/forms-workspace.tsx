@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "./auth-provider";
 import {
   ArrowLeft,
   ArrowRight,
@@ -94,6 +96,8 @@ const names = {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 export function FormsWorkspace() {
+  const { session } = useAuth();
+  const cache = useQueryClient();
   const [forms, setForms] = useState<FormRecord[]>([]),
     [active, setActive] = useState<FormRecord | null>(null),
     [csrf, setCsrf] = useState<string | null>(null),
@@ -112,30 +116,28 @@ export function FormsWorkspace() {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
   }>({ defaultValues: { title: "", recipient: "EMPLOYEE" } });
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
+    if (!session) { setCsrf(null); setForms([]); setLoading(false); return; }
+    setCsrf(session.csrfToken);
     setLoading(true);
     try {
-      const session = await api.GET("/api/v1/auth/session");
-      if (session.data) setCsrf(session.data.csrfToken);
-      const { data, error, response } = await api.GET("/api/v1/forms");
-      if (response.status === 401) {
-        setCsrf(null);
-        return;
-      }
-      if (error) throw new Error(errorMessage(error));
-      setForms((data ?? []).map(normaliseForm));
-    } catch (error) {
-      setNotice({
-        kind: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Could not connect to the API.",
+      const key = ["hr-form-library", session.id];
+      if (force) await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
+      const forms = await cache.fetchQuery({
+        queryKey: key,
+        staleTime: 30_000,
+        queryFn: async () => {
+          const { data, error, response } = await api.GET("/api/v1/forms");
+          if (response.status === 401) throw new Error("Your session expired. Sign in again.");
+          if (error) throw new Error(errorMessage(error));
+          return (data ?? []).map(normaliseForm);
+        },
       });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      setForms(forms);
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Could not load forms." });
+    } finally { setLoading(false); }
+  }, [cache, session?.id, session?.csrfToken]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -161,7 +163,7 @@ export function FormsWorkspace() {
       setActive(record);
       setCreateOpen(false);
       reset();
-      await refresh();
+      await refresh(true);
     } catch (error) {
       setNotice({
         kind: "error",
@@ -205,7 +207,7 @@ export function FormsWorkspace() {
           csrf={csrf ?? ""}
           onBack={() => {
             setActive(null);
-            void refresh();
+            void refresh(true);
           }}
           onChange={setActive}
           onNotice={setNotice}
