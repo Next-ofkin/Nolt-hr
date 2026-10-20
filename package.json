@@ -41,7 +41,7 @@
     "scanner:test": "node scripts/test-clamav.mjs",
     "build:api": "npm run db:generate && npm run contracts:build && npm run build -w @nolt/api && npx tsx --test tests/session-fast-path.test.ts tests/hr-export.test.ts",
     "start:api": "node apps/api/dist/main.js",
-    "build:web": "npm run contracts:build && npm run build -w @nolt/web",
+    "build:web": "npm run contracts:build && npm run build -w @nolt/web && npx tsx --test tests/employee-pack-grouping.test.ts",
     "start:web": "npm run start:railway -w @nolt/web",
     "auth:hr:preflight": "node scripts/hr-activation-preflight.mjs",
     "auth:hr:provider-check": "node scripts/hr-provider-readonly-check.mjs",
