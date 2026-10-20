@@ -17,6 +17,8 @@ import { Button } from "./ui/button";
 import { EmployeeResponse } from "./employee-response";
 import { ExternalContact } from "./external-contact";
 import { MyPackProgress } from "./my-pack-progress";
+import { StatusChip } from "./status-chip";
+import { CheckCircle2, CircleDashed, Hourglass, TriangleAlert } from "lucide-react";
 export function HomeWorkspace() {
   const { session } = useAuth();
   useEffect(() => {
@@ -104,14 +106,11 @@ function EmployeeHome() {
       )}
       {data?.employee && (
         <>
-          <div className="rounded-xl border bg-white p-6">
-            <h2 className="break-words text-xl font-semibold">
-              Welcome, {data.employee.fullName}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {data.employee.department} · {data.employee.jobTitle}
-            </p>
-          </div>
+          <OnboardingHero
+            name={data.employee.fullName}
+            subtitle={`${data.employee.department} · ${data.employee.jobTitle}`}
+            statuses={data.onboardingCase?.assignments.map((a) => a.status) ?? []}
+          />
           {!data.onboardingCase ? (
             <p>HR has not opened your onboarding case yet.</p>
           ) : (
@@ -145,27 +144,10 @@ function EmployeeHome() {
                     <h2 className="break-words font-semibold">
                       {a.title} · v{a.version}
                     </h2>
-                    <p className="text-sm">
-                      {a.required ? "Required" : "Optional"} ·{" "}
-                      {a.status === "EXTERNAL_SUBMITTED" ? (
-                        <span>Guarantor submitted — awaiting HR follow-up</span>
-                      ) : a.status === "APPROVED" ? (
-                        <span className="font-medium text-green-700">
-                          Approved
-                        </span>
-                      ) : a.status === "CHANGES_REQUIRED" ? (
-                        <span className="font-semibold text-amber-700">
-                          Changes requested — action required
-                        </span>
-                      ) : a.status === "SUBMITTED" ? (
-                        <span>Submitted — awaiting HR review</span>
-                      ) : a.status === "DRAFT" ? (
-                        <span>Draft saved</span>
-                      ) : (
-                        <span>Not started</span>
-                      )}
-                      {a.dueDate ? ` · Due ${a.dueDate}` : ""}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <StatusChip status={a.status} label={a.status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted — awaiting HR" : a.status === "SUBMITTED" ? "Submitted — awaiting HR review" : a.status === "CHANGES_REQUIRED" ? "Changes requested — action required" : undefined} />
+                      <span>{a.required ? "Required" : "Optional"}{a.dueDate ? ` · Due ${a.dueDate}` : ""}</span>
+                    </div>
                     {a.recipient === "EMPLOYEE" ? (
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -254,5 +236,51 @@ function EmployeeHome() {
         </div>
       )}
     </section>
+  );
+}
+
+function OnboardingHero({ name, subtitle, statuses }: { name: string; subtitle: string; statuses: string[] }) {
+  const total = statuses.length;
+  const count = (...k: string[]) => statuses.filter((x) => k.includes(x)).length;
+  const done = count("APPROVED");
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const cards = [
+    { label: "Approved", value: done, icon: CheckCircle2, tint: "bg-emerald-50 text-emerald-700" },
+    { label: "Awaiting HR", value: count("SUBMITTED", "EXTERNAL_SUBMITTED"), icon: Hourglass, tint: "bg-indigo-50 text-indigo-700" },
+    { label: "Action needed", value: count("CHANGES_REQUIRED"), icon: TriangleAlert, tint: "bg-amber-50 text-amber-700" },
+    { label: "To do", value: count("NOT_STARTED", "DRAFT"), icon: CircleDashed, tint: "bg-accent text-primary" },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-[#010f4c] to-[#04228a] p-6 text-white sm:p-8">
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-bright/25 blur-3xl" />
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-bright">Your onboarding</p>
+          <h2 className="mt-2 break-words text-2xl font-semibold tracking-tight sm:text-3xl">Welcome, {name}</h2>
+          <p className="mt-1 text-sm text-sky-100/80">{subtitle}</p>
+          {total > 0 && (
+            <div className="mt-6 max-w-md">
+              <div className="mb-2 flex justify-between text-xs font-medium text-sky-100">
+                <span>{done} of {total} forms approved</span><span>{pct}%</span>
+              </div>
+              <div role="progressbar" aria-label="Onboarding progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="h-2.5 overflow-hidden rounded-full bg-white/15">
+                <div className="h-full rounded-full bg-bright transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {total > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {cards.map(({ label, value, icon: Icon, tint }) => (
+            <div key={label} className="rounded-2xl border bg-white p-4 shadow-sm">
+              <span className={`flex size-9 items-center justify-center rounded-xl ${tint}`}><Icon size={18} aria-hidden="true" /></span>
+              <p className="mt-3 text-3xl font-semibold tabular-nums">{value}</p>
+              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

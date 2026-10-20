@@ -196,7 +196,8 @@ export function PackAssignmentPanel({
 
   const { assignmentsById: assignmentMap, standalone: standaloneForms } = splitAssignmentsByPack(assignments, existing);
 
-  return <section className="space-y-4 rounded-xl border bg-muted/20 p-4 sm:p-5">\n    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>{confirmation === "mismatch" ? "Employment type mismatch" : "Approve onboarding pack?"}</DialogTitle><DialogDescription>{confirmation === "mismatch" ? `This pack is for ${selectedPack?.employmentType ?? "another employment type"}, but this employee is listed as ${employmentType}. Assigning it anyway will be recorded in the audit history.` : "Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (confirmation === "mismatch") void assign(true); else if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>{confirmation === "mismatch" ? "Assign anyway" : "Approve pack"}</Button></div></DialogContent></Dialog>
+  return <section className="space-y-4 rounded-xl border bg-muted/20 p-4 sm:p-5">
+    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>{confirmation === "mismatch" ? "Employment type mismatch" : "Approve onboarding pack?"}</DialogTitle><DialogDescription>{confirmation === "mismatch" ? `This pack is for ${selectedPack?.employmentType ?? "another employment type"}, but this employee is listed as ${employmentType}. Assigning it anyway will be recorded in the audit history.` : "Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (confirmation === "mismatch") void assign(true); else if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>{confirmation === "mismatch" ? "Assign anyway" : "Approve pack"}</Button></div></DialogContent></Dialog>
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
       <p className="mt-1 text-xs text-muted-foreground">Assign all forms from a published pack to this active onboarding case.</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -275,7 +276,7 @@ export function PackAssignmentPanel({
               <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar"
                 aria-valuemin={0} aria-valuemax={pack.requiredForms} aria-valuenow={pack.approvedRequired}
                 aria-label={`${pack.packName} required forms approved`}>
-                <div className="h-full rounded-full bg-emerald-600"
+                <div className="h-full rounded-full bg-primary"
                   style={{width: `${pack.requiredForms ? pack.approvedRequired / pack.requiredForms * 100 : 0}%`}} />
               </div>
               {pack.overdue && <p role="status" className="text-xs font-semibold text-red-700">Overdue — HR follow-up needed</p>}

@@ -19,6 +19,6 @@ export const brand = Object.freeze({
   productName: text(process.env.NEXT_PUBLIC_PRODUCT_NAME, "HR", 50),
   description: text(process.env.NEXT_PUBLIC_BRAND_DESCRIPTION,
     "Employee onboarding and HR workspace", 160),
-  primary: colour(process.env.NEXT_PUBLIC_BRAND_PRIMARY, "#006b5e"),
+  primary: colour(process.env.NEXT_PUBLIC_BRAND_PRIMARY, "#0b63ce"),
   logoPath: logo(process.env.NEXT_PUBLIC_BRAND_LOGO_PATH),
 });
