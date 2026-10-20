@@ -1,8 +1,7 @@
 "use client";
-import { useLiveRefresh } from "@/lib/live-refresh";
-
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Building2, CheckCircle2, Clock3, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Users, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { HrInvitationDrafts } from "./hr-invitation-drafts";
@@ -24,30 +23,28 @@ export function DeveloperWorkspace() {
 
 function DeveloperHome() {
   const { session } = useAuth();
-  const [data, setData] = useState<Overview | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const load = useCallback(async (silent = false) => {
-    if (!silent) { setLoading(true); setError(""); }
-    try {
+  const overviewQuery = useQuery({
+    queryKey: ["developer-overview", page, pageSize, appliedSearch, status],
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
       const response = await fetch(`/api/v1/developer/overview?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(appliedSearch)}&status=${status}`, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your account does not have Developer administration access." : "We couldn't retrieve the account overview. Please try again.");
-      const overview: Overview = await response.json();
-      setData(overview);
-      if (overview.hrPagination.page > overview.hrPagination.totalPages) setPage(overview.hrPagination.totalPages);
-    } catch (e) {
-      if (!silent) setError(e instanceof Error ? e.message : "Could not load the Developer workspace.");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [page, pageSize, appliedSearch, status]);
-  useEffect(() => { void load(); }, [load]);
-  useLiveRefresh(() => load(true));
+      return await response.json() as Overview;
+    },
+  });
+  const data = overviewQuery.data ?? null;
+  const loading = overviewQuery.isPending;
+  const error = overviewQuery.error && !overviewQuery.data ? overviewQuery.error.message : "";
+  const { refetch: refetchOverview } = overviewQuery;
+  const load = useCallback(async () => { await refetchOverview(); }, [refetchOverview]);
+  useEffect(() => {
+    if (data && data.hrPagination.page > data.hrPagination.totalPages) setPage(Math.max(1, data.hrPagination.totalPages));
+  }, [data]);
 
   const greeting = session?.name?.trim().split(/\s+/)[0] || "Developer";
   const stats = [

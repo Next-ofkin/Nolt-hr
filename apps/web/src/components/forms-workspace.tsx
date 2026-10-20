@@ -1,8 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useLiveRefresh } from "@/lib/live-refresh";
 import { useForm } from "react-hook-form";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-provider";
 import {
   ArrowLeft,
@@ -99,10 +98,7 @@ type Notice = { kind: "success" | "error"; text: string } | null;
 export function FormsWorkspace() {
   const { session } = useAuth();
   const cache = useQueryClient();
-  const [forms, setForms] = useState<FormRecord[]>([]),
-    [active, setActive] = useState<FormRecord | null>(null),
-    [csrf, setCsrf] = useState<string | null>(null),
-    [loading, setLoading] = useState(true),
+  const [active, setActive] = useState<FormRecord | null>(null),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState<Notice>(null),
     [search, setSearch] = useState(""),
@@ -117,35 +113,29 @@ export function FormsWorkspace() {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
   }>({ defaultValues: { title: "", recipient: "EMPLOYEE" } });
-  const refresh = useCallback(async (force = false, silent = false) => {
-    if (!session) { setCsrf(null); setForms([]); setLoading(false); return; }
-    setCsrf(session.csrfToken);
-    if (!silent) setLoading(true);
-    try {
-      const key = ["hr-form-library", session.id];
-      if (force) await Promise.all([
-        cache.invalidateQueries({ queryKey: key, refetchType: "none" }),
-        cache.invalidateQueries({ queryKey: ["hr-published-forms", session.id], refetchType: "none" }),
-      ]);
-      const forms = await cache.fetchQuery({
-        queryKey: key,
-        staleTime: 30_000,
-        queryFn: async () => {
-          const { data, error, response } = await api.GET("/api/v1/forms");
-          if (response.status === 401) throw new Error("Your session expired. Sign in again.");
-          if (error) throw new Error(errorMessage(error));
-          return (data ?? []).map(normaliseForm);
-        },
-      });
-      setForms(forms);
-    } catch (error) {
-      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Could not load forms." });
-    } finally { setLoading(false); }
-  }, [cache, session?.id, session?.csrfToken]);
+  const formsKey = ["hr-form-library", session?.id];
+  const formsQuery = useQuery({
+    queryKey: formsKey,
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/api/v1/forms");
+      if (response.status === 401) throw new Error("Your session expired. Sign in again.");
+      if (error) throw new Error(errorMessage(error));
+      return (data ?? []).map(normaliseForm);
+    },
+  });
+  const forms = formsQuery.data ?? [];
+  const loading = formsQuery.isLoading;
+  const csrf = session?.csrfToken ?? null;
+  const { refetch: refetchForms } = formsQuery;
+  const refresh = useCallback(async (force = false) => {
+    if (force) await cache.invalidateQueries({ queryKey: ["hr-published-forms", session?.id], refetchType: "none" });
+    await refetchForms();
+  }, [cache, session?.id, refetchForms]);
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-  useLiveRefresh(() => refresh(false, true), Boolean(session) && !busy && !createOpen);
+    if (formsQuery.error && !formsQuery.data)
+      setNotice({ kind: "error", text: formsQuery.error instanceof Error ? formsQuery.error.message : "Could not load forms." });
+  }, [formsQuery.error, formsQuery.data]);
   useEffect(() => {
     if (!notice) return;
     if (notice.kind === "error") toast.error(notice.text);

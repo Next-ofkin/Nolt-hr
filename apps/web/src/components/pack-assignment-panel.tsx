@@ -1,11 +1,10 @@
 "use client";
-import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { EmployeeAssignmentCard, type EmployeeAssignment } from "./employee-assignment-card";
 import { ChevronDown, FileStack, PackageOpen } from "lucide-react";
 import { splitAssignmentsByPack } from "@/lib/split-assignments-by-pack";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-provider";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
@@ -29,9 +28,6 @@ export function PackAssignmentPanel({
 }) {
   const { session } = useAuth();
   const cache = useQueryClient();
-  const [packs, setPacks] = useState<Pack[]>([]);
-  const [existing, setExisting] = useState<Progress[]>([]);
-  const [progressLoaded, setProgressLoaded] = useState(false);
   const [packId, setPackId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [extension, setExtension] = useState<{id:string; date:string; reason:string} | null>(null);
@@ -41,34 +37,37 @@ export function PackAssignmentPanel({
   const [confirmation, setConfirmation] = useState<"mismatch" | "approve" | null>(null);
   const [approvalId, setApprovalId] = useState<string | null>(null);
 
+  const libraryKey = ["hr-pack-library", session?.id];
+  const libraryQuery = useQuery({
+    queryKey: libraryKey,
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const r = await fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load published packs.");
+      return await r.json() as Pack[];
+    },
+  });
+  const progressQuery = useQuery({
+    queryKey: ["hr-case-packs", caseId],
+    queryFn: async () => {
+      const r = await fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, { credentials: "same-origin", cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load assigned packs.");
+      return await r.json() as Progress[];
+    },
+  });
+  const packs = libraryQuery.data ?? [];
+  const existing = progressQuery.data ?? [];
+  const progressLoaded = progressQuery.isSuccess;
+  const { refetch: refetchLibrary } = libraryQuery;
+  const { refetch: refetchProgress } = progressQuery;
   const refresh = useCallback(async () => {
-    try {
-      const [packList, response] = await Promise.all([
-        cache.fetchQuery({
-          queryKey: ["hr-pack-library", session?.id],
-          queryFn: async () => {
-            const r = await fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" });
-            if (!r.ok) throw new Error("Unable to load published packs.");
-            return r.json() as Promise<Pack[]>;
-          },
-          staleTime: 30_000,
-        }),
-        fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, { credentials: "same-origin", cache: "no-store" }),
-      ]);
-      if (!response.ok) throw new Error("Unable to load assigned packs.");
-      setPacks(packList);
-      setExisting(await response.json() as Progress[]);
-      setProgressLoaded(true);
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load assigned packs.");
-    }
-  }, [caseId, cache, session?.id]);
-
-  useEffect(() => { void refresh(); }, [refresh]);
-  // Keep a single visibility-aware refresh timer. Avoid competing React Query
-  // polling and interval requests against the same case and pack endpoints.
-  useLiveRefresh(() => refresh(), !busy);
+    await Promise.all([refetchLibrary(), refetchProgress()]);
+  }, [refetchLibrary, refetchProgress]);
+  const loadError = (progressQuery.error ?? libraryQuery.error) as Error | null;
+  useEffect(() => {
+    if (loadError && !progressQuery.data) setError(loadError.message);
+    else if (!loadError) setError(current => current === "Unable to load assigned packs." || current === "Unable to load published packs." ? "" : current);
+  }, [loadError, progressQuery.data]);
 
   const latestPublished = new Map<string, Pack>();
   for (const pack of packs) {
@@ -114,7 +113,7 @@ export function PackAssignmentPanel({
       const publishedResponse = await fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" });
       if (!publishedResponse.ok) throw new Error("Unable to refresh the published packs.");
       const published = await publishedResponse.json() as Pack[];
-      setPacks(published);
+      cache.setQueryData(libraryKey, published);
       const chosen = published.find(p => p.id === requestedPackId && p.status === "PUBLISHED");
       const newer = chosen && published.some(p =>
         p.status === "PUBLISHED" &&

@@ -1,6 +1,6 @@
 "use client";
-import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ClipboardCheck, Clock3, Loader2, UserPlus, XCircle } from "lucide-react";
 import { useAuth } from "./auth-provider";
@@ -11,29 +11,31 @@ type Draft = { id: string; name: string; email: string; state: string; createdAt
 const endpoint = "/api/v1/developer/hr-invitation-drafts";
 export function HrInvitationDrafts() {
   const { session } = useAuth();
-  const [items, setItems] = useState<Draft[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(true);
   const [sendAvailable, setSendAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmSendId, setConfirmSendId] = useState<string | null>(null);
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
+  const draftsQuery = useQuery({
+    queryKey: ["hr-invitation-drafts", session?.id],
+    enabled: Boolean(session),
+    queryFn: async () => {
       const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error("Could not load HR invitation drafts.");
-      const value: {items: Draft[]} = await response.json();
-      setItems(value.items);
-    } catch(e) { if (!silent) setError(e instanceof Error ? e.message : "Could not load drafts."); }
-    finally { if (!silent) setLoading(false); }
-  }, []);
-  useEffect(() => { void load(); }, [load]);
+      return ((await response.json()) as { items: Draft[] }).items;
+    },
+  });
+  const items = draftsQuery.data ?? [];
+  const loading = draftsQuery.isLoading;
+  const { refetch: refetchDrafts } = draftsQuery;
+  const load = useCallback(async () => { await refetchDrafts(); }, [refetchDrafts]);
+  useEffect(() => {
+    if (draftsQuery.error && !draftsQuery.data) setError(draftsQuery.error.message);
+  }, [draftsQuery.error, draftsQuery.data]);
   // Server-driven delivery jobs finish asynchronously. Refresh visible dashboards
   // without full-page reloads, and fetch immediately when the tab regains focus.
-  useLiveRefresh(() => load(true), !busy);
   useEffect(() => {
     let active = true;
     void fetch("/api/v1/developer/overview", { credentials: "same-origin", cache: "no-store" })
