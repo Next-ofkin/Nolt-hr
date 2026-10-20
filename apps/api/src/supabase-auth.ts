@@ -488,6 +488,30 @@ export class SupabaseAuth {
       encrypted: checked.encrypted,
     };
   }
+  // The JWT expiry is only a scheduling hint. It never authenticates a user:
+  // validate() still performs the provider MFA, revocation and membership proofs.
+  canValidateWithoutSessionLock(encrypted: string, now = Date.now()): boolean {
+    try {
+      const tokens = unseal<Tokens>(encrypted);
+      const payload = tokens.access_token.split(".")[1];
+      if (!payload) return false;
+      const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: unknown };
+      return typeof exp === "number" && Number.isFinite(exp) &&
+        exp * 1000 > now + 120_000;
+    } catch {
+      return false;
+    }
+  }
+  providerTokensUnchanged(previous: string, verified: string): boolean {
+    try {
+      const original = unseal<Tokens>(previous);
+      const next = unseal<Tokens>(verified);
+      return original.access_token === next.access_token &&
+        original.refresh_token === next.refresh_token;
+    } catch {
+      return false;
+    }
+  }
   async validate(
     encrypted: string,
     database: Pick<Database, "identity" | "$queryRaw"> = this.db,
