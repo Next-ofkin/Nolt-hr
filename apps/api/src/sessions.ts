@@ -155,7 +155,35 @@ export class Sessions {
       if (typeof csrf !== "string" || digest(csrf) !== session.csrfHash)
         throw new ForbiddenException("Invalid request verification token.");
     }
-    await this.db
+    // Check the provider outside the per-session row lock when the token has
+    // ample lifetime left. All identity/MFA/provider-revocation checks still run.
+    // Compare-and-swap the saved token snapshot so concurrent logout or refresh
+    // cannot silently reuse a stale session.
+    let verifiedWithoutLock = false;
+    if (process.env.SESSION_FAST_AUTH !== "false" &&
+        this.provider.canValidateWithoutSessionLock(session.providerSession)) {
+      const proof = await this.provider.validate(session.providerSession);
+      if (proof.user.id !== session.userId ||
+          proof.user.authVersion !== session.authVersion)
+        throw new UnauthorizedException("Account access changed. Sign in again.");
+      if (this.provider.providerTokensUnchanged(session.providerSession, proof.encrypted)) {
+        const verifiedAt = new Date();
+        const updated = await this.db.session.updateMany({
+          where: {
+            id: session.id,
+            userId: session.userId,
+            authVersion: session.authVersion,
+            providerSession: session.providerSession,
+            revokedAt: null,
+            expiresAt: { gt: verifiedAt },
+            lastSeenAt: { gt: new Date(verifiedAt.getTime() - SESSION_IDLE_MS) },
+          },
+          data: { lastSeenAt: verifiedAt },
+        });
+        verifiedWithoutLock = updated.count === 1;
+      }
+    }
+    if (!verifiedWithoutLock) await this.db
       .$transaction(
         async (tx) => {
           await tx.$queryRaw`SELECT id FROM public."Session" WHERE id=${session.id}::uuid FOR UPDATE`;
