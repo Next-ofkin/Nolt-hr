@@ -77,7 +77,9 @@ class PdfDocument {
     this.page.y -= 22;
   }
   image(bytes: Buffer, dimensions: {width:number;height:number}, label: string) {
-    const width = Math.min(250, dimensions.width), height = Math.min(215, width * dimensions.height / dimensions.width);
+    // Preserve the photo or signature aspect ratio instead of stretching it.
+    const scale = Math.min(1, 250 / dimensions.width, 215 / dimensions.height);
+    const width = dimensions.width * scale, height = dimensions.height * scale;
     this.ensure(height + 28);
     const name = `Im${this.page.images.length+1}`;
     this.page.images.push({data:bytes,width:dimensions.width,height:dimensions.height,name});
