@@ -492,8 +492,9 @@ export class SupabaseAuth {
   // validate() still performs the provider MFA, revocation and membership proofs.
   canValidateWithoutSessionLock(encrypted: string, now = Date.now()): boolean {
     try {
-      const tokens = unseal<Tokens>(encrypted);
-      const payload = tokens.access_token.split(".")[1];
+      const decoded = unseal<Tokens | FlowState>(encrypted);
+      const tokens = "access_token" in decoded ? decoded : decoded.tokens;
+      const payload = tokens?.access_token.split(".")[1];
       if (!payload) return false;
       const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: unknown };
       return typeof exp === "number" && Number.isFinite(exp) &&
@@ -504,10 +505,12 @@ export class SupabaseAuth {
   }
   providerTokensUnchanged(previous: string, verified: string): boolean {
     try {
-      const original = unseal<Tokens>(previous);
-      const next = unseal<Tokens>(verified);
-      return original.access_token === next.access_token &&
-        original.refresh_token === next.refresh_token;
+      const previousEnvelope = unseal<Tokens | FlowState>(previous);
+      const verifiedEnvelope = unseal<Tokens | FlowState>(verified);
+      const original = "access_token" in previousEnvelope ? previousEnvelope : previousEnvelope.tokens;
+      const next = "access_token" in verifiedEnvelope ? verifiedEnvelope : verifiedEnvelope.tokens;
+      return Boolean(original && next && original.access_token === next.access_token &&
+        original.refresh_token === next.refresh_token);
     } catch {
       return false;
     }
