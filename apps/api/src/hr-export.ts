@@ -7,6 +7,7 @@ import { Database } from "./database.js";
 import { FilesService } from "./files.js";
 import { SessionGuard, type AuthRequest } from "./auth.js";
 import { appOrigin } from "./security.js";
+import { createFileShareToken } from "./shared-files.js";
 
 type Image = { data: Buffer; width: number; height: number; name: string };
 const safe = (v: string) => v.replace(/[^\w .-]+/g, "_").slice(0, 90).trim() || "document";
@@ -209,9 +210,8 @@ export class HrExportService {
           const filename = safe(uploaded.fileName);
           supporting.push({name:`Supporting_Documents/${safe(a.formVersion.title)}/${String(supporting.length+1).padStart(2,"0")}_${filename}`,bytes:uploaded.buffer});
           doc.text(`Attachment: ${filename}`, 10, false, 6);
-          const extension = ["application/pdf","image/png","image/jpeg"].includes(uploaded.mimeType) ? "preview" : "download";
-          doc.link("Open attached document securely", `${appOrigin()}/api/v1/files/${file.id}/${extension}`);
-          doc.text("The link requires an authorised NOLT HR sign-in.", 8, false, 12);
+          const token = createFileShareToken(file.id, file.sha256);
+          doc.link("Open attached document", `${appOrigin()}/api/v1/shared-files/${file.id}?token=${token}`);
         } else if (uploaded.mimeType.startsWith("image/")) {
           const image = await sharp(uploaded.buffer).rotate().flatten({background:"#ffffff"}).jpeg({quality:85}).toBuffer({resolveWithObject:true});
           doc.image(image.data,{width:image.info.width,height:image.info.height},
