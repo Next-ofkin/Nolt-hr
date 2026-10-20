@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { api, errorMessage } from "@nolt/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import type { components } from "@nolt/api-client/schema";
 type Session = components["schemas"]["SessionDto"];
 const AuthContext = createContext<{
@@ -28,6 +29,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loading, setLoading] = useState(true),
     [error, setError] = useState<string | null>(null);
   const pendingRefresh = useRef<Promise<void> | null>(null);
+  const queryClient = useQueryClient();
+  const cachedIdentity = useRef<string | null>(null);
+  useEffect(() => {
+    // Memory-only HR data must never outlive a sign-out or user switch.
+    const identity = session?.id ?? null;
+    if (cachedIdentity.current !== identity) {
+      queryClient.clear();
+      cachedIdentity.current = identity;
+    }
+  }, [queryClient, session?.id]);
   const refresh = useCallback((): Promise<void> => {
     if (pendingRefresh.current) return pendingRefresh.current;
     const request = (async () => {
@@ -74,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (result.error && result.response.status !== 401)
       throw new Error(errorMessage(result.error));
+    queryClient.clear();
     setSession(null);
     setError(null);
     window.location.assign("/login");
