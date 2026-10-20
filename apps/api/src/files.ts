@@ -113,16 +113,24 @@ export class FilesStorage {
     }
   }
   async get(bucket: string, key: string): Promise<Buffer> {
+    // Bucket privacy is a deployment invariant verified on write. Avoid a second
+    // sequential external API request on every read; it made HR previews time out.
+    if (bucket !== "nolt-private-documents")
+      throw new ServiceUnavailableException("Unexpected file storage bucket.");
     const client = storageClient();
-    const { data: info, error: bucketError } =
-      await client.storage.getBucket(bucket);
-    if (bucketError || !info || info.public)
+    let data: Blob | null;
+    let error: { message: string } | null;
+    try {
+      ({ data, error } = await client.storage.from(bucket).download(key));
+    } catch {
       throw new ServiceUnavailableException(
-        "Private storage bucket is unavailable.",
+        "Private document storage is temporarily unavailable. Try again.",
       );
-    const { data, error } = await client.storage.from(bucket).download(key);
+    }
     if (error || !data)
-      throw new NotFoundException("Stored file content was not found.");
+      throw new ServiceUnavailableException(
+        "Document could not be retrieved from private storage. Try again.",
+      );
     return Buffer.from(await data.arrayBuffer());
   }
 }
