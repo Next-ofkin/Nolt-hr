@@ -398,6 +398,24 @@ export function SubmissionReview({
                           <span className="italic text-muted-foreground">
                             Not answered
                           </span>
+                        ) : (field.type === "signature" || field.type === "passport_photo" || field.type === "file") && typeof raw === "string" ? (
+                          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw) ? (
+                            <div className="space-y-3 rounded-lg border bg-slate-50 p-3">
+                              {(field.type === "signature" || field.type === "passport_photo") && (
+                                <img
+                                  src={`/api/v1/files/${encodeURIComponent(raw)}/preview`}
+                                  alt={field.type === "signature" ? "Employee's submitted signature" : "Employee's submitted passport photograph"}
+                                  className={field.type === "passport_photo" ? "max-h-64 max-w-48 rounded border object-contain bg-white" : "max-h-40 max-w-full rounded border object-contain bg-white"}
+                                />
+                              )}
+                              <a href={`/api/v1/files/${encodeURIComponent(raw)}/preview`}
+                                target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center rounded border bg-white px-3 py-2 text-sm font-medium text-primary underline underline-offset-2 hover:bg-slate-100">
+                                {field.type === "file" ? "Open attachment in new tab" : field.type === "signature" ? "Open signature in new tab" : "Open photograph in new tab"}
+                              </a>
+                              {field.type === "file" && <p className="text-xs text-muted-foreground">Opens the original scanned attachment securely. PDFs and supported images can be previewed in your browser.</p>}
+                            </div>
+                          ) : <p role="alert" className="text-sm text-destructive">Invalid file reference. This attachment cannot be previewed.</p>
                         ) : typeof raw === "boolean" ? (
                           <Badge variant={raw ? "default" : "secondary"}>
                             {raw ? "Yes" : "No"}
