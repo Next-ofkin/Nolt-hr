@@ -12,6 +12,7 @@ export function hrProviderDiagnostic(error: { code?: string; status?: number; na
 }
 
 import { appOrigin } from "./security.js";
+import { inviteEmail, inviteTtlMinutes, resendConfigured, sendViaResend } from "./invite-email.js";
 
 export type HrDeliveryResult =
   | { status: "SENT"; providerSubject: string }
@@ -52,10 +53,15 @@ export async function deliverHrInvitationEmail(
     global: { fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(25000) }) },
   });
   try {
-    const result = await client.auth.admin.inviteUserByEmail(invitation.email, {
-      redirectTo: appOrigin() + "/hr-invitations/accept?id=" + encodeURIComponent(invitation.id),
-      data: { name: invitation.name, nolt_hr_creation_secret: invitation.creationSecret },
-    });
+    const redirectTo = appOrigin() + "/hr-invitations/accept?id=" + encodeURIComponent(invitation.id);
+    const data = { name: invitation.name, nolt_hr_creation_secret: invitation.creationSecret };
+    // Branded path: Supabase only creates the account and the one-time proof; the
+    // NOLT-branded email is sent through Resend. Without Resend settings we fall
+    // back to Supabase's own invitation email so delivery never silently stops.
+    const branded = resendConfigured(env);
+    const result = branded
+      ? await client.auth.admin.generateLink({ type: "invite", email: invitation.email, options: { redirectTo, data } })
+      : await client.auth.admin.inviteUserByEmail(invitation.email, { redirectTo, data });
     if (result.error) {
       diagnosticLogger.warn(hrProviderDiagnostic({ code: result.error.code, status: result.error.status, name: result.error.name }));
       return hrDeliveryError(result.error.code, result.error.status);
@@ -67,6 +73,19 @@ export async function deliverHrInvitationEmail(
       return { status: "UNCERTAIN", errorCode: "PROVIDER_SUBJECT_MISSING", retryable: false };
     if (result.data.user?.email?.trim().toLowerCase() !== invitation.email.trim().toLowerCase())
       return { status: "UNCERTAIN", errorCode: "PROVIDER_EMAIL_MISMATCH", retryable: false };
+    if (branded) {
+      const props = (result.data as { properties?: { hashed_token?: string; verification_type?: string } }).properties;
+      if (!props?.hashed_token || props.verification_type !== "invite")
+        return { status: "UNCERTAIN", errorCode: "PROOF_GENERATION_FAILED", retryable: false };
+      const expiresAt = new Date(Date.now() + inviteTtlMinutes(env) * 60_000);
+      const link = redirectTo + "#token_hash=" + encodeURIComponent(props.hashed_token) + "&type=invite";
+      const failed = await sendViaResend(invitation.email, inviteEmail("HR", { name: invitation.name, link, expiresAt }), env);
+      if (failed) {
+        diagnosticLogger.warn(`HR_INVITE_EMAIL_FAILURE status=${failed.status} code=${failed.code}`);
+        // The account exists at the provider, so never retry blindly and create duplicates.
+        return { status: "UNCERTAIN", errorCode: failed.code, retryable: false };
+      }
+    }
     return { status: "SENT", providerSubject: subject };
   } catch {
     diagnosticLogger.warn("HR_INVITE_PROVIDER_FAILURE status=unknown code=DELIVERY_UNCERTAIN category=TRANSPORT");

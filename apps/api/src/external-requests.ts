@@ -4,6 +4,7 @@ import {
   ExternalSessionDto,
 } from "./external-sessions.js";
 import { externalInvitation } from "./external-email.js";
+import { inviteTtlMinutes, sendViaResend } from "./invite-email.js";
 import {
   BadRequestException,
   Body,
@@ -269,7 +270,7 @@ export class ExternalRequestsService {
           email: contact.email,
           createdBy: actorId,
           updatedBy: actorId,
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + inviteTtlMinutes() * 60_000),
         },
       });
       await tx.externalDelivery.create({ data: { requestId: r.id } });
@@ -624,21 +625,8 @@ export class ExternalRequestsService {
       link,
       row.expiresAt,
     );
-    const result = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(25000),
-      headers: {
-        Authorization: "Bearer " + process.env.RESEND_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL,
-        to: [email],
-        ...message,
-      }),
-    });
-    if (!result.ok)
-      return { code: "EMAIL_PROVIDER_REJECTED", status: result.status };
+    const failed = await sendViaResend(email, message);
+    if (failed) return failed;
     return null;
   }
   async deliverNext(onlyRequestId?: string) {
