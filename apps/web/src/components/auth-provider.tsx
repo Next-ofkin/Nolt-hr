@@ -33,12 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const cachedIdentity = useRef<string | null>(null);
   useEffect(() => {
     // Memory-only HR data must never outlive a sign-out or user switch.
-    const identity = session?.id ?? null;
+    // CSRF token is unique to the session, even when the same HR signs in again.
+    const identity = session ? `${session.id}:${session.csrfToken}` : null;
     if (cachedIdentity.current !== identity) {
       queryClient.clear();
       cachedIdentity.current = identity;
     }
-  }, [queryClient, session?.id]);
+  }, [queryClient, session?.id, session?.csrfToken]);
   const refresh = useCallback((): Promise<void> => {
     if (pendingRefresh.current) return pendingRefresh.current;
     const request = (async () => {
