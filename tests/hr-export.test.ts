@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { HrExportService, zipFiles } from "../apps/api/dist/hr-export.js";
 import { createHash } from "node:crypto";
+import { createFileShareToken, verifyFileShareToken } from "../apps/api/dist/shared-files.js";
 
 const assignmentId = "11111111-1111-4111-8111-111111111111";
 const caseId = "22222222-2222-4222-8222-222222222222";
@@ -10,6 +11,7 @@ const fieldId = "44444444-4444-4444-8444-444444444444";
 const reviewerId = "55555555-5555-4555-8555-555555555555";
 
 function setup() {
+  process.env.AUTH_ENCRYPTION_KEY ??= Buffer.alloc(32,77).toString("base64");
   const db = {
     user: { findUnique: async () => ({ active:true, role:"HR" }) },
     formAssignment: { findUnique: async () => ({
@@ -81,4 +83,16 @@ test("ZIP creator produces standard ZIP local and directory headers",()=>{
   assert.equal(archive.readUInt32LE(0),0x04034b50);
   assert(archive.includes(Buffer.from("test.txt")));
   assert.equal(archive.readUInt32LE(archive.length-22),0x06054b50);
+});
+
+test("shared-document links expire and are bound to one unchanged file",()=>{
+  process.env.AUTH_ENCRYPTION_KEY ??= Buffer.alloc(32,77).toString("base64");
+  const now=Date.UTC(2026,9,20);
+  const id="11111111-1111-4111-8111-111111111111";
+  const digest="a".repeat(64);
+  const token=createFileShareToken(id,digest,now);
+  assert.equal(verifyFileShareToken(id,digest,token,now),true);
+  assert.equal(verifyFileShareToken(id,digest,token,now+7*86400_000),false);
+  assert.equal(verifyFileShareToken(id,"b".repeat(64),token,now),false);
+  assert.equal(verifyFileShareToken(id,digest,token+"x",now),false);
 });
