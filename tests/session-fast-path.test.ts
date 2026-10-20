@@ -56,8 +56,9 @@ test("fresh encrypted provider token envelope enables the fast path, expired tok
   process.env.AUTH_ENCRYPTION_KEY=Buffer.alloc(32,42).toString("base64");
   try {
     const token=(exp:number)=>"header."+Buffer.from(JSON.stringify({exp})).toString("base64url")+".signature";
-    const valid=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)+3600),refresh_token:"test-refresh"}});
-    const duplicate=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)+3600),refresh_token:"test-refresh"}});
+    const future=Math.floor(Date.now()/1000)+3600;
+    const valid=seal({tokens:{access_token:token(future),refresh_token:"test-refresh"}});
+    const duplicate=seal({tokens:{access_token:token(future),refresh_token:"test-refresh"}});
     const expired=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)-10),refresh_token:"test-refresh"}});
     const service=new SupabaseAuth({} as never);
     assert.equal(service.canValidateWithoutSessionLock(valid),true);
