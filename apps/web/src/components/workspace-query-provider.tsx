@@ -6,7 +6,8 @@ export function WorkspaceQueryProvider({ children }: { children: React.ReactNode
   const [client] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5000,
+        staleTime: 30_000,
+        gcTime: 5 * 60_000,
         retry: 1,
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,

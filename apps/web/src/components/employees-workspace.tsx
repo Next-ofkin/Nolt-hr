@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -40,6 +40,7 @@ const labels = {
 };
 export function EmployeesWorkspace() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<Employee[]>([]),
     [next, setNext] = useState<string | null>(null),
     [page, setPage] = useState(0),
@@ -70,23 +71,30 @@ export function EmployeesWorkspace() {
       setLoading(true);
       setError("");
       try {
-        const r = await api.GET("/api/v1/employees", {
-          params: {
-            query: {
-              q,
-              department,
-              employmentType,
-              ...(caseStatus ? { caseStatus } : {}),
-              ...(startFrom ? { startFrom } : {}),
-              ...(startTo ? { startTo } : {}),
-              limit: 6,
-              ...(cursor ? { cursor } : {}),
-            },
+        const pageData = await queryClient.fetchQuery({
+          queryKey: ["hr-employees", session?.id, pageNumber, cursor ?? null, q, department, employmentType, caseStatus, startFrom, startTo],
+          staleTime: 30_000,
+          queryFn: async () => {
+            const r = await api.GET("/api/v1/employees", {
+                      params: {
+                        query: {
+                          q,
+                          department,
+                          employmentType,
+                          ...(caseStatus ? { caseStatus } : {}),
+                          ...(startFrom ? { startFrom } : {}),
+                          ...(startTo ? { startTo } : {}),
+                          limit: 6,
+                          ...(cursor ? { cursor } : {}),
+                        },
+                      },
+                    });
+                    if (r.error) throw new Error(errorMessage(r.error));
+            return r.data;
           },
         });
-        if (r.error) throw new Error(errorMessage(r.error));
-        setItems(r.data.items);
-        setNext(r.data.nextCursor);
+        setItems(pageData.items);
+        setNext(pageData.nextCursor);
         setPage(pageNumber);
         if (pageNumber === 0) setPageCursors([null]);
       } catch (e) {
@@ -95,12 +103,12 @@ export function EmployeesWorkspace() {
         setLoading(false);
       }
     },
-    [q, department, employmentType, startFrom, startTo, caseStatus],
+    [q, department, employmentType, startFrom, startTo, caseStatus, session?.id, queryClient],
   );
   // Read-only background synchronization; mutations still use their explicit
   // CSRF-protected actions and the selected employee does not change.
   const directoryQuery = useQuery({
-    queryKey: ["hr-employees", session?.email, page, pageCursors[page], q, department, employmentType, caseStatus, startFrom, startTo],
+    queryKey: ["hr-employees", session?.id, page, pageCursors[page], q, department, employmentType, caseStatus, startFrom, startTo],
     enabled: Boolean(session),
     queryFn: async () => {
       const r = await api.GET("/api/v1/employees", {
@@ -116,7 +124,7 @@ export function EmployeesWorkspace() {
       if (r.error) throw new Error(errorMessage(r.error));
       return r.data;
     },
-    refetchInterval: 15000,
+    staleTime: 30_000,
   });
   useEffect(() => {
     if (directoryQuery.data) {
@@ -132,7 +140,7 @@ export function EmployeesWorkspace() {
     }
   }, [directoryQuery.error]);
   const selectedEmployeeQuery = useQuery({
-    queryKey: ["hr-employee-detail", session?.email, detail?.employee.id],
+    queryKey: ["hr-employee-detail", session?.id, detail?.employee.id],
     enabled: Boolean(session && detail?.employee.id && !editing && !reviewingAssignmentId),
     queryFn: async () => {
       const id = detail?.employee.id;
@@ -141,7 +149,7 @@ export function EmployeesWorkspace() {
       if (r.error) throw new Error(errorMessage(r.error));
       return r.data;
     },
-    refetchInterval: 12000,
+    staleTime: 20_000,
   });
   useEffect(() => {
     if (selectedEmployeeQuery.data && !editing && !reviewingAssignmentId &&
@@ -169,6 +177,7 @@ export function EmployeesWorkspace() {
       });
       if (r.error) throw new Error(errorMessage(r.error));
       setDetail(r.data);
+      queryClient.setQueryData(["hr-employee-detail", session?.id, id], r.data);
       setEditing(false);
     });
   }
@@ -339,8 +348,10 @@ export function EmployeesWorkspace() {
                       });
                   if (r.error) throw new Error(errorMessage(r.error));
                   setDetail(r.data);
+                  queryClient.setQueryData(["hr-employee-detail",session?.id,r.data.employee.id],r.data);
                   setEditing(false);
                   setNotice("Employee record saved.");
+                  await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id],refetchType:"none"});
                   await list();
                 });
               }}
@@ -463,6 +474,8 @@ export function EmployeesWorkspace() {
                         );
                         if (r.error) throw new Error(errorMessage(r.error));
                         setDetail(r.data);
+                        queryClient.setQueryData(["hr-employee-detail",session?.id,r.data.employee.id],r.data);
+                        await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id]});
                         setNotice("Onboarding case opened.");
                       })
                     }
@@ -486,6 +499,8 @@ export function EmployeesWorkspace() {
                       });
                       if (refreshed.error || !refreshed.data) throw new Error("Could not reload the employee case.");
                       setDetail(refreshed.data);
+                      queryClient.setQueryData(["hr-employee-detail",session?.id,refreshed.data.employee.id],refreshed.data);
+                      await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id]});
                     }}
                   />
                   <ul className="space-y-3">

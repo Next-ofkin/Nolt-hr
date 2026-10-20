@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "./auth-provider";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -15,6 +17,8 @@ export function PackAssignmentPanel({ caseId, employeeId, employmentType, csrfTo
   caseId: string; caseRevision: number; employmentType: string; csrfToken: string;
   onAssigned: () => Promise<void>;
 }) {
+  const { session } = useAuth();
+  const cache = useQueryClient();
   const [packs, setPacks] = useState<Pack[]>([]);
   const [existing, setExisting] = useState<Progress[]>([]);
   const [packId, setPackId] = useState("");
@@ -28,18 +32,26 @@ export function PackAssignmentPanel({ caseId, employeeId, employmentType, csrfTo
 
   const refresh = useCallback(async () => {
     try {
-      const [p, a] = await Promise.all([
-        fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" }),
+      const [packList, response] = await Promise.all([
+        cache.fetchQuery({
+          queryKey: ["hr-pack-library", session?.id],
+          queryFn: async () => {
+            const r = await fetch("/api/v1/packs", { credentials: "same-origin", cache: "no-store" });
+            if (!r.ok) throw new Error("Unable to load published packs.");
+            return r.json() as Promise<Pack[]>;
+          },
+          staleTime: 300_000,
+        }),
         fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, { credentials: "same-origin", cache: "no-store" }),
       ]);
-      if (!p.ok || !a.ok) throw new Error("Unable to load published packs and assignments.");
-      setPacks(await p.json() as Pack[]);
-      setExisting(await a.json() as Progress[]);
+      if (!response.ok) throw new Error("Unable to load assigned packs.");
+      setPacks(packList);
+      setExisting(await response.json() as Progress[]);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load assigned packs.");
     }
-  }, [caseId]);
+  }, [caseId, cache, session?.id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
   // Keep a single visibility-aware refresh timer. Avoid competing React Query
