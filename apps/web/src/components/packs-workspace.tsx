@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ArrowDown, ArrowUp, FileStack, Loader2, Plus, RefreshCw, Save, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "./auth-provider";
@@ -31,6 +32,7 @@ async function readJson<T>(url: string): Promise<T> {
 
 export function PacksWorkspace() {
   const { session } = useAuth();
+  const cache = useQueryClient();
   const [packs, setPacks] = useState<Pack[]>([]);
   const [confirmPublish, setConfirmPublish] = useState<Pack | null>(null);
   const [forms, setForms] = useState<FormVersion[]>([]);
@@ -58,23 +60,27 @@ export function PacksWorkspace() {
     })).sort((a,b) => b.versions[0].createdAt.localeCompare(a.versions[0].createdAt));
   }, [packs]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const refresh = useCallback(async (force = false) => {
+    if (!session) { setPacks([]); setForms([]); setLoading(false); return; }
+    setLoading(true); setError("");
     try {
+      const packKey = ["hr-pack-library", session.id];
+      const formKey = ["hr-published-forms", session.id];
+      if (force) await Promise.all([
+        cache.invalidateQueries({queryKey: packKey, refetchType: "none"}),
+        cache.invalidateQueries({queryKey: formKey, refetchType: "none"}),
+      ]);
       const [packRecords, formRecords] = await Promise.all([
-        readJson<Pack[]>("/api/v1/packs"),
-        readJson<FormVersion[]>("/api/v1/forms/published"),
+        cache.fetchQuery({queryKey: packKey, queryFn: () => readJson<Pack[]>("/api/v1/packs"), staleTime: 300_000}),
+        cache.fetchQuery({queryKey: formKey, queryFn: () => readJson<FormVersion[]>("/api/v1/forms/published"), staleTime: 300_000}),
       ]);
       setPacks(packRecords);
       setForms(formRecords.filter(form => form.status === "PUBLISHED"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load the pack builder.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  useEffect(() => { if (session) void refresh(); }, [refresh, session]);
+    } finally { setLoading(false); }
+  }, [cache, session?.id]);
+  useEffect(() => { if (session) void refresh(); }, [refresh, session?.id]);
 
   const available = useMemo(() => forms.filter(form =>
     !selected.some(item => item.formId === form.formId) &&
@@ -111,7 +117,7 @@ export function PacksWorkspace() {
       });
       if (!response.ok) throw new Error("Could not create a new version. Refresh the Pack list.");
       const draft = await response.json() as Pack;
-      await refresh();
+      await refresh(true);
       startEdit(draft);
       setNotice(`Pack version ${draft.versionNumber} draft is ready to edit. Previously assigned versions remain unchanged.`);
     } catch (cause) {
@@ -289,7 +295,7 @@ export function PacksWorkspace() {
       <section className="rounded-2xl border bg-white">
         <div className="flex items-center justify-between border-b p-5">
           <div><h2 className="text-lg font-semibold">Saved packs</h2><p className="text-sm text-muted-foreground">Draft packs prepared by HR.</p></div>
-          <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15}/> Refresh</Button>
+          <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void refresh(true)}><RefreshCw size={15}/> Refresh</Button>
         </div>
         {loading ? <p role="status" className="flex items-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 size={18} className="animate-spin"/> Loading packs…</p> :
         packs.length === 0 ? <p className="p-8 text-sm text-muted-foreground">No packs saved yet. Create your first pack draft above.</p> :
