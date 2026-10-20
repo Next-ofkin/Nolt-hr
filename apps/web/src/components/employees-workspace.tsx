@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -40,6 +40,7 @@ const labels = {
 };
 export function EmployeesWorkspace() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<Employee[]>([]),
     [next, setNext] = useState<string | null>(null),
     [page, setPage] = useState(0),
@@ -70,23 +71,30 @@ export function EmployeesWorkspace() {
       setLoading(true);
       setError("");
       try {
-        const r = await api.GET("/api/v1/employees", {
-          params: {
-            query: {
-              q,
-              department,
-              employmentType,
-              ...(caseStatus ? { caseStatus } : {}),
-              ...(startFrom ? { startFrom } : {}),
-              ...(startTo ? { startTo } : {}),
-              limit: 6,
-              ...(cursor ? { cursor } : {}),
-            },
+        const pageData = await queryClient.fetchQuery({
+          queryKey: ["hr-employees", session?.id, pageNumber, cursor ?? null, q, department, employmentType, caseStatus, startFrom, startTo],
+          staleTime: 30_000,
+          queryFn: async () => {
+            const r = await api.GET("/api/v1/employees", {
+                      params: {
+                        query: {
+                          q,
+                          department,
+                          employmentType,
+                          ...(caseStatus ? { caseStatus } : {}),
+                          ...(startFrom ? { startFrom } : {}),
+                          ...(startTo ? { startTo } : {}),
+                          limit: 6,
+                          ...(cursor ? { cursor } : {}),
+                        },
+                      },
+                    });
+                    if (r.error) throw new Error(errorMessage(r.error));
+            return r.data;
           },
         });
-        if (r.error) throw new Error(errorMessage(r.error));
-        setItems(r.data.items);
-        setNext(r.data.nextCursor);
+        setItems(pageData.items);
+        setNext(pageData.nextCursor);
         setPage(pageNumber);
         if (pageNumber === 0) setPageCursors([null]);
       } catch (e) {
@@ -95,7 +103,7 @@ export function EmployeesWorkspace() {
         setLoading(false);
       }
     },
-    [q, department, employmentType, startFrom, startTo, caseStatus],
+    [q, department, employmentType, startFrom, startTo, caseStatus, session?.id, queryClient],
   );
   // Read-only background synchronization; mutations still use their explicit
   // CSRF-protected actions and the selected employee does not change.
