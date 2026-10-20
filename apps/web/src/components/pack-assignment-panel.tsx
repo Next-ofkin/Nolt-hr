@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { EmployeeAssignmentCard, type EmployeeAssignment } from "./employee-assignment-card";
 import { ChevronDown, FileStack, PackageOpen } from "lucide-react";
+import { splitAssignmentsByPack } from "@/lib/split-assignments-by-pack";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-provider";
 import { Label } from "./ui/label";
@@ -193,9 +194,7 @@ export function PackAssignmentPanel({
     } finally { setBusy(false); }
   }
 
-  const assignmentMap = new Map(assignments.map(form => [form.id, form]));
-  const packedFormIds = new Set(existing.flatMap(pack => pack.forms.map(form => form.assignmentId)));
-  const standaloneForms = assignments.filter(form => !packedFormIds.has(form.id));
+  const { assignmentsById: assignmentMap, standalone: standaloneForms } = splitAssignmentsByPack(assignments, existing);
 
   return <section className="space-y-4 rounded-xl border bg-muted/20 p-4 sm:p-5">\n    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>{confirmation === "mismatch" ? "Employment type mismatch" : "Approve onboarding pack?"}</DialogTitle><DialogDescription>{confirmation === "mismatch" ? `This pack is for ${selectedPack?.employmentType ?? "another employment type"}, but this employee is listed as ${employmentType}. Assigning it anyway will be recorded in the audit history.` : "Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (confirmation === "mismatch") void assign(true); else if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>{confirmation === "mismatch" ? "Assign anyway" : "Approve pack"}</Button></div></DialogContent></Dialog>
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
@@ -225,11 +224,12 @@ export function PackAssignmentPanel({
       {busy ? "Assigning…" : "Assign selected pack"}
     </Button>
     </details>
-    {!progressLoaded && (
+    {!progressLoaded && !error && (
       <p role="status" className="rounded-lg border bg-white px-4 py-3 text-sm text-muted-foreground">
         Loading assigned packs and forms…
       </p>
     )}
+    {!progressLoaded && error && <Button type="button" variant="outline" onClick={() => void refresh()}>Retry loading assigned packs</Button>}
     {progressLoaded && (
       <div className="space-y-4 border-t pt-4">
         <div>
