@@ -52,6 +52,27 @@ export type AuthRequest = Request & {
   sessionToken: string;
   externalRequestId?: string | null;
 };
+
+const sessionRefreshChains = new Map<string, Promise<void>>();
+/** Runs `work` after earlier work for the same session finishes (in-process only). */
+export async function withSessionRefreshQueue<T>(
+  sessionId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previous = sessionRefreshChains.get(sessionId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const chain = previous.then(() => gate);
+  sessionRefreshChains.set(sessionId, chain);
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
+    if (sessionRefreshChains.get(sessionId) === chain)
+      sessionRefreshChains.delete(sessionId);
+  }
+}
 @Injectable()
 export class Sessions {
   constructor(
@@ -184,19 +205,20 @@ export class Sessions {
         verifiedWithoutLock = updated.count === 1;
       }
     }
-    if (!verifiedWithoutLock) await this.db
-      .$transaction(
-        async (tx) => {
-          await tx.$queryRaw`SELECT id FROM public."Session" WHERE id=${session.id}::uuid FOR UPDATE`;
-          const current = await tx.session.findUnique({
+    // Slow path (token near expiry, or the fast-path compare-and-swap lost a race).
+    // Refresh-token rotation must not run twice at once for one session, so requests
+    // for the same session queue in this process. The queue is in memory: a database
+    // row lock must never be held while we wait on Supabase (that caused 30s stalls).
+    // The final write is a compare-and-swap, so a second API instance stays safe.
+    if (!verifiedWithoutLock)
+      await withSessionRefreshQueue(session.id, async () => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const current = await this.db.session.findUnique({
             where: { id: session.id },
           });
           if (!current?.providerSession || current.revokedAt)
             throw new UnauthorizedException("Your session was revoked.");
-          const provider = await this.provider.validate(
-            current.providerSession,
-            tx,
-          );
+          const provider = await this.provider.validate(current.providerSession);
           if (
             provider.user.id !== session.userId ||
             provider.user.authVersion !== session.authVersion
@@ -204,27 +226,26 @@ export class Sessions {
             throw new UnauthorizedException(
               "Account access changed. Sign in again.",
             );
-          await tx.session.update({
-            where: { id: session.id },
+          const verifiedAt = new Date();
+          const updated = await this.db.session.updateMany({
+            where: {
+              id: session.id,
+              userId: session.userId,
+              authVersion: session.authVersion,
+              providerSession: current.providerSession,
+              revokedAt: null,
+              expiresAt: { gt: verifiedAt },
+            },
             data: {
-              lastSeenAt: new Date(),
+              lastSeenAt: verifiedAt,
               providerSession: provider.encrypted,
             },
           });
-        },
-        { timeout: 30000, maxWait: 10000 },
-      )
-      .catch((error: unknown) => {
-        if (
-          error &&
-          typeof error === "object" &&
-          "code" in error &&
-          ["P2028", "P2024"].includes(String(error.code))
-        )
-          throw new ServiceUnavailableException(
-            "Sign-in verification is temporarily unavailable. Please retry.",
-          );
-        throw error;
+          if (updated.count === 1) return;
+        }
+        throw new ServiceUnavailableException(
+          "Sign-in verification is temporarily unavailable. Please retry.",
+        );
       });
     req.actor = {
       externalRequestId: session.externalRequestId,

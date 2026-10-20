@@ -281,45 +281,45 @@ export class HrInvitationExchangeController {
   constructor(@Inject(HrInvitationExchangeService) private readonly service: HrInvitationExchangeService) {}
   @Get("verification")
   verification(@Req() req: Request) {
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.verification(req);
   }
   @Get("activation-readiness")
   activationReadiness(@Req() req: Request) {
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.activationReadiness(req);
   }
   @Post("password")
   @ApiCreatedResponse({ type: HrPasswordResultDto })
   password(@Body() value: unknown, @Req() req: Request) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.setPassword(value, req);
   }
   @Post("resume")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
   resume(@Body() value:unknown, @Req() req:Request, @Res({passthrough:true}) res:Response) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.resume(value,req,res);
   }
   @Post("resume-confirm")
   confirmResume(@Req() req:Request) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.confirmResume(req);
   }
   @Post("activate")
   activate(@Req() req: Request) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.activate(req);
   }
   @Post("exchange")
   @ApiCreatedResponse({ type: HrExchangeResultDto })
   exchange(@Body() value: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     assertOrigin(req);
-    this.limiter.take(req.socket.remoteAddress ?? "unknown");
+    this.limiter.take(req.ip ?? req.socket.remoteAddress ?? "unknown");
     return this.service.exchange(value, req, res);
   }
 }
