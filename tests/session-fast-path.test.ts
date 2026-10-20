@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Sessions } from "../apps/api/dist/sessions.js";
 import { cookieName } from "../apps/api/dist/security.js";
+import { seal } from "../apps/api/dist/auth-crypto.js";
+import { SupabaseAuth } from "../apps/api/dist/supabase-auth.js";
 
 test("concurrent reads validate provider without holding an exclusive session lock", async () => {
   const now = new Date();
@@ -47,4 +49,23 @@ test("a revoked session fails when the fast-path compare-and-swap loses the race
   const request={method:"GET",headers:{cookie:cookieName("session")+"="+"a".repeat(64)}};
   await assert.rejects(service.authenticate(request as never),/revoked/i);
   assert.equal((request as any).actor,undefined);
+});
+
+test("fresh encrypted provider token envelope enables the fast path, expired tokens do not", () => {
+  const originalKey=process.env.AUTH_ENCRYPTION_KEY;
+  process.env.AUTH_ENCRYPTION_KEY=Buffer.alloc(32,42).toString("base64");
+  try {
+    const token=(exp:number)=>"header."+Buffer.from(JSON.stringify({exp})).toString("base64url")+".signature";
+    const valid=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)+3600),refresh_token:"test-refresh"}});
+    const duplicate=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)+3600),refresh_token:"test-refresh"}});
+    const expired=seal({tokens:{access_token:token(Math.floor(Date.now()/1000)-10),refresh_token:"test-refresh"}});
+    const service=new SupabaseAuth({} as never);
+    assert.equal(service.canValidateWithoutSessionLock(valid),true);
+    assert.equal(service.canValidateWithoutSessionLock(expired),false);
+    assert.equal(service.providerTokensUnchanged(valid,duplicate),true);
+    assert.equal(service.providerTokensUnchanged(valid,expired),false);
+  } finally {
+    if(originalKey===undefined) delete process.env.AUTH_ENCRYPTION_KEY;
+    else process.env.AUTH_ENCRYPTION_KEY=originalKey;
+  }
 });
