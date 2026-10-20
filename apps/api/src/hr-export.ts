@@ -234,11 +234,50 @@ export class HrExportService {
   async recordDownload(actorId:string, targetId:string, action:string) {
     await this.db.auditEvent.create({data:{actorId,targetId,action,metadata:{exportedAt:new Date().toISOString()}}});
   }
+  async caseArchive(userId:string, caseId:string) {
+    const user = await this.db.user.findUnique({where:{id:userId},select:{active:true,role:true}});
+    if (!user?.active || user.role !== "HR") throw new ForbiddenException("Active HR access required.");
+    const onboarding = await this.db.onboardingCase.findUnique({
+      where:{id:caseId},
+      include:{
+        employee:true,
+        assignments:{
+          where:{formVersion:{recipient:"EMPLOYEE"},submissions:{some:{}}},
+          orderBy:{createdAt:"asc"},
+          include:{formVersion:{select:{title:true}}},
+        },
+      },
+    });
+    if (!onboarding) throw new NotFoundException("Employee onboarding case not found.");
+    if (!onboarding.assignments.length)
+      throw new BadRequestException("This employee has not submitted any forms yet.");
+    const root = `${safe(onboarding.employee.fullName)}_Completed_Forms`;
+    const entries:{name:string;bytes:Buffer}[]=[];
+    const info=new PdfDocument();
+    info.text("Employee completed forms",18,true,12);
+    info.section("Onboarding summary");
+    info.field("Employee",onboarding.employee.fullName);
+    info.field("Exported",formattedDate(new Date()));
+    info.field("Completed form submissions",onboarding.assignments.length);
+    for(const [index,assignment] of onboarding.assignments.entries()) {
+      const rendered = await this.render(userId,assignment.id);
+      const prefix = String(index+1).padStart(2,"0");
+      entries.push({name:`${root}/${prefix}_${rendered.title}.pdf`,bytes:rendered.pdf});
+      for(const attachment of rendered.attachments) {
+        entries.push({name:`${root}/Supporting_Documents/${prefix}_${rendered.title}/${attachment.name.split("/").pop()}`,bytes:attachment.bytes});
+      }
+      info.text(`${prefix}. ${assignment.formVersion.title} - ${rendered.review.replaceAll("_"," ")}`,11);
+    }
+    entries.unshift({name:`${root}/00_Completed_Forms_Summary.pdf`,bytes:info.build()});
+    if(entries.length>160 || entries.reduce((n,e)=>n+e.bytes.length,0)>100*1024*1024)
+      throw new BadRequestException("Export is too large. Download the forms individually.");
+    return {buffer:zipFiles(entries),filename:`${root}.zip`};
+  }
   async pack(userId:string, packAssignmentId:string) {
     const user=await this.db.user.findUnique({where:{id:userId}});
     if(!user?.active || user.role!=="HR") throw new ForbiddenException("Active HR access required.");
     const pack=await this.db.packAssignment.findUnique({where:{id:packAssignmentId},include:{
-      pack:true,onboardingCase:{include:{employee:true}},forms:{orderBy:{position:"asc"}}
+      pack:true,onboardingCase:{include:{employee:true}},forms:{orderBy:{position:"asc"},include:{formAssignment:{include:{formVersion:{select:{title:true}}}}}}}
     }});
     if(!pack) throw new NotFoundException("Assigned pack not found.");
     const employee=safe(pack.onboardingCase.employee.fullName);
@@ -250,14 +289,14 @@ export class HrExportService {
         const form=await this.render(userId,part.formAssignmentId);
         const prefix=String(index+1).padStart(2,"0");
         entries.push({name:`${root}/${prefix}_${form.title}.pdf`,bytes:form.pdf});
-        for(const item of form.attachments) entries.push({name:`${root}/${item.name}`,bytes:item.bytes});
+        for(const item of form.attachments) entries.push({name:`${root}/Supporting_Documents/${prefix}_${form.title}/${item.name.split("/").pop()}`,bytes:item.bytes});
         summary.push(`${prefix}. ${form.title} | Submission v${form.version} | ${form.review}`);
       } catch (error) {
         if(!(error instanceof NotFoundException)) throw error;
-        summary.push(`${index+1}. Assignment ${part.formAssignmentId} | NOT SUBMITTED`);
+        summary.push(`${index+1}. ${part.formAssignment.formVersion.title} | Not yet submitted`);
       }
     }
-    const info=new PdfDocument();for(const line of summary) info.text(line,11);
+    const info=new PdfDocument();info.section("Onboarding pack summary");for(const line of summary) info.text(line,11);
     entries.unshift({name:`${root}/00_Pack_Summary.pdf`,bytes:info.build()});
     if(entries.length>160)throw new BadRequestException("Pack contains too many attachments to export.");
     if(entries.reduce((n,entry)=>n+entry.bytes.length,0)>100*1024*1024)
@@ -278,6 +317,15 @@ export class HrExportController {
     res.setHeader("Content-Disposition",`attachment; filename="${doc.employee}_${doc.title}.pdf"`);
     res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
     res.send(doc.pdf);
+  }
+  @Get("cases/:id.zip")
+  async caseArchive(@Req() req:AuthRequest,@Param("id",ParseUUIDPipe) id:string,@Res() res:Response) {
+    const archive=await this.exports.caseArchive(req.actor.id,id);
+    await this.exports.recordDownload(req.actor.id,id,"CASE_FORMS_ZIP_EXPORTED");
+    res.setHeader("Content-Type","application/zip");
+    res.setHeader("Content-Disposition",`attachment; filename="${archive.filename}"`);
+    res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
+    res.send(archive.buffer);
   }
   @Get("packs/:id.zip")
   async pack(@Req() req:AuthRequest,@Param("id",ParseUUIDPipe) id:string,@Res() res:Response) {
