@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { HrExportService, zipFiles } from "../apps/api/dist/hr-export.js";
+import { createHash } from "node:crypto";
 
 const assignmentId = "11111111-1111-4111-8111-111111111111";
 const caseId = "22222222-2222-4222-8222-222222222222";
@@ -21,7 +22,7 @@ function setup() {
           reviewedBy:reviewerId,reviewer:{name:"Aisha Bello"}}}],
     }) },
     storedFile: {findMany:async()=>[{id:fileId,fieldId,status:"CONFIRMED",
-      scanStatus:"CLEAN",signature:null}]},
+      scanStatus:"CLEAN",signature:null, sha256:createHash("sha256").update("example private evidence").digest("hex")}]},
     onboardingCase:{findUnique:async()=>({
       employee:{fullName:"Example Employee"},
       assignments:[{id:assignmentId,formVersion:{title:"Personal Details"}}],
@@ -35,7 +36,7 @@ function setup() {
   return new HrExportService(db as never,files as never);
 }
 
-test("individual form PDF uses reviewer name and a clickable authenticated attachment URL",async()=>{
+test("individual form PDF uses reviewer name and a login-free shareable attachment URL",async()=>{
   const previous=process.env.PUBLIC_APP_URL;
   process.env.PUBLIC_APP_URL="https://nolt-web-production.up.railway.app";
   try {
@@ -45,8 +46,10 @@ test("individual form PDF uses reviewer name and a clickable authenticated attac
     assert(source.includes("(Aisha Bello)"));
     assert(source.includes("(/api/v1/")===false);
     assert(source.includes("/Subtype /Link"));
-    assert(source.includes("https://nolt-web-production.up.railway.app/api/v1/files/"));
-    assert(source.includes("Open attached document securely"));
+    assert(source.includes("https://nolt-web-production.up.railway.app/api/v1/shared-files/"));
+    assert(source.includes("?token="));
+    assert(source.includes("Open attached document"));
+    assert(!source.includes("requires an authorised NOLT HR sign-in"));
     assert(!source.includes("Reviewer record:"));
     assert(!source.includes("Evidence reference:"));
     assert.equal(r.attachments.length,1);
