@@ -20,8 +20,40 @@ export function decodePayload(value: string): Buffer {
   return Buffer.from(raw, "base64");
 }
 
-// ClamAV INSTREAM: no shell, no temporary files and no success on timeout/error.
+// Cloud scanner requires an explicit provider and key; never bypass validation.
+async function scanCloudmersive(data: Buffer): Promise<void> {
+  const key = process.env.CLOUDMERSIVE_API_KEY;
+  if (!key) throw new ServiceUnavailableException("Malware scanning is not configured. Upload confirmation is unavailable.");
+  // Evaluation-tier file size cap; raise only after upgrading the scanning plan.
+  const max = Number(process.env.CLOUDMERSIVE_MAX_SCAN_BYTES ?? 3500000);
+  if (!Number.isSafeInteger(max) || max < 1 || data.length > max)
+    throw new BadRequestException("File exceeds the configured malware scanning size limit.");
+  const form = new FormData();
+  form.append("inputFile", new Blob([new Uint8Array(data)], { type: "application/octet-stream" }), "upload.bin");
+  let response: Response;
+  try {
+    response = await fetch("https://api.cloudmersive.com/virus/scan/file", {
+      method: "POST", headers: { Apikey: key }, body: form,
+      signal: AbortSignal.timeout(15000), redirect: "error",
+    });
+  } catch {
+    throw new ServiceUnavailableException("Malware scanner unavailable. File was not confirmed.");
+  }
+  if (!response.ok) throw new ServiceUnavailableException("Malware scanner unavailable. File was not confirmed.");
+  let result: unknown;
+  try { result = await response.json(); }
+  catch { throw new ServiceUnavailableException("Malware scanner returned an invalid result. File was not confirmed."); }
+  if (!result || typeof result !== "object" || !("CleanResult" in result) ||
+      typeof result.CleanResult !== "boolean")
+    throw new ServiceUnavailableException("Malware scanner returned an invalid result. File was not confirmed.");
+  if (!result.CleanResult)
+    throw new BadRequestException("File rejected by malware scanner.");
+}
+
+// ClamAV INSTREAM is retained for self-hosted deployments.
+
 export async function scanBytes(data: Buffer): Promise<void> {
+  if (process.env.MALWARE_SCANNER_PROVIDER === "cloudmersive") return scanCloudmersive(data);
   const host = process.env.CLAMAV_HOST;
   if (!host)
     throw new ServiceUnavailableException(

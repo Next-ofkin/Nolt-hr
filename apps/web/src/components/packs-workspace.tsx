@@ -212,7 +212,7 @@ export function PacksWorkspace() {
           <p className="text-xs font-semibold tracking-[0.15em] text-primary">PEOPLE OPERATIONS</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Onboarding packs</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Group published forms into reusable onboarding packs. Edit drafts, then publish to lock their contents. Employee assignment is coming next.
+            Combine published forms into reusable packs, then assign a published pack from an employee’s onboarding checklist. Drafts can be edited; published versions stay unchanged.
           </p>
         </div>
         <Button type="button" onClick={() => showComposer ? resetComposer() : setShowComposer(true)} disabled={!session || loading} className="gap-2">
@@ -221,6 +221,16 @@ export function PacksWorkspace() {
         </Button>
       </div>
 
+      <section aria-label="How onboarding works" className="rounded-2xl border bg-white p-5">
+        <h2 className="font-semibold">How forms, versions and packs work</h2>
+        <ol className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <li><strong>1. Build a form</strong><p className="text-muted-foreground">Create questions in Form library and save your draft.</p></li>
+          <li><strong>2. Publish the form</strong><p className="text-muted-foreground">Publishing freezes that version so employee answers stay tied to the original questions.</p></li>
+          <li><strong>3. Build and publish a pack</strong><p className="text-muted-foreground">Select published form versions, choose their order, and publish the pack.</p></li>
+          <li><strong>4. Assign to an employee</strong><p className="text-muted-foreground">Go to Employees → onboarding checklist → Assign a new onboarding pack. Submitted forms need an assigned HR reviewer.</p></li>
+        </ol>
+        <p className="mt-3 text-xs text-muted-foreground">Need to change a published form or pack? Create a new version. Existing employee assignments continue using the version they received.</p>
+      </section>
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">{notice}</div>}
 
