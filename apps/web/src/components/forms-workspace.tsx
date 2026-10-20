@@ -122,7 +122,10 @@ export function FormsWorkspace() {
     setLoading(true);
     try {
       const key = ["hr-form-library", session.id];
-      if (force) await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
+      if (force) await Promise.all([
+        cache.invalidateQueries({ queryKey: key, refetchType: "none" }),
+        cache.invalidateQueries({ queryKey: ["hr-published-forms", session.id], refetchType: "none" }),
+      ]);
       const forms = await cache.fetchQuery({
         queryKey: key,
         staleTime: 30_000,
