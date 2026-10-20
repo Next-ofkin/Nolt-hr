@@ -50,7 +50,7 @@ export function PackAssignmentPanel({
             if (!r.ok) throw new Error("Unable to load published packs.");
             return r.json() as Promise<Pack[]>;
           },
-          staleTime: 300_000,
+          staleTime: 30_000,
         }),
         fetch(`/api/v1/packs/cases/${encodeURIComponent(caseId)}`, { credentials: "same-origin", cache: "no-store" }),
       ]);

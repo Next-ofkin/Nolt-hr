@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useVisibleRefresh } from "@/lib/use-visible-refresh";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ArrowDown, ArrowUp, FileStack, Loader2, Plus, RefreshCw, Save, ShieldCheck, X } from "lucide-react";
@@ -60,9 +61,9 @@ export function PacksWorkspace() {
     })).sort((a,b) => b.versions[0].createdAt.localeCompare(a.versions[0].createdAt));
   }, [packs]);
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, silent = false) => {
     if (!session) { setPacks([]); setForms([]); setLoading(false); return; }
-    setLoading(true); setError("");
+    if (!silent) { setLoading(true); setError(""); }
     try {
       const packKey = ["hr-pack-library", session.id];
       const formKey = ["hr-published-forms", session.id];
@@ -71,8 +72,8 @@ export function PacksWorkspace() {
         cache.invalidateQueries({queryKey: formKey, refetchType: "none"}),
       ]);
       const [packRecords, formRecords] = await Promise.all([
-        cache.fetchQuery({queryKey: packKey, queryFn: () => readJson<Pack[]>("/api/v1/packs"), staleTime: 300_000}),
-        cache.fetchQuery({queryKey: formKey, queryFn: () => readJson<FormVersion[]>("/api/v1/forms/published"), staleTime: 300_000}),
+        cache.fetchQuery({queryKey: packKey, queryFn: () => readJson<Pack[]>("/api/v1/packs"), staleTime: 30_000}),
+        cache.fetchQuery({queryKey: formKey, queryFn: () => readJson<FormVersion[]>("/api/v1/forms/published"), staleTime: 30_000}),
       ]);
       setPacks(packRecords);
       setForms(formRecords.filter(form => form.status === "PUBLISHED"));
@@ -81,6 +82,7 @@ export function PacksWorkspace() {
     } finally { setLoading(false); }
   }, [cache, session?.id]);
   useEffect(() => { if (session) void refresh(); }, [refresh, session?.id]);
+  useVisibleRefresh(() => refresh(false, true), undefined, Boolean(session));
 
   const available = useMemo(() => forms.filter(form =>
     !selected.some(item => item.formId === form.formId) &&

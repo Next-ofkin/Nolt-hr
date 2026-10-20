@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useVisibleRefresh } from "@/lib/use-visible-refresh";
 
 type PackProgress = {
   id: string; packName: string; dueDate: string | null; status: string; overdue: boolean;
@@ -21,6 +22,7 @@ export function MyPackProgress({ refreshKey }: { refreshKey: number }) {
     }
   }, []);
   useEffect(() => { void load(); }, [load, refreshKey]);
+  useVisibleRefresh(load, 15_000);
   if (error) return <p role="alert" className="rounded-lg border p-4 text-sm">{error}</p>;
   if (!packs.length) return null;
   return <section className="space-y-3" aria-label="Onboarding pack progress">

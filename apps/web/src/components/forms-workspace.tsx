@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useVisibleRefresh } from "@/lib/use-visible-refresh";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-provider";
@@ -116,10 +117,10 @@ export function FormsWorkspace() {
     title: string;
     recipient: "EMPLOYEE" | "GUARANTOR" | "REFERENCE";
   }>({ defaultValues: { title: "", recipient: "EMPLOYEE" } });
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, silent = false) => {
     if (!session) { setCsrf(null); setForms([]); setLoading(false); return; }
     setCsrf(session.csrfToken);
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const key = ["hr-form-library", session.id];
       if (force) await Promise.all([
@@ -144,6 +145,7 @@ export function FormsWorkspace() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useVisibleRefresh(() => refresh(false, true), undefined, Boolean(session));
   useEffect(() => {
     if (!notice) return;
     if (notice.kind === "error") toast.error(notice.text);
