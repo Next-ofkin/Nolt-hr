@@ -61,7 +61,7 @@ export function PacksWorkspace() {
   }, [packs]);
 
   const refresh = useCallback(async (force = false) => {
-    if (!session) { setLoading(false); return; }
+    if (!session) { setPacks([]); setForms([]); setLoading(false); return; }
     setLoading(true); setError("");
     try {
       const packKey = ["hr-pack-library", session.id];
