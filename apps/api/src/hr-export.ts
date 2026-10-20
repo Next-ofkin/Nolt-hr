@@ -6,9 +6,11 @@ import sharp from "sharp";
 import { Database } from "./database.js";
 import { FilesService } from "./files.js";
 import { SessionGuard, type AuthRequest } from "./auth.js";
+import { appOrigin } from "./security.js";
 
 type Image = { data: Buffer; width: number; height: number; name: string };
 const safe = (v: string) => v.replace(/[^\w .-]+/g, "_").slice(0, 90).trim() || "document";
+const formattedDate = (d: Date) => new Intl.DateTimeFormat("en-GB", {dateStyle:"medium",timeStyle:"short",timeZone:"UTC"}).format(d) + " UTC";
 const ascii = (v: unknown) => String(v ?? "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "?");
 const escapePdf = (v: string) => ascii(v).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 const crcTable = Array.from({ length: 256 }, (_, i) => {
@@ -34,10 +36,10 @@ export function zipFiles(entries: {name: string; bytes: Buffer}[]): Buffer {
 }
 
 class PdfDocument {
-  private pages: { lines: string[]; images: Image[]; y: number }[] = [];
+  private pages: { lines: string[]; images: Image[]; links: {url:string; y:number}[]; y: number }[] = [];
   private page = this.next();
   private next() {
-    const page = { lines: [] as string[], images: [] as Image[], y: 780 };
+    const page = { lines: [] as string[], images: [] as Image[], links: [] as {url:string; y:number}[], y: 775 };
     this.pages.push(page); return page;
   }
   private ensure(space: number) { if (this.page.y - space < 65) this.page = this.next(); }
@@ -56,6 +58,24 @@ class PdfDocument {
     }
     if (line) emit(line); if (!words.length) emit("");
   }
+  section(title: string) {
+    this.ensure(45);
+    this.page.y -= 7;
+    this.page.lines.push(`0.91 0.95 0.99 rg 43 ${(this.page.y-23).toFixed(1)} 509 29 re f 0.05 0.19 0.39 rg`);
+    this.page.lines.push(`BT /F2 12 Tf 52 ${(this.page.y-14).toFixed(1)} Td (${escapePdf(title)}) Tj ET 0 0 0 rg`);
+    this.page.y -= 41;
+  }
+  field(label: string, value: unknown) {
+    this.text(label, 9, true, 5);
+    this.text(value, 11, false, 13);
+  }
+  link(label: string, url: string) {
+    this.ensure(26);
+    const y=this.page.y;
+    this.page.lines.push(`0.04 0.34 0.72 rg BT /F2 10 Tf 48 ${y.toFixed(1)} Td (${escapePdf(label)}) Tj ET 0 0 0 rg`);
+    this.page.links.push({url,y});
+    this.page.y -= 22;
+  }
   image(bytes: Buffer, dimensions: {width:number;height:number}, label: string) {
     const width = Math.min(250, dimensions.width), height = Math.min(215, width * dimensions.height / dimensions.width);
     this.ensure(height + 28);
@@ -73,7 +93,8 @@ class PdfDocument {
     const pagesId = put("");
     const pageIds: number[] = [];
     for (const [index, page] of this.pages.entries()) {
-      page.lines.push(`BT /F1 8 Tf 48 35 Td (NOLT HR | Confidential | Page ${index+1} of ${this.pages.length}) Tj ET`);
+      page.lines.unshift(`0.04 0.15 0.33 rg 0 811 595 31 re f 1 1 1 rg BT /F2 14 Tf 48 821 Td (NOLT HR) Tj ET 0 0 0 rg`);
+      page.lines.push(`0.45 0.49 0.57 rg BT /F1 8 Tf 48 35 Td (NOLT HR  |  Confidential  |  Page ${index+1} of ${this.pages.length}) Tj ET 0 0 0 rg`);
       const imRefs: string[] = [];
       for (const img of page.images) {
         const header = Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.data.length} >>\nstream\n`);
@@ -82,7 +103,10 @@ class PdfDocument {
       }
       const commands = Buffer.from(page.lines.join("\n"), "latin1");
       const contentId = put(Buffer.concat([Buffer.from(`<< /Length ${commands.length} >>\nstream\n`),commands,Buffer.from("\nendstream")]));
-      pageIds.push(put(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font1} 0 R /F2 ${font2} 0 R >> /XObject << ${imRefs.join(" ")} >> >> /Contents ${contentId} 0 R >>`));
+      const annotationRefs = page.links.map(link => put(
+        `<< /Type /Annot /Subtype /Link /Rect [45 ${(link.y-5).toFixed(1)} 550 ${(link.y+12).toFixed(1)}] /Border [0 0 0] /A << /S /URI /URI (${escapePdf(link.url)}) >> >>`
+      ));
+      pageIds.push(put(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font1} 0 R /F2 ${font2} 0 R >> /XObject << ${imRefs.join(" ")} >> >> /Contents ${contentId} 0 R /Annots [${annotationRefs.map(id=>id+" 0 R").join(" ")}] >>`));
     }
     objects[pagesId] = Buffer.from(`<< /Type /Pages /Kids [${pageIds.map(id=>id+" 0 R").join(" ")}] /Count ${pageIds.length} >>`);
     const catalog = put(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
