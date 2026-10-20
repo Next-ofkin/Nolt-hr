@@ -155,6 +155,9 @@ export class HrExportService {
     doc.text(`Evidence reference: ${submission.id} | Form version reference: ${submission.formVersionId}`,8);
     return {pdf:doc.build(),attachments:supporting,employee:safe(a.onboardingCase.employee.fullName),title:safe(a.formVersion.title),version:submission.version,review:submission.review?.decision??"AWAITING_REVIEW"};
   }
+  async recordDownload(actorId:string, targetId:string, action:string) {
+    await this.db.auditEvent.create({data:{actorId,targetId,action,metadata:{exportedAt:new Date().toISOString()}}});
+  }
   async pack(userId:string, packAssignmentId:string) {
     const user=await this.db.user.findUnique({where:{id:userId}});
     if(!user?.active || user.role!=="HR") throw new ForbiddenException("Active HR access required.");
@@ -181,6 +184,8 @@ export class HrExportService {
     const info=new PdfDocument();for(const line of summary) info.text(line,11);
     entries.unshift({name:`${root}/00_Pack_Summary.pdf`,bytes:info.build()});
     if(entries.length>160)throw new BadRequestException("Pack contains too many attachments to export.");
+    if(entries.reduce((n,entry)=>n+entry.bytes.length,0)>100*1024*1024)
+      throw new BadRequestException("Pack export exceeds the 100MB safety limit. Download individual forms instead.");
     return {buffer:zipFiles(entries),filename:`${root}.zip`};
   }
 }
@@ -192,6 +197,7 @@ export class HrExportController {
   @Get("forms/:id.pdf")
   async form(@Req() req:AuthRequest,@Param("id",ParseUUIDPipe) id:string,@Res() res:Response) {
     const doc=await this.exports.render(req.actor.id,id);
+    await this.exports.recordDownload(req.actor.id, id, "FORM_PDF_EXPORTED");
     res.setHeader("Content-Type","application/pdf");
     res.setHeader("Content-Disposition",`attachment; filename="${doc.employee}_${doc.title}.pdf"`);
     res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
@@ -200,6 +206,7 @@ export class HrExportController {
   @Get("packs/:id.zip")
   async pack(@Req() req:AuthRequest,@Param("id",ParseUUIDPipe) id:string,@Res() res:Response) {
     const archive=await this.exports.pack(req.actor.id,id);
+    await this.exports.recordDownload(req.actor.id, id, "PACK_ZIP_EXPORTED");
     res.setHeader("Content-Type","application/zip");
     res.setHeader("Content-Disposition",`attachment; filename="${archive.filename}"`);
     res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
