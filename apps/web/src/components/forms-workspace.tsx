@@ -217,7 +217,7 @@ export function FormsWorkspace() {
         />
       ) : (
         <>
-          <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+          <div className="mb-6 rounded-xl border border-primary/15 bg-accent/60 px-4 py-3 text-sm">
             <strong>Form workflow:</strong> Create draft → add fields → save and preview → publish → open Onboarding packs to group published forms → assign the pack from an employee's checklist.
             <p className="mt-1 text-xs text-muted-foreground">Published forms are locked. For changes, create a new form version; employees already assigned an earlier version keep it for audit history.</p>
           </div>

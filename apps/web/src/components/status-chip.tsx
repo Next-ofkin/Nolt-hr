@@ -21,8 +21,8 @@ export function StatusChip({ status, label }: { status: string; label?: string }
   const c = config[status] ?? { label: status.replaceAll("_", " ").toLowerCase(), tone: "neutral" as Tone, icon: Clock3 };
   const Icon = c.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[c.tone]}`}>
-      <Icon size={13} aria-hidden="true" />
+    <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold leading-snug ${tones[c.tone]}`}>
+      <Icon size={13} aria-hidden="true" className="shrink-0" />
       {label ?? c.label}
     </span>
   );
