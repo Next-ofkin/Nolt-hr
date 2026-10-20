@@ -485,7 +485,15 @@ export function EmployeesWorkspace() {
                 </div>
               ) : (
                 <div className="space-y-4 border-t pt-5">
-                  <div><h3 className="text-lg font-semibold">Onboarding checklist</h3><p className="text-xs text-muted-foreground">Review forms that need attention and track completed work.</p></div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><h3 className="text-lg font-semibold">Onboarding checklist</h3><p className="text-xs text-muted-foreground">Review forms that need attention and track completed work.</p></div>
+                    {c.assignments.some(a => a.recipient === "EMPLOYEE" && ["SUBMITTED","APPROVED","CHANGES_REQUIRED"].includes(a.status)) && (
+                      <a href={`/api/v1/exports/cases/${c.id}.zip`} download
+                        className="inline-flex min-h-10 items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
+                        Download all completed forms (ZIP)
+                      </a>
+                    )}
+                  </div>
                   <PackAssignmentPanel
                     key={c.id}
                     caseId={c.id}
