@@ -501,6 +501,9 @@ export function EmployeesWorkspace() {
                     caseRevision={c.revision}
                     employmentType={detail.employee.employmentType}
                     csrfToken={session!.csrfToken}
+                    assignments={c.assignments}
+                    onReviewForm={setReviewingAssignmentId}
+                    onReviewExternal={setExternalReviewId}
                     onAssigned={async () => {
                       const refreshed = await api.GET("/api/v1/employees/{id}", {
                         params: { path: { id: detail.employee.id } },
@@ -511,84 +514,6 @@ export function EmployeesWorkspace() {
                       await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id]});
                     }}
                   />
-                  <ul className="space-y-3">
-                    {c.assignments.map((a) => {
-                      const isExternal = a.recipient !== "EMPLOYEE";
-                      const hasSubmission =
-                        !isExternal && (a.status === "SUBMITTED" ||
-                        a.status === "CHANGES_REQUIRED" ||
-                        a.status === "APPROVED");
-                      return (
-                        <li
-                          key={a.id}
-                          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3.5 ${a.status === "APPROVED" ? "border-emerald-200 bg-emerald-50/40" : ["EXTERNAL_SUBMITTED","SUBMITTED"].includes(a.status) ? "border-amber-200 bg-amber-50/40" : ""}`}
-                        >
-                          <div className="min-w-0 space-y-1">
-                            <p className="break-words font-medium">
-                              {a.title}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                              <span>
-                                {a.recipient.toLowerCase()} ·{" "}
-                                {a.required ? "Required" : "Optional"}
-                              </span>
-                              <span>·</span>
-                              {a.status === "EXTERNAL_SUBMITTED" ? (
-                                <Badge variant="secondary" className="text-xs">Guarantor submitted — HR follow-up required</Badge>
-                              ) : a.status === "APPROVED" ? (
-                                <Badge className="bg-green-600 hover:bg-green-700 text-xs">
-                                  Approved
-                                </Badge>
-                              ) : a.status === "CHANGES_REQUIRED" ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-amber-500 text-amber-700 bg-amber-50 text-xs"
-                                >
-                                  Changes Requested
-                                </Badge>
-                              ) : a.status === "SUBMITTED" ? (
-                                <Badge className="bg-amber-600 hover:bg-amber-700 text-xs">
-                                  Submitted — Review Required
-                                </Badge>
-                              ) : a.status === "DRAFT" ? (
-                                <Badge variant="secondary" className="text-xs">
-                                  Draft Saved
-                                </Badge>
-                              ) : (
-                                <span className="text-xs">Not started</span>
-                              )}
-                              {a.dueDate ? (
-                                <span>· Due {a.dueDate}</span>
-                              ) : null}
-                            </div>
-                          </div>
-                          {isExternal && ["EXTERNAL_SUBMITTED", "APPROVED", "CHANGES_REQUIRED"].includes(a.status) && (
-                            <Button type="button" size="sm" variant={a.status === "EXTERNAL_SUBMITTED" ? "default" : "outline"}
-                              onClick={() => setExternalReviewId(a.id)}>
-                              {a.status === "EXTERNAL_SUBMITTED" ? "Review guarantor evidence" : "View guarantor evidence"}
-                            </Button>
-                          )}
-                          {hasSubmission && (
-                             <a href={`/api/v1/exports/forms/${a.id}.pdf`} className="inline-flex min-h-9 items-center rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted" download>Download form PDF</a>
-                           )}
-                           {hasSubmission && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={
-                                a.status === "SUBMITTED" ? "default" : "outline"
-                              }
-                              onClick={() => setReviewingAssignmentId(a.id)}
-                            >
-                              {a.status === "SUBMITTED"
-                                ? "Review submission"
-                                : "View submission"}
-                            </Button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
                   {!c.assignments.length && (
                     <p className="text-sm text-muted-foreground">
                       No onboarding forms assigned yet. Choose a published pack above to assign its forms together.

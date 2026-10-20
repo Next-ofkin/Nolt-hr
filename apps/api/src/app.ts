@@ -6,6 +6,7 @@ import { HrInvitationExchangeController, HrInvitationExchangeService } from "./h
 import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import "reflect-metadata";
 import { HrExportController, HrExportService } from "./hr-export.js";
+import { SharedFilesController } from "./shared-files.js";
 import {
   ExternalRequestsController,
   ExternalWorkspaceController,
@@ -86,6 +87,7 @@ class HealthController {
     InvitationsController,
     InvitationActivationController,
     FilesController,
+    SharedFilesController,
     HrExportController,
     ExternalContactsController,
     ExternalRequestsController,
