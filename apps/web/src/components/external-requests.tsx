@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
@@ -17,10 +18,18 @@ export function ExternalRequests({
   onRequestStatus: (hasRequest: boolean, latestState: string | null) => void;
 }) {
   const { session } = useAuth();
-  const [items, setItems] = useState<
-      components["schemas"]["ExternalRequestDto"][]
-    >([]),
-    [busy, setBusy] = useState(false),
+  const requestsQuery = useQuery({
+    queryKey: ["external-requests", assignmentId],
+    queryFn: async () => {
+      const r = await api.GET("/api/v1/me/assignments/{id}/external-requests", {
+        params: { path: { id: assignmentId } },
+      });
+      if (r.error) throw Error(errorMessage(r.error));
+      return r.data.items as components["schemas"]["ExternalRequestDto"][];
+    },
+  });
+  const items = requestsQuery.data ?? [];
+  const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const pending = useRef<{
@@ -28,39 +37,14 @@ export function ExternalRequests({
     expectedContactRevision: number;
     replaceRequestId?: string;
   } | null>(null);
-  const load = useCallback(async (silent = false) => {
-    if (!silent) { setBusy(true); setError(""); }
-    try {
-      const r = await api.GET("/api/v1/me/assignments/{id}/external-requests", {
-        params: { path: { id: assignmentId } },
-      });
-      if (r.error) throw Error(errorMessage(r.error));
-      setItems(r.data.items);
-      onRequestStatus(r.data.items.length > 0, r.data.items[0]?.state ?? null);
-    } catch (e) {
-      if (!silent) setError(
-        e instanceof Error ? e.message : "Could not load request status.",
-      );
-    } finally {
-      if (!silent) setBusy(false);
-    }
-  }, [assignmentId, onRequestStatus]);
+  const { refetch: refetchRequests, data: requestData, error: requestError } = requestsQuery;
+  const load = useCallback(async () => { await refetchRequests(); }, [refetchRequests]);
   useEffect(() => {
-    void load();
-  }, [load]);
-  // Keep requests and delivery history up-to-date without manual refresh.
-  // Background reads never block editing or show an intrusive spinner.
+    if (requestData) onRequestStatus(requestData.length > 0, requestData[0]?.state ?? null);
+  }, [requestData, onRequestStatus]);
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void load(true); };
-    const interval = window.setInterval(refresh, 8000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
+    if (requestError && !requestData) setError(requestError instanceof Error ? requestError.message : "Could not load request status.");
+  }, [requestError, requestData]);
   const active = items[0];
   const approved = active?.state === "APPROVED";
   const correction = active?.state === "CHANGES_REQUIRED";

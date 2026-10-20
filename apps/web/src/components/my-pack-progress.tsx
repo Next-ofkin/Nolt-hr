@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 type PackProgress = {
   id: string; packName: string; dueDate: string | null; status: string; overdue: boolean;
@@ -8,19 +9,23 @@ type PackProgress = {
 };
 
 export function MyPackProgress({ refreshKey }: { refreshKey: number }) {
-  const [packs, setPacks] = useState<PackProgress[]>([]);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    try {
+  const packsQuery = useQuery({
+    queryKey: ["my-packs"],
+    queryFn: async () => {
       const response = await fetch("/api/v1/me/packs", { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error("Your pack progress is temporarily unavailable.");
-      setPacks(await response.json() as PackProgress[]);
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load packs.");
-    }
-  }, []);
-  useEffect(() => { void load(); }, [load, refreshKey]);
+      return await response.json() as PackProgress[];
+    },
+  });
+  const packs = packsQuery.data ?? [];
+  const error = packsQuery.error && !packsQuery.data ? packsQuery.error.message : "";
+  const seenKey = useRef(refreshKey);
+  const { refetch } = packsQuery;
+  useEffect(() => {
+    if (seenKey.current === refreshKey) return;
+    seenKey.current = refreshKey;
+    void refetch();
+  }, [refreshKey, refetch]);
   if (error) return <p role="alert" className="rounded-lg border p-4 text-sm">{error}</p>;
   if (!packs.length) return null;
   return <section className="space-y-3" aria-label="Onboarding pack progress">
