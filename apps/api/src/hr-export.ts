@@ -124,7 +124,7 @@ export class HrExportService {
   private async form(userId: string, assignmentId: string) {
     const assignment = await this.db.formAssignment.findUnique({
       where: {id:assignmentId}, include: { formVersion: true, onboardingCase: {include:{employee:true}},
-        response: true, submissions: {orderBy:{version:"desc"},take:1,include:{review:true}} },
+        response: true, submissions: {orderBy:{version:"desc"},take:1,include:{review:{include:{reviewer:{select:{name:true}}}}}} },
     });
     if (!assignment || assignment.formVersion.recipient !== "EMPLOYEE" || !assignment.submissions.length)
       throw new NotFoundException("Completed employee submission not found.");
@@ -133,51 +133,103 @@ export class HrExportService {
     return assignment;
   }
   async render(userId:string, assignmentId:string) {
-    const a=await this.form(userId,assignmentId); const submission=a.submissions[0];
-    const doc=new PdfDocument(); const supporting:{name:string;bytes:Buffer}[]=[];
-    doc.text("NOLT HR | COMPLETED EMPLOYEE FORM",17,true,12);
-    doc.text(a.formVersion.title,15,true,14);
-    doc.text(`Employee: ${a.onboardingCase.employee.fullName} | ${a.onboardingCase.employee.email}`);
-    doc.text(`Form version: ${a.formVersion.version} | Submission: ${submission.version} | Submitted: ${submission.submittedAt.toISOString()}`,9);
-    doc.text(`Review status: ${submission.review?.decision ?? "AWAITING REVIEW"}`,10,true);
-    if(submission.review) doc.text(`Reviewed: ${submission.review.reviewedAt.toISOString()} | Reviewer record: ${submission.review.reviewedBy}`,9);
-    doc.text("SUBMITTED ANSWERS",12,true,12);
+    const a = await this.form(userId, assignmentId);
+    const submission = a.submissions[0];
+    const answers = submission.answers as Record<string, unknown>;
     const fields = a.formVersion.fields as unknown;
     if (!Array.isArray(fields)) throw new BadRequestException("Invalid form definition.");
-    const answers = submission.answers as Record<string,unknown>;
-    for(const field of fields) {
-      if (!field || typeof field !== "object") continue;
-      const f=field as {id?:string;label?:string;type?:string};
-      if(!f.id) continue;
-      doc.text(f.label??"Field",11,true,4);
-      const raw=answers[f.id];
-      if(raw===null || raw===undefined || raw==="") {doc.text("(Not answered)",10);continue;}
-      if(["passport_photo","signature","file"].includes(f.type??"")) {
-        if(typeof raw!=="string" || !/^[0-9a-f-]{36}$/i.test(raw)) {doc.text("(Attachment unavailable)",10);continue;}
-        // Validate evidence belongs to this assignment and field, not merely to any HR-accessible case.
-        const stored = await this.db.storedFile.findFirst({where:{
-          assignmentId,
-          fieldId:f.id,
-          OR:[{id:raw},{signature:{is:{id:raw}}}],
-          status:"CONFIRMED",scanStatus:"CLEAN",
-        }});
-        if(!stored) {doc.text("(Verified attachment unavailable)",10);continue;}
-        const file=await this.files.downloadFile(userId,stored.id);
-        if(f.type==="file") {
-          const filename=safe(file.fileName);
-          supporting.push({name:`Supporting_Documents/${safe(a.formVersion.title)}/${String(supporting.length+1).padStart(2,"0")}_${filename}`,bytes:file.buffer});
-          doc.text(`Attached document: ${filename} (original included in pack ZIP)`,10);
-        } else {
-          if(!file.mimeType.startsWith("image/")) {doc.text("(Invalid image evidence)",10);continue;}
-          const image=sharp(file.buffer).rotate().flatten({background:"#ffffff"});
-          const metadata=await image.metadata();
-          const data=await image.jpeg({quality:88}).toBuffer();
-          doc.image(data,{width:metadata.width??400,height:metadata.height??400}, f.type==="signature"?"Electronically captured employee signature":"Employee passport photograph");
-        }
-      } else doc.text(typeof raw==="boolean"?(raw?"Yes":"No"):typeof raw==="string"?raw:JSON.stringify(raw),10);
+    const doc = new PdfDocument();
+    const supporting: { name:string; bytes:Buffer }[] = [];
+
+    doc.text(a.formVersion.title, 18, true, 13);
+    doc.text("Completed employee form  |  NOLT HR", 10, false, 14);
+    doc.section("Employee information");
+    doc.field("Employee", a.onboardingCase.employee.fullName);
+    doc.field("Employee email", a.onboardingCase.employee.email);
+    doc.field("Submitted", formattedDate(submission.submittedAt));
+    doc.field("Form version", `Version ${a.formVersion.version}  |  Submission ${submission.version}`);
+
+    doc.section("HR review");
+    const decision = submission.review?.decision ?? "AWAITING REVIEW";
+    doc.field("Status", decision.replaceAll("_", " "));
+    if (submission.review) {
+      doc.field("Reviewed by", submission.review.reviewer.name || "HR reviewer");
+      doc.field("Review date", formattedDate(submission.review.reviewedAt));
+      if (submission.review.reason) doc.field("Review comments", submission.review.reason);
     }
-    doc.text(`Evidence reference: ${submission.id} | Form version reference: ${submission.formVersionId}`,8);
-    return {pdf:doc.build(),attachments:supporting,employee:safe(a.onboardingCase.employee.fullName),title:safe(a.formVersion.title),version:submission.version,review:submission.review?.decision??"AWAITING_REVIEW"};
+
+    doc.section("Submitted answers");
+    const storedFiles = await this.db.storedFile.findMany({
+      where: { assignmentId, status:"CONFIRMED", scanStatus:"CLEAN" },
+      include: { signature: {select:{id:true, signedAt:true}} },
+    });
+    const filesToLoad = new Map<string, typeof storedFiles[number]>();
+    for (const item of fields) {
+      if (!item || typeof item !== "object") continue;
+      const field = item as {id?:string;type?:string};
+      const raw = field.id ? answers[field.id] : undefined;
+      if (typeof raw !== "string" || !["file","passport_photo","signature"].includes(field.type ?? "")) continue;
+      const file = storedFiles.find(row => row.fieldId === field.id &&
+        (row.id === raw || row.signature?.id === raw));
+      if (file) filesToLoad.set(file.id, file);
+    }
+    // Load private evidence concurrently, in small bounded groups to avoid
+    // waiting serially on Supabase without exhausting storage connections.
+    const evidence = new Map<string, Awaited<ReturnType<FilesService["downloadFile"]>>>();
+    const requested = [...filesToLoad.values()];
+    for (let i=0;i<requested.length;i+=3) {
+      const chunk = requested.slice(i,i+3);
+      const results = await Promise.all(chunk.map(file => this.files.downloadFile(userId,file.id)));
+      results.forEach((result,index) => evidence.set(chunk[index].id,result));
+    }
+
+    for (const value of fields) {
+      if (!value || typeof value !== "object") continue;
+      const field = value as {id?:string;label?:string;type?:string};
+      if (!field.id) continue;
+      const label = field.label?.trim() || "Form field";
+      const raw = answers[field.id];
+      if (raw === null || raw === undefined || raw === "") {
+        doc.field(label, "Not provided");
+        continue;
+      }
+      if (["file", "passport_photo", "signature"].includes(field.type ?? "")) {
+        const file = typeof raw === "string" ?
+          storedFiles.find(row => row.fieldId === field.id &&
+            (row.id === raw || row.signature?.id === raw)) : undefined;
+        const uploaded = file ? evidence.get(file.id) : undefined;
+        if (!uploaded || !file) {
+          doc.field(label, "File was not available for this submitted field");
+          continue;
+        }
+        doc.text(label, 10, true, 9);
+        if (field.type === "file") {
+          const filename = safe(uploaded.fileName);
+          supporting.push({name:`Supporting_Documents/${safe(a.formVersion.title)}/${String(supporting.length+1).padStart(2,"0")}_${filename}`,bytes:uploaded.buffer});
+          doc.text(`Attachment: ${filename}`, 10, false, 6);
+          const extension = ["application/pdf","image/png","image/jpeg"].includes(uploaded.mimeType) ? "preview" : "download";
+          doc.link("Open attached document securely", `${appOrigin()}/api/v1/files/${file.id}/${extension}`);
+          doc.text("The link requires an authorised NOLT HR sign-in.", 8, false, 12);
+        } else if (uploaded.mimeType.startsWith("image/")) {
+          const image = await sharp(uploaded.buffer).rotate().flatten({background:"#ffffff"}).jpeg({quality:85}).toBuffer({resolveWithObject:true});
+          doc.image(image.data,{width:image.info.width,height:image.info.height},
+            field.type === "signature" ? "Employee signature" : "Uploaded photograph");
+          if (field.type === "signature" && file.signature?.signedAt) {
+            doc.text(`Signed: ${formattedDate(file.signature.signedAt)}`,9);
+          }
+        } else {
+          doc.text("The submitted image could not be displayed.",10);
+        }
+      } else {
+        const answer = typeof raw === "boolean" ? (raw ? "Yes" : "No") :
+          typeof raw === "string" ? raw : JSON.stringify(raw);
+        doc.field(label,answer);
+      }
+    }
+    doc.text("This report contains the employee's saved form responses and HR review outcome.",8);
+    return {pdf:doc.build(),attachments:supporting,
+      employee:safe(a.onboardingCase.employee.fullName),title:safe(a.formVersion.title),
+      version:submission.version,review:decision};
   }
   async recordDownload(actorId:string, targetId:string, action:string) {
     await this.db.auditEvent.create({data:{actorId,targetId,action,metadata:{exportedAt:new Date().toISOString()}}});
