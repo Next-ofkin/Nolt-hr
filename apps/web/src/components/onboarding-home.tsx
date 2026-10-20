@@ -59,7 +59,6 @@ function EmployeeHome() {
       if (r.error) throw new Error(errorMessage(r.error));
       return r.data;
     },
-    refetchInterval: 10000,
   });
   useEffect(() => {
     if (liveOnboarding.data) {

@@ -1,4 +1,5 @@
 "use client";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
@@ -50,17 +51,7 @@ export function ExternalRequests({
   }, [load]);
   // Keep requests and delivery history up-to-date without manual refresh.
   // Background reads never block editing or show an intrusive spinner.
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void load(true); };
-    const interval = window.setInterval(refresh, 8000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
+  useLiveRefresh(() => load(true));
   const active = items[0];
   const approved = active?.state === "APPROVED";
   const correction = active?.state === "CHANGES_REQUIRED";

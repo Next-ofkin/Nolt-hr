@@ -125,7 +125,6 @@ export function EmployeesWorkspace() {
       return r.data;
     },
     staleTime: 30_000,
-    refetchInterval: 15_000,
   });
   useEffect(() => {
     if (directoryQuery.data) {
@@ -151,7 +150,6 @@ export function EmployeesWorkspace() {
       return r.data;
     },
     staleTime: 20_000,
-    refetchInterval: 15_000,
   });
   useEffect(() => {
     if (selectedEmployeeQuery.data && !editing && !reviewingAssignmentId &&

@@ -1,4 +1,5 @@
 "use client";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
@@ -46,11 +47,7 @@ export function EmployeeInvitations({
   }, [load]);
   const latest = items[0],
     accepted = items.some((i) => i.state === "ACCEPTED");
-  useEffect(() => {
-    if (!latest || !["QUEUED", "SENDING"].includes(latest.state)) return;
-    const interval = window.setInterval(() => { void load().catch(() => {}); }, 5000);
-    return () => window.clearInterval(interval);
-  }, [latest?.id, latest?.state, load]);
+  useLiveRefresh(() => load(), Boolean(latest && ["QUEUED", "SENDING"].includes(latest.state)));
   async function send() {
     if (!session) return;
     const p = request ?? {

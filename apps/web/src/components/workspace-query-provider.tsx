@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { LIVE_REFRESH_MS } from "@/lib/live-refresh";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export function WorkspaceQueryProvider({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export function WorkspaceQueryProvider({ children }: { children: React.ReactNode
         retry: 1,
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
+        refetchInterval: LIVE_REFRESH_MS,
         refetchIntervalInBackground: false,
       },
     },

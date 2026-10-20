@@ -1,4 +1,5 @@
 "use client";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { EmployeeAssignmentCard, type EmployeeAssignment } from "./employee-assignment-card";
@@ -67,12 +68,7 @@ export function PackAssignmentPanel({
   useEffect(() => { void refresh(); }, [refresh]);
   // Keep a single visibility-aware refresh timer. Avoid competing React Query
   // polling and interval requests against the same case and pack endpoints.
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (!busy && document.visibilityState === "visible") void refresh();
-    }, 60000);
-    return () => window.clearInterval(timer);
-  }, [refresh, busy]);
+  useLiveRefresh(() => refresh(), !busy);
 
   const latestPublished = new Map<string, Pack>();
   for (const pack of packs) {

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useVisibleRefresh } from "@/lib/use-visible-refresh";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ArrowDown, ArrowUp, FileStack, Loader2, Plus, RefreshCw, Save, ShieldCheck, X } from "lucide-react";
@@ -82,7 +82,7 @@ export function PacksWorkspace() {
     } finally { setLoading(false); }
   }, [cache, session?.id]);
   useEffect(() => { if (session) void refresh(); }, [refresh, session?.id]);
-  useVisibleRefresh(() => refresh(false, true), undefined, Boolean(session));
+  useLiveRefresh(() => refresh(false, true), Boolean(session));
 
   const available = useMemo(() => forms.filter(form =>
     !selected.some(item => item.formId === form.formId) &&

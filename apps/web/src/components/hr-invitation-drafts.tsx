@@ -1,4 +1,5 @@
 "use client";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ClipboardCheck, Clock3, Loader2, UserPlus, XCircle } from "lucide-react";
@@ -32,17 +33,7 @@ export function HrInvitationDrafts() {
   useEffect(() => { void load(); }, [load]);
   // Server-driven delivery jobs finish asynchronously. Refresh visible dashboards
   // without full-page reloads, and fetch immediately when the tab regains focus.
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible" && !busy) void load(true); };
-    const interval = window.setInterval(refresh, 8000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load, busy]);
+  useLiveRefresh(() => load(true), !busy);
   useEffect(() => {
     let active = true;
     void fetch("/api/v1/developer/overview", { credentials: "same-origin", cache: "no-store" })

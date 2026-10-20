@@ -1,4 +1,5 @@
 "use client";
+import { useLiveRefresh } from "@/lib/live-refresh";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -46,17 +47,7 @@ function DeveloperHome() {
     }
   }, [page, pageSize, appliedSearch, status]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void load(true); };
-    const interval = window.setInterval(refresh, 30000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [load]);
+  useLiveRefresh(() => load(true));
 
   const greeting = session?.name?.trim().split(/\s+/)[0] || "Developer";
   const stats = [

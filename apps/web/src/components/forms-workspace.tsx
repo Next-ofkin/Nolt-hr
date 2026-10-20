@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useVisibleRefresh } from "@/lib/use-visible-refresh";
+import { useLiveRefresh } from "@/lib/live-refresh";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-provider";
@@ -145,7 +145,7 @@ export function FormsWorkspace() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  useVisibleRefresh(() => refresh(false, true), undefined, Boolean(session));
+  useLiveRefresh(() => refresh(false, true), Boolean(session) && !busy && !createOpen);
   useEffect(() => {
     if (!notice) return;
     if (notice.kind === "error") toast.error(notice.text);
