@@ -213,7 +213,7 @@ export function PackAssignmentPanel({ caseId, employeeId, employmentType, csrfTo
     {existing.length > 0 && <div className="space-y-3 border-t pt-3">
       <p className="text-sm font-semibold">Assigned packs</p>
       {existing.map(a=><article key={a.id} className="rounded-lg border bg-white p-3">
-        <p className="font-medium">{a.packName}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{a.packName}</p><a href={`/api/v1/exports/packs/${a.id}.zip`} download className="inline-flex min-h-9 items-center rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted">Download pack ZIP</a></div>
         <p className="mt-1 text-xs text-muted-foreground">{a.totalForms} forms · {a.approvedRequired}/{a.requiredForms} required approved · Due {a.dueDate ?? "date not set"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant={a.approvedAt ? "default" : "secondary"}>{a.status.replaceAll("_"," ")}</Badge><span className="text-xs text-muted-foreground">{a.approvedRequired} of {a.requiredForms} required forms approved</span></div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${a.requiredForms ? (a.approvedRequired / a.requiredForms) * 100 : 0}%` }} /></div>
