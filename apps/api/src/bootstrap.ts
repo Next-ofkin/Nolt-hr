@@ -15,6 +15,10 @@ export async function createApp() {
     logger: ["error", "warn", "log"],
     bodyParser: false,
   });
+  // Railway terminates TLS in front of the API. Trust exactly one proxy hop so
+  // req.ip is the real visitor address; otherwise every user shares one address
+  // and the sign-in rate limiter blocks everyone together.
+  app.set("trust proxy", 1);
   app.useBodyParser("json", { limit: "15mb" });
   app.setGlobalPrefix("api/v1");
   app.use(
