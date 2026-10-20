@@ -1,6 +1,6 @@
 "use client";
 import type { components } from "@nolt/api-client/schema";
-import { Badge } from "./ui/badge";
+import { StatusChip } from "./status-chip";
 import { Button } from "./ui/button";
 import { Download, FileText } from "lucide-react";
 
@@ -28,7 +28,7 @@ export function EmployeeAssignmentCard({
     DRAFT: "Draft saved",
   };
   return (
-    <li className={`flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border p-3.5 sm:p-4 ${assignment.status === "APPROVED" ? "border-emerald-200 bg-emerald-50/50" : needsReview ? "border-amber-200 bg-amber-50/40" : "bg-white"}`}>
+    <li className={`flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border p-3.5 sm:p-4 ${assignment.status === "APPROVED" ? "border-emerald-200 bg-emerald-50/50" : needsReview ? "border-indigo-200 bg-indigo-50/40" : "bg-white"}`}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border bg-white text-primary" aria-hidden="true">
           <FileText size={17} />
@@ -41,12 +41,7 @@ export function EmployeeAssignmentCard({
             <span>{assignment.required ? "Required" : "Optional"}</span>
             {assignment.dueDate && <span>· Due {assignment.dueDate}</span>}
           </div>
-          <Badge
-            variant={assignment.status === "APPROVED" ? "default" : "secondary"}
-            className={assignment.status === "APPROVED" ? "bg-emerald-700 text-white" : needsReview ? "bg-amber-100 text-amber-900" : ""}
-          >
-            {statusLabel[assignment.status] ?? (assignment.status === "NOT_STARTED" ? "Not started" : assignment.status.replaceAll("_"," ").toLowerCase())}
-          </Badge>
+          <StatusChip status={assignment.status} label={statusLabel[assignment.status]} />
         </div>
       </div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
