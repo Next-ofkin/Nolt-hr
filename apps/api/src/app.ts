@@ -5,6 +5,7 @@ import { HrInvitationDeliveryLedger } from "./hr-invitation-ledger.js";
 import { HrInvitationExchangeController, HrInvitationExchangeService } from "./hr-invitation-exchange.js";
 import { HrInvitationProofService } from "./hr-invitation-proof.js";
 import "reflect-metadata";
+import { HrExportController, HrExportService } from "./hr-export.js";
 import {
   ExternalRequestsController,
   ExternalWorkspaceController,
@@ -85,6 +86,7 @@ class HealthController {
     InvitationsController,
     InvitationActivationController,
     FilesController,
+    HrExportController,
     ExternalContactsController,
     ExternalRequestsController,
     ExternalEvidenceReviewController,
@@ -109,6 +111,7 @@ class HealthController {
     InvitationsService,
     FilesService,
     FilesStorage,
+    HrExportService,
     ExternalContactsService,
     ExternalRequestsService,
     ExternalEvidenceReviewService,
