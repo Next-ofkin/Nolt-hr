@@ -246,7 +246,7 @@ export function SubmissionReview({
         >
           <h3 className="font-semibold">Assign review access</h3>
           <p className="text-sm text-muted-foreground">
-            Assign the HR colleague who will approve this form or request changes. New HR accounts do not automatically receive access. The case creator must assign a reviewer, and health/financial permissions require separate authorisation.
+            All active HR colleagues can review submitted employee forms. Individual reviewer assignments are not required.
           </p>
           <div className="space-y-2">
             <Label htmlFor="reviewer-email">Reviewer email</Label>
@@ -292,7 +292,7 @@ export function SubmissionReview({
       )}
       {access && !access.canConfigure && !access.canReview && !loading && (
         <p role="status">
-          You cannot approve or request changes yet. Ask the HR colleague who opened this onboarding case to assign you as the reviewer. If another reviewer is already assigned or sensitive-data access is missing, an authorised administrator must resolve this.
+          You cannot review this form. Only active HR accounts can review employee submissions in active onboarding cases. Contact your administrator if your HR account is not activated.
         </p>
       )}
 
