@@ -278,9 +278,21 @@ export class HrExportService {
   async pack(userId:string, packAssignmentId:string) {
     const user=await this.db.user.findUnique({where:{id:userId}});
     if(!user?.active || user.role!=="HR") throw new ForbiddenException("Active HR access required.");
-    const pack=await this.db.packAssignment.findUnique({where:{id:packAssignmentId},include:{
-      pack:true,onboardingCase:{include:{employee:true}},forms:{orderBy:{position:"asc"},include:{formAssignment:{include:{formVersion:{select:{title:true}}}}}}}
-    }});
+    const pack = await this.db.packAssignment.findUnique({
+      where: { id: packAssignmentId },
+      include: {
+        pack: true,
+        onboardingCase: { include: { employee: true } },
+        forms: {
+          orderBy: { position: "asc" },
+          include: {
+            formAssignment: {
+              include: { formVersion: { select: { title: true } } },
+            },
+          },
+        },
+      },
+    });
     if(!pack) throw new NotFoundException("Assigned pack not found.");
     const employee=safe(pack.onboardingCase.employee.fullName);
     const root=`${employee}_${safe(pack.pack.name)}`;
