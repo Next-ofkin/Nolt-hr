@@ -546,6 +546,9 @@ export function EmployeesWorkspace() {
                             </Button>
                           )}
                           {hasSubmission && (
+                             <a href={`/api/v1/exports/forms/${a.id}.pdf`} className="inline-flex min-h-9 items-center rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted" download>Download form PDF</a>
+                           )}
+                           {hasSubmission && (
                             <Button
                               type="button"
                               size="sm"
