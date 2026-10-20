@@ -166,7 +166,8 @@ export class Sessions {
       if (proof.user.id !== session.userId ||
           proof.user.authVersion !== session.authVersion)
         throw new UnauthorizedException("Account access changed. Sign in again.");
-      if (this.provider.providerTokensUnchanged(session.providerSession, proof.encrypted)) {
+      {
+        const unchanged = this.provider.providerTokensUnchanged(session.providerSession, proof.encrypted);
         const verifiedAt = new Date();
         const updated = await this.db.session.updateMany({
           where: {
@@ -178,7 +179,7 @@ export class Sessions {
             expiresAt: { gt: verifiedAt },
             lastSeenAt: { gt: new Date(verifiedAt.getTime() - SESSION_IDLE_MS) },
           },
-          data: { lastSeenAt: verifiedAt },
+          data: { lastSeenAt: verifiedAt, ...(!unchanged ? {providerSession:proof.encrypted} : {}) },
         });
         verifiedWithoutLock = updated.count === 1;
       }
