@@ -17,7 +17,7 @@ test("review access requires explicit classification and technical administratio
     false,
   );
   assert.equal(
-    permissionsFor({ role: "SYSTEM_ADMIN", permissions: [] }).includes(
+    permissionsFor({ role: "DEVELOPER", permissions: [] }).includes(
       "reviews.assigned",
     ),
     false,

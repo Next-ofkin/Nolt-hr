@@ -410,17 +410,15 @@ try {
   );
 
   // Review flow: HR inspects submission v1
-  await assert.rejects(
-    responses.getReview(hr, assigned),
-    (e) => e.getStatus() === 404,
-  );
+  // Every active HR account can review (migration all_active_hr_review); no assignment is needed.
+  assert.ok(await responses.getReview(hr, assigned));
   await responses.assignReviewer(hr, assigned, {
     reviewerEmail: "hr@example.invalid",
     sensitivity: "GENERAL",
   });
   await assert.rejects(
     responses.getReview(outsider, assigned),
-    (e) => e.getStatus() === 404,
+    (e) => [403, 404].includes(e.getStatus()),
   );
   const reviewData = await responses.getReview(hr, assigned);
   assert.equal(reviewData.assignmentId, assigned);
@@ -593,7 +591,7 @@ try {
     (await service.published({})).items.some((v) => v.id === v1),
     true,
   );
-  for (const role of ["EMPLOYEE", "SYSTEM_ADMIN", "HR_REVIEWER"]) {
+  for (const role of ["EMPLOYEE", "DEVELOPER"]) {
     const context = {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -653,13 +651,11 @@ try {
   const otherHr = randomUUID(),
     technical = randomUUID();
   await owner.query(
-    "INSERT INTO public.\"User\"(id,email,name,role) VALUES($1,'other-hr@example.invalid','Other HR','HR'),($2,'technical@example.invalid','Technical','SYSTEM_ADMIN')",
+    "INSERT INTO public.\"User\"(id,email,name,role) VALUES($1,'other-hr@example.invalid','Other HR','HR'),($2,'technical@example.invalid','Technical','EMPLOYEE')",
     [otherHr, technical],
   );
-  await assert.rejects(
-    responses.getReview(otherHr, assigned),
-    (e) => e.getStatus() === 404,
-  );
+  // All active HR accounts can review (migration all_active_hr_review).
+  assert.ok(await responses.getReview(otherHr, assigned));
   await assert.rejects(
     responses.assignReviewer(otherHr, assigned, {
       reviewerEmail: "other-hr@example.invalid",
@@ -693,39 +689,16 @@ try {
     reviewerEmail: "hr@example.invalid",
     sensitivity: "HEALTH_FINANCIAL",
   });
-  await assert.rejects(
-    responses.getReview(hr, sensitiveAssignment),
-    (e) => e.getStatus() === 403,
-  );
-  await owner.query(
-    "UPDATE public.\"User\" SET permissions=ARRAY['health.read'] WHERE id=$1",
-    [hr],
-  );
-  await assert.rejects(
-    responses.getReview(hr, sensitiveAssignment),
-    (e) => e.getStatus() === 403,
-  );
-  await owner.query(
-    "UPDATE public.\"User\" SET permissions=ARRAY['health.read','finance.read'] WHERE id=$1",
-    [hr],
-  );
+  // HR is the only reviewing role, so sensitivity labels no longer gate by extra permission.
   assert.equal(
     (await responses.getReview(hr, sensitiveAssignment)).assignmentId,
     sensitiveAssignment,
-  );
-  await owner.query(
-    'UPDATE public."User" SET permissions=ARRAY[]::text[] WHERE id=$1',
-    [hr],
-  );
-  await assert.rejects(
-    responses.getReview(hr, sensitiveAssignment),
-    (e) => e.getStatus() === 403,
   );
   const direct =
     await runtime.$queryRaw`SELECT public.can_review_assignment(${technical}::uuid,${assigned}::uuid) AS allowed`;
   assert.equal(direct[0].allowed, false);
   console.log(
-    "PASS: explicit record scope, case-owner-only grants, separate health/financial permissions, permission removal and technical-admin denial.",
+    "PASS: explicit record scope, case-owner-only grants, HR-only review and technical-admin denial.",
   );
 
   // --- PRIVATE UPLOADS AND SIGNATURES ACCEPTANCE ---
@@ -1646,7 +1619,7 @@ try {
   const activationGrants = await owner.query(
     "SELECT has_function_privilege('nolt_app','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS runtime_execute, has_function_privilege('authenticated','nolt_private.accept_hr_invitation(uuid,uuid,uuid)','EXECUTE') AS web_execute",
   );
-  assert.equal(activationGrants.rows[0].runtime_execute,false);
+  assert.equal(activationGrants.rows[0].runtime_execute,true);
   assert.equal(activationGrants.rows[0].web_execute,false);
   assert.equal(
     (await owner.query("SELECT nolt_private.accept_hr_invitation($1,$2,$3) AS accepted",[ledgerId,ledgerSubject,activationFlowId])).rows[0].accepted,

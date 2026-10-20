@@ -263,7 +263,7 @@ export class ResponsesService {
       if (
         !a ||
         !user?.active ||
-        !["HR", "HR_REVIEWER"].includes(user.role) ||
+        user.role !== "HR" ||
         a.onboardingCase.status !== "ACTIVE"
       )
         throw new NotFoundException("Assigned review not found.");
@@ -304,9 +304,9 @@ export class ResponsesService {
       const reviewer = await tx.user.findUnique({
         where: { email: p.reviewerEmail },
       });
-      if (!reviewer?.active || !["HR", "HR_REVIEWER"].includes(reviewer.role))
+      if (!reviewer?.active || reviewer.role !== "HR")
         throw new BadRequestException(
-          "Choose an existing active HR or reviewer account.",
+          "Choose an existing active HR account.",
         );
       const existing = await tx.assignmentReviewAccess.findUnique({
         where: { assignmentId },

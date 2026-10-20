@@ -6,7 +6,7 @@ The workflow is employee submits -> assigned reviewer requests changes with a ma
 
 ## Access
 
-The reviews.assigned permission is separate from form management. HR and HR_REVIEWER have that module permission; employees and technical administrators do not. Every read/decision also requires an AssignmentReviewAccess record for the exact actor/assignment. The API checks current database membership and sensitivity permissions.
+The reviews.assigned permission is separate from form management. Only the HR role has that module permission (the HR_REVIEWER and SYSTEM_ADMIN roles were removed on 20 October 2026; only EMPLOYEE, HR and DEVELOPER exist). Employees and developers do not. Every read/decision also requires an AssignmentReviewAccess record for the exact actor/assignment. The API checks current database membership and sensitivity permissions.
 
 The HR account that opened the case explicitly selects one reviewer and classifies the whole form as GENERAL, HEALTH, FINANCIAL or HEALTH_FINANCIAL. Existing assignments remain inaccessible for review until configured. Health/financial forms additionally require health.read and/or finance.read. Assignment cannot grant these extra permissions. Database guards enforce the same boundary for review writes.
 
