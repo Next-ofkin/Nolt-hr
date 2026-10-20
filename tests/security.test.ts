@@ -7,8 +7,9 @@ import {
   permissionsFor,
 } from "../apps/api/src/security.js";
 test("Role grants separate technical administration and sensitive HR access", () => {
-  assert.deepEqual(permissionsFor({ role: "SYSTEM_ADMIN", permissions: [] }), [
+  assert.deepEqual(permissionsFor({ role: "DEVELOPER", permissions: [] }), [
     "system.manage",
+    "hr.accounts.manage",
   ]);
   assert.equal(
     permissionsFor({ role: "HR", permissions: [] }).includes("health.read"),
@@ -16,15 +17,18 @@ test("Role grants separate technical administration and sensitive HR access", ()
   );
   assert.equal(
     permissionsFor({
-      role: "HR_REVIEWER",
+      role: "EMPLOYEE",
       permissions: ["forms.manage", "health.read", "arbitrary"],
     }).includes("forms.manage"),
     false,
   );
   assert.deepEqual(
-    permissionsFor({ role: "HR_REVIEWER", permissions: ["health.read"] }),
-    ["reviews.assigned", "health.read"],
+    permissionsFor({ role: "EMPLOYEE", permissions: ["health.read"] }),
+    ["profile.own", "health.read"],
   );
+  // Removed roles must fail closed, even with optional extra permissions.
+  for (const role of ["HR_REVIEWER", "SYSTEM_ADMIN", "HR_ADMIN", ""])
+    assert.deepEqual(permissionsFor({ role, permissions: ["health.read"] }), []);
 });
 test("Production cookies use host prefix and configuration rejects HTTP origins", () => {
   const previous = {
