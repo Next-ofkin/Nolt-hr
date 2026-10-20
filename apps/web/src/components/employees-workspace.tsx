@@ -177,6 +177,7 @@ export function EmployeesWorkspace() {
       });
       if (r.error) throw new Error(errorMessage(r.error));
       setDetail(r.data);
+      queryClient.setQueryData(["hr-employee-detail", session?.id, id], r.data);
       setEditing(false);
     });
   }
@@ -347,8 +348,10 @@ export function EmployeesWorkspace() {
                       });
                   if (r.error) throw new Error(errorMessage(r.error));
                   setDetail(r.data);
+                  queryClient.setQueryData(["hr-employee-detail",session?.id,r.data.employee.id],r.data);
                   setEditing(false);
                   setNotice("Employee record saved.");
+                  await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id],refetchType:"none"});
                   await list();
                 });
               }}
@@ -471,6 +474,8 @@ export function EmployeesWorkspace() {
                         );
                         if (r.error) throw new Error(errorMessage(r.error));
                         setDetail(r.data);
+                        queryClient.setQueryData(["hr-employee-detail",session?.id,r.data.employee.id],r.data);
+                        await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id]});
                         setNotice("Onboarding case opened.");
                       })
                     }
@@ -494,6 +499,8 @@ export function EmployeesWorkspace() {
                       });
                       if (refreshed.error || !refreshed.data) throw new Error("Could not reload the employee case.");
                       setDetail(refreshed.data);
+                      queryClient.setQueryData(["hr-employee-detail",session?.id,refreshed.data.employee.id],refreshed.data);
+                      await queryClient.invalidateQueries({queryKey:["hr-employees",session?.id]});
                     }}
                   />
                   <ul className="space-y-3">
