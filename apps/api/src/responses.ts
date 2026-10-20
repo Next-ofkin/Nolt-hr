@@ -239,10 +239,6 @@ export class ResponsesService {
     reviewerId: string,
     assignmentId: string,
   ) {
-    const grant = await tx.assignmentReviewAccess.findFirst({
-      where: { assignmentId, reviewerId },
-    });
-    if (!grant) throw new NotFoundException("Assigned review not found.");
     const allowed = await tx.$queryRaw<
       { allowed: boolean }[]
     >`SELECT public.can_review_assignment(${reviewerId}::uuid,${assignmentId}::uuid) AS allowed`;
@@ -268,19 +264,14 @@ export class ResponsesService {
         !a ||
         !user?.active ||
         !["HR", "HR_REVIEWER"].includes(user.role) ||
-        (a.onboardingCase.createdBy !== actorId &&
-          a.reviewAccess?.reviewerId !== actorId)
+        a.onboardingCase.status !== "ACTIVE"
       )
         throw new NotFoundException("Assigned review not found.");
       const allowed = await tx.$queryRaw<
         { allowed: boolean }[]
       >`SELECT public.can_review_assignment(${actorId}::uuid,${assignmentId}::uuid) AS allowed`;
       return {
-        canConfigure:
-          user.role === "HR" &&
-          a.onboardingCase.createdBy === actorId &&
-          !a.reviewAccess &&
-          a.onboardingCase.status === "ACTIVE",
+        canConfigure: false,
         canReview: allowed[0]?.allowed ?? false,
         reviewerEmail: a.reviewAccess?.reviewer.email ?? null,
         sensitivity: a.reviewAccess?.sensitivity ?? null,
