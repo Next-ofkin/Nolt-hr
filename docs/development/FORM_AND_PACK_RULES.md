@@ -26,7 +26,7 @@ Updated 21 October 2026. Enforced by the API (`apps/api/src/forms.ts`, `packs.ts
 | Unpublish | Any published pack. Employees who already have it keep it |
 | Reopen as draft / edit | The pack must be unpublished first, must never have been assigned, and must have no newer version. Otherwise make a **new version** |
 | Delete | **Unpublish first**, then the same conditions as reopening (never assigned, no newer version) |
-| Assign | Only a published, non-empty pack, to an active onboarding case. Refused if a newer published version exists, if the pack is already on the case, or if any of its forms is already on the case. A pack for a different employment type needs an explicit confirmation |
+| Assign | Only a published, non-empty pack, to an active onboarding case. Refused if a newer published version exists, if the pack is already on the case, or if any of its forms is already on the case. Any published pack can be given to any employee; the pack's employment type is only a label and gives no warning |
 | Versions | Each assignment records exactly which pack and form versions the employee got |
 
 ## Which form version does a new assignment use?

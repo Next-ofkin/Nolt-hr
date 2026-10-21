@@ -253,7 +253,7 @@ export class PacksService {
   async assign(actorId: string, packId: string, input: unknown) {
     const parsed = assignPackSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException("Select an active case, its revision and an optional valid due date.");
-    const { caseId, expectedCaseRevision, dueDate, confirmEmploymentTypeMismatch } = parsed.data;
+    const { caseId, expectedCaseRevision, dueDate } = parsed.data;
     try {
       return await this.db.$transaction(async tx => {
         // Serialize against form assignment, case closure and other pack assignments.
@@ -282,8 +282,6 @@ export class PacksService {
         });
         if (!newestPublished || newestPublished.id !== pack.id)
           throw new ConflictException("A newer published version exists. Select the latest Pack version.");
-        if (pack.employmentType.trim().toLowerCase() !== activeCase.employee.employmentType.trim().toLowerCase() && !confirmEmploymentTypeMismatch)
-          throw new BadRequestException("This pack is for a different employment type. Confirm the mismatch to assign it.");
         if (await tx.packAssignment.findUnique({ where: { packId_caseId: { packId, caseId } } }))
           throw new ConflictException("This pack is already assigned to the case.");
         // A form that was edited after the pack was published: use its newest published version.
