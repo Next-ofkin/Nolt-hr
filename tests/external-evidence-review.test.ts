@@ -20,9 +20,11 @@ function fakeDb(role = "HR", submitted = true) {
       id: owner, active: true, role, permissions: [],
     }) },
     formAssignment: { findUnique: async () => assignment },
+    assignmentGuarantorRule: { findUnique: async () => null },
     externalRequest: {
       findMany: async () => submitted ? [{
-        id: requestId, email: "recipient@example.test", fullName: "Recipient",
+        id: requestId, email: "recipient@example.test", fullName: "Recipient", slot: 1,
+        createdAt: new Date("2026-10-19T11:00:00Z"), state: "SUBMITTED",
         submission: { answers: { [assignment.formVersion.fields[0].id]: "A name" },
           submittedAt: new Date("2026-10-19T12:00:00Z") }, evidenceReview: null,
       }] : [],

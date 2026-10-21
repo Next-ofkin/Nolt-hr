@@ -5463,11 +5463,21 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "expectedContactRevision": {
+                  "slot": {
                     "type": "integer",
-                    "minimum": 0,
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 2
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "requestKey": {
                     "type": "string",
@@ -5481,7 +5491,9 @@
                   }
                 },
                 "required": [
-                  "expectedContactRevision",
+                  "slot",
+                  "fullName",
+                  "email",
                   "requestKey"
                 ],
                 "additionalProperties": false
@@ -5657,6 +5669,50 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR external evidence review"
+        ]
+      }
+    },
+    "/api/v1/employees/assignments/{id}/external-evidence/required": {
+      "put": {
+        "operationId": "ExternalEvidenceReviewController_setRequired",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "required": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2
+                  }
+                },
+                "required": [
+                  "required"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": ""
@@ -7764,6 +7820,12 @@
           "email": {
             "type": "string"
           },
+          "fullName": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "number"
+          },
           "correctionReason": {
             "type": "string",
             "nullable": true
@@ -7776,6 +7838,8 @@
           "expiresAt",
           "createdAt",
           "email",
+          "fullName",
+          "slot",
           "correctionReason"
         ]
       },
@@ -7787,10 +7851,14 @@
             "items": {
               "$ref": "#/components/schemas/ExternalRequestDto"
             }
+          },
+          "required": {
+            "type": "number"
           }
         },
         "required": [
-          "items"
+          "items",
+          "required"
         ]
       },
       "ExternalSessionDto": {

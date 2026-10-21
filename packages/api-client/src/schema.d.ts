@@ -1204,6 +1204,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/employees/assignments/{id}/external-evidence/required": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ExternalEvidenceReviewController_setRequired"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/employees/assignments/{id}/external-evidence/{requestId}/decision": {
         parameters: {
             query?: never;
@@ -1665,10 +1681,13 @@ export interface components {
             expiresAt: string;
             createdAt: string;
             email: string;
+            fullName: string;
+            slot: number;
             correctionReason: string | null;
         };
         ExternalRequestsDto: {
             items: components["schemas"]["ExternalRequestDto"][];
+            required: number;
         };
         ExternalSessionDto: {
             requestId: string;
@@ -5315,7 +5334,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    expectedContactRevision: number;
+                    slot: number;
+                    fullName: string;
+                    /** Format: email */
+                    email: string;
                     /** Format: uuid */
                     requestKey: string;
                     /** Format: uuid */
@@ -5446,6 +5468,31 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExternalEvidenceReviewController_setRequired: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    required: number;
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {

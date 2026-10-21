@@ -39,23 +39,19 @@ test("expired and revoked request links fail before any provider proof is accept
     );
   }
 });
-test("external requests bind saved contact revisions and reject actor or recipient overrides", () => {
-  const p = { requestKey: randomUUID(), expectedContactRevision: 1 };
-  assert.equal(createExternalSchema.safeParse(p).success, true);
-  assert.equal(
-    createExternalSchema.safeParse({ ...p, expectedContactRevision: 0 })
-      .success,
-    false,
-  );
+test("a send carries the name, email and slot, and rejects actor or recipient overrides", () => {
+  const p = { requestKey: randomUUID(), slot: 1, fullName: "Ada Obi", email: "Ada@Example.com" };
+  const ok = createExternalSchema.safeParse(p);
+  assert.equal(ok.success, true);
+  assert.equal(ok.success && ok.data.email, "ada@example.com");
+  for (const bad of [{ slot: 0 }, { slot: 3 }, { email: "not-an-email" }, { fullName: "  " }])
+    assert.equal(createExternalSchema.safeParse({ ...p, ...bad }).success, false);
   for (const override of [
     { respondentId: randomUUID() },
-    { email: "different@example.invalid" },
     { assignmentId: randomUUID() },
+    { expectedContactRevision: 1 },
   ])
-    assert.equal(
-      createExternalSchema.safeParse({ ...p, ...override }).success,
-      false,
-    );
+    assert.equal(createExternalSchema.safeParse({ ...p, ...override }).success, false);
 });
 test("external exchange requires a bounded provider proof and rejects fabricated identity fields", () => {
   const p = {

@@ -1,3 +1,4 @@
+import { externalAssignmentStatus } from "./external-status.js";
 import {
   BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject,
   Delete, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Put, Req, UseGuards,
@@ -11,9 +12,9 @@ import { assignPackSchema, extendPackDeadlineSchema, isPackOverdue, packTemplate
 const packAssignmentInclude = {
   pack: { select: { name: true, employmentType: true } },
   forms: { orderBy: { position: "asc" as const },
-    include: { formAssignment: { include: { formVersion: { select: { title: true } },
+    include: { formAssignment: { include: { formVersion: { select: { title: true, recipient: true } },
       response: { select: { status: true } },
-      externalRequests: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], select: { state: true, evidenceReview: { select: { decision: true } } }, take: 1 } } } } },
+      externalRequests: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], select: { id: true, slot: true, createdAt: true, state: true, evidenceReview: { select: { decision: true } } }, take: 40 }, guarantorRule: { select: { required: true } } } } } },
 } satisfies Prisma.PackAssignmentInclude;
 
 @Injectable()
@@ -337,10 +338,9 @@ export class PacksService {
       title: link.formAssignment.formVersion.title,
       required: link.formAssignment.required,
       position: link.position,
-      status: link.formAssignment.externalRequests[0]?.evidenceReview?.decision === "APPROVED" ? "APPROVED"
-        : link.formAssignment.externalRequests[0]?.evidenceReview?.decision === "CHANGES_REQUIRED" ? "CHANGES_REQUIRED"
-        : link.formAssignment.externalRequests[0]?.state === "SUBMITTED" ? "EXTERNAL_SUBMITTED"
-        : link.formAssignment.response?.status ?? "NOT_STARTED",
+      status: link.formAssignment.formVersion.recipient !== "EMPLOYEE"
+        ? externalAssignmentStatus(link.formAssignment.externalRequests, link.formAssignment.guarantorRule?.required ?? 1)
+      : link.formAssignment.response?.status ?? "NOT_STARTED",
     }));
     const required = forms.filter(form => form.required);
     const approvedRequired = required.filter(form => form.status === "APPROVED").length;
