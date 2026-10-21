@@ -1,5 +1,6 @@
 "use client";
 
+import { fieldVisible } from "@nolt/form-schemas";
 import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage, normaliseForm } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
@@ -380,6 +381,10 @@ export function SubmissionReview({
               <div className="divide-y rounded-lg border bg-white">
                 {content.fields.map((field) => {
                   const raw = selectedSub.answers[field.id];
+                  if (field.type === "heading")
+                    return <div key={field.id} className="bg-accent/50 px-4 py-2 text-sm font-semibold text-primary">{field.label}</div>;
+                  if (field.type === "paragraph") return null;
+                  if (!fieldVisible(field, selectedSub.answers)) return null;
                   return (
                     <div key={field.id} className="p-4 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
