@@ -1,13 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Clock3, Mail, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Clock3, Mail, MessageCircle, TriangleAlert } from "lucide-react";
 import { api, errorMessage } from "@nolt/api-client";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { latestForSlot, progressLabel, stillSending, viewOf, type SlotItem } from "@/lib/guarantor-slots";
+import { headsUpMessage, latestForSlot, progressLabel, stillSending, viewOf, type SlotItem } from "@/lib/guarantor-slots";
 
 /** One card per guarantor. Type a name and an email, tap Send. Nothing else to save. */
 export function GuarantorSlots({ assignmentId, recipient }: { assignmentId: string; recipient: string }) {
@@ -34,15 +34,15 @@ export function GuarantorSlots({ assignmentId, recipient }: { assignmentId: stri
         <p className="text-sm text-muted-foreground">HR needs <b>{required} {word}s</b> for this form. Each one gets their own email.</p>
       )}
       {Array.from({ length: required }, (_, i) => (
-        <SlotCard key={i + 1} slot={i + 1} total={required} word={Word} lower={word} assignmentId={assignmentId}
+        <SlotCard key={i + 1} slot={i + 1} total={required} word={Word} lower={word} assignmentId={assignmentId} recipient={recipient}
           item={latestForSlot(items as SlotItem[], i + 1)} />
       ))}
     </div>
   );
 }
 
-function SlotCard({ slot, total, word, lower, assignmentId, item }: {
-  slot: number; total: number; word: string; lower: string; assignmentId: string; item: SlotItem | undefined;
+function SlotCard({ slot, total, word, lower, assignmentId, recipient, item }: {
+  slot: number; total: number; word: string; lower: string; assignmentId: string; recipient: string; item: SlotItem | undefined;
 }) {
   const { session } = useAuth();
   const qc = useQueryClient();
@@ -53,6 +53,7 @@ function SlotCard({ slot, total, word, lower, assignmentId, item }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [copied, setCopied] = useState(false);
   const key = useRef<{ sig: string; id: string } | null>(null);
   const label = total > 1 ? `${word} ${slot}` : word;
   const showForm = view === "EMPTY" || view === "CHANGES_REQUIRED" || editing;
@@ -176,6 +177,29 @@ function SlotCard({ slot, total, word, lower, assignmentId, item }: {
           <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={() => void cancel()}>
             Cancel
           </Button>
+        </div>
+      )}
+      {view === "IN_PROGRESS" && !editing && item && item.state !== "ACTIVE" && (
+        <div className="space-y-2 rounded-xl border border-[#bcd6f7] bg-[#e6f1ff] p-3 text-sm text-[#0a3a7a]">
+          <p><b>Tell {item.fullName.split(" ")[0]} to expect it.</b> People trust an email more when they hear about it first.</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <a
+              className="inline-flex h-11 w-full items-center sm:w-auto sm:flex-1 justify-center gap-2 rounded-xl bg-[#0b63c9] px-4 text-sm font-semibold text-white"
+              target="_blank" rel="noreferrer"
+              href={`https://wa.me/?text=${encodeURIComponent(headsUpMessage({ guarantorName: item.fullName, employeeName: session?.name ?? "", role: recipient, host: typeof window === "undefined" ? "" : window.location.host }))}`}
+            >
+              <MessageCircle className="size-4" aria-hidden="true" /> Send on WhatsApp
+            </a>
+            <Button type="button" variant="outline" className="h-11 w-full bg-white sm:w-auto sm:flex-1" onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(headsUpMessage({ guarantorName: item.fullName, employeeName: session?.name ?? "", role: recipient, host: window.location.host }));
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2500);
+              } catch { /* clipboard blocked: the WhatsApp button still works */ }
+            }}>
+              {copied ? "Copied" : "Copy the message"}
+            </Button>
+          </div>
         </div>
       )}
       {error && <p role="alert" className="break-words rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
