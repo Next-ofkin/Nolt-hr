@@ -15,9 +15,7 @@ import { WorkspaceAccess } from "./workspace-access";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
 import { EmployeeResponse } from "./employee-response";
-import { ExternalContact } from "./external-contact";
-import { MyPackProgress } from "./my-pack-progress";
-import { StatusChip } from "./status-chip";
+import { MyOnboardingList } from "./my-onboarding-list";
 import { CheckCircle2, CircleDashed, Hourglass, TriangleAlert } from "lucide-react";
 export function HomeWorkspace() {
   const { session } = useAuth();
@@ -114,99 +112,34 @@ function EmployeeHome() {
             <p>HR has not opened your onboarding case yet.</p>
           ) : (
             <>
-              <MyPackProgress refreshKey={packRefresh} />
-              <p className="text-sm">
-                {
-                  data.onboardingCase.assignments.filter((a) => a.required)
-                    .length
-                }{" "}
-                required items ·{" "}
-                {
-                  data.onboardingCase.assignments.filter((a) => !a.required)
-                    .length
-                }{" "}
-                optional items
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Save your answers as a draft, then submit when complete. Signing
-                and sending requests to third parties are being built.
-              </p>
-              {data.onboardingCase.assignments.length === 0 && (
-                <p>No forms assigned yet.</p>
-              )}
-              <ul className="space-y-3">
-                {data.onboardingCase.assignments.map((a) => (
-                  <li
-                    key={a.id}
-                    className="space-y-2 rounded-xl border bg-white p-5"
-                  >
-                    <h2 className="break-words font-semibold">
-                      {a.title} · v{a.version}
-                    </h2>
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <StatusChip status={a.status} label={a.status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted — awaiting HR" : a.status === "SUBMITTED" ? "Submitted — awaiting HR review" : a.status === "CHANGES_REQUIRED" ? "Changes requested — action required" : undefined} />
-                      <span>{a.required ? "Required" : "Optional"}{a.dueDate ? ` · Due ${a.dueDate}` : ""}</span>
-                    </div>
-                    {a.recipient === "EMPLOYEE" ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          disabled={busy || responseId !== null}
-                          onClick={() => {
-                            setPreview(null);
-                            setResponseId(a.id);
-                          }}
-                        >
-                          {a.status === "APPROVED"
-                            ? "View approved form"
-                            : a.status === "CHANGES_REQUIRED"
-                              ? "Update & resubmit"
-                              : a.status === "SUBMITTED"
-                                ? "View submitted form"
-                                : a.status === "DRAFT"
-                                  ? "Continue form"
-                                  : "Fill form"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          disabled={busy || responseId !== null}
-                          onClick={() =>
-                            void (async () => {
-                              setBusy(true);
-                              setError("");
-                              setPreview(null);
-                              try {
-                                const r = await api.GET(
-                                  "/api/v1/me/assignments/{id}",
-                                  { params: { path: { id: a.id } } },
-                                );
-                                if (r.error)
-                                  throw new Error(errorMessage(r.error));
-                                setPreview(normaliseForm(r.data));
-                                setResponseId(null);
-                              } catch (e) {
-                                setError(
-                                  e instanceof Error
-                                    ? e.message
-                                    : "Could not load this form.",
-                                );
-                              } finally {
-                                setBusy(false);
-                              }
-                            })()
-                          }
-                        >
-                          Preview assigned form
-                        </Button>
-                      </div>
-                    ) : (
-                      <ExternalContact
-                        assignmentId={a.id}
-                        recipient={a.recipient}
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <MyOnboardingList
+                assignments={data.onboardingCase.assignments}
+                refreshKey={packRefresh}
+                disabled={busy || responseId !== null}
+                onOpen={(id) => {
+                  setPreview(null);
+                  setResponseId(id);
+                }}
+                onPreview={(id) =>
+                  void (async () => {
+                    setBusy(true);
+                    setError("");
+                    setPreview(null);
+                    try {
+                      const r = await api.GET("/api/v1/me/assignments/{id}", {
+                        params: { path: { id } },
+                      });
+                      if (r.error) throw new Error(errorMessage(r.error));
+                      setPreview(normaliseForm(r.data));
+                      setResponseId(null);
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Could not load this form.");
+                    } finally {
+                      setBusy(false);
+                    }
+                  })()
+                }
+              />
             </>
           )}
         </>
