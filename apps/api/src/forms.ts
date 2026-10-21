@@ -75,8 +75,15 @@ export class FormDto {
   fields!: unknown[];
   @ApiProperty({ type: String }) updatedAt!: string;
   @ApiProperty({ nullable: true, type: String }) publishedAt!: string | null;
+  /** This version has been sent to an employee or put in a pack, so it is locked for good. */
+  @ApiProperty({ type: Boolean }) inUse!: boolean;
+  /** Some version of this form has been used, so the form cannot be deleted. */
+  @ApiProperty({ type: Boolean }) formInUse!: boolean;
 }
-export function dto(row: {
+export function dto(row: Parameters<typeof dtoWithUse>[0]): FormDto {
+  return dtoWithUse(row);
+}
+export function dtoWithUse(row: {
   id: string;
   formId: string;
   title: string;
@@ -88,9 +95,11 @@ export function dto(row: {
   fields: Prisma.JsonValue;
   updatedAt: Date;
   publishedAt: Date | null;
-}): FormDto {
+}, use: { inUse?: boolean; formInUse?: boolean } = {}): FormDto {
   return {
     ...row,
+    inUse: use.inUse ?? false,
+    formInUse: use.formInUse ?? false,
     fields: row.fields as unknown[],
     updatedAt: row.updatedAt.toISOString(),
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -100,6 +109,10 @@ export function dto(row: {
  * Permanent draft deletion is allowed only for a form with exactly one
  * never-published version and no assignment history.
  */
+/** A form can be deleted only while none of its versions was ever sent to an employee or put in a pack. */
+export function canDeleteForm(assignmentCount: number, packItemCount: number): boolean {
+  return assignmentCount === 0 && packItemCount === 0;
+}
 export function canDeleteUnpublishedDraft(
   versions: readonly { status: string }[],
   assignmentCount: number,
@@ -129,13 +142,32 @@ export class FormsService {
       throw error;
     }
   }
+  /** Which versions / forms have been used, so the screen only offers actions that will work. */
+  private async usage(formIds: string[]) {
+    const [a, p, av, pv] = await Promise.all([
+      this.db.formAssignment.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
+      this.db.formAssignment.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
+    ]);
+    const forms = new Set([...a, ...p].map((r) => r.formId));
+    const versions = new Set([...av, ...pv].map((r) => r.formVersionId));
+    return { forms, versions };
+  }
+  private async view(row: Parameters<typeof dtoWithUse>[0]): Promise<FormDto> {
+    const use = await this.usage([row.formId]);
+    return dtoWithUse(row, { inUse: use.versions.has(row.id), formInUse: use.forms.has(row.formId) });
+  }
   async list() {
     const forms = await this.db.form.findMany({
       take: 100,
       orderBy: { createdAt: "desc" },
       include: { versions: { orderBy: { version: "desc" }, take: 1 } },
     });
-    return forms.flatMap((f) => f.versions.map(dto));
+    const use = await this.usage(forms.map((f) => f.id));
+    return forms.flatMap((f) =>
+      f.versions.map((v) => dtoWithUse(v, { inUse: use.versions.has(v.id), formInUse: use.forms.has(f.id) })),
+    );
   }
   async listPublished() {
     const versions = await this.db.formVersion.findMany({
@@ -143,12 +175,12 @@ export class FormsService {
       take: 500,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
-    return versions.map(dto);
+    return versions.map((v) => dto(v));
   }
   async get(id: string) {
     const row = await this.db.formVersion.findUnique({ where: { id } });
     if (!row) throw new NotFoundException("Form version not found.");
-    return dto(row);
+    return this.view(row);
   }
   async record(
     tx: Prisma.TransactionClient,
@@ -175,7 +207,7 @@ export class FormsService {
         },
       });
       await this.record(tx, actorId, "FORM_CREATED", row.id, { version: 1 });
-      return dto(row);
+      return this.view(row);
     });
   }
   async save(actorId: string, id: string, input: unknown) {
@@ -197,7 +229,7 @@ export class FormsService {
       await this.record(tx, actorId, "FORM_DRAFT_SAVED", id, {
         revision: row.revision,
       });
-      return dto(row);
+      return this.view(row);
     });
   }
   async publish(actorId: string, id: string, input: unknown) {
@@ -241,7 +273,7 @@ export class FormsService {
       await this.record(tx, actorId, "FORM_PUBLISHED", id, {
         version: row.version,
       });
-      return dto(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
+      return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
   async unpublish(actorId: string, id: string, input: unknown) {
@@ -256,21 +288,55 @@ export class FormsService {
       if (updated.count !== 1)
         throw new ConflictException("This form has changed or is no longer published.");
       await this.record(tx, actorId, "FORM_UNPUBLISHED", id, { version: row.version });
-      return dto(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
+      return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
-  async deleteDraft(actorId: string, formId: string) {
+  /** Delete a form and all its versions, but only if no version was ever used. */
+  async deleteForm(actorId: string, formId: string) {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;
       const form = await tx.form.findUnique({ where: { id: formId }, include: { versions: true } });
       if (!form) throw new NotFoundException("Form not found.");
-      const assignments = await tx.formAssignment.count({ where: { formId } });
-      if (!canDeleteUnpublishedDraft(form.versions, assignments))
-        throw new ConflictException("Only a never-published, never-assigned draft can be deleted.");
-      await tx.formVersion.delete({ where: { id: form.versions[0].id } });
+      const [assignments, packItems] = await Promise.all([
+        tx.formAssignment.count({ where: { formId } }),
+        tx.packItem.count({ where: { formId } }),
+      ]);
+      if (!canDeleteForm(assignments, packItems))
+        throw new ConflictException(
+          packItems > 0 && assignments === 0
+            ? "This form is part of a pack. Delete or change the pack first."
+            : "This form has already been sent to an employee, so its record is kept. Unpublish it instead.",
+        );
+      const latest = form.versions.reduce((a, b) => (b.version > a.version ? b : a));
+      await tx.formVersion.deleteMany({ where: { formId } });
       await tx.form.delete({ where: { id: formId } });
-      await this.record(tx, actorId, "FORM_DRAFT_DELETED", formId, { title: form.versions[0].title });
+      await this.record(tx, actorId, "FORM_DELETED", formId, { title: latest.title, versions: form.versions.length });
       return { deleted: true };
+    });
+  }
+  /** Take an unpublished, never-used latest version back to an editable draft. */
+  async reopen(actorId: string, id: string, input: unknown) {
+    const { expectedRevision } = parse(revisionSchema, input);
+    return this.db.$transaction(async (tx) => {
+      const row = await tx.formVersion.findUnique({ where: { id } });
+      if (!row) throw new NotFoundException("Form version not found.");
+      await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${row.formId}::uuid FOR UPDATE`;
+      const [assignments, packItems, newer] = await Promise.all([
+        tx.formAssignment.count({ where: { formVersionId: id } }),
+        tx.packItem.count({ where: { formVersionId: id } }),
+        tx.formVersion.count({ where: { formId: row.formId, version: { gt: row.version } } }),
+      ]);
+      if (assignments + packItems > 0)
+        throw new ConflictException("This version has already been used, so it stays as it is. Create a new version to make changes.");
+      if (newer > 0) throw new ConflictException("A newer version of this form exists. Edit that one instead.");
+      const updated = await tx.formVersion.updateMany({
+        where: { id, revision: expectedRevision, status: "UNPUBLISHED" },
+        data: { status: "DRAFT", publishedAt: null, revision: { increment: 1 } },
+      });
+      if (updated.count !== 1)
+        throw new ConflictException("This form has changed or is not unpublished. Reload it.");
+      await this.record(tx, actorId, "FORM_REOPENED", id, { version: row.version });
+      return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
   async newVersion(actorId: string, formId: string) {
@@ -283,7 +349,7 @@ export class FormsService {
         where: { formId },
         orderBy: { version: "desc" },
       });
-      if (latest.status === "DRAFT") return dto(latest);
+      if (latest.status === "DRAFT") return this.view(latest);
       const content = parse(formContentSchema, {
         title: latest.title,
         description: latest.description,
@@ -301,7 +367,7 @@ export class FormsService {
       await this.record(tx, actorId, "FORM_VERSION_CREATED", row.id, {
         version: row.version,
       });
-      return dto(row);
+      return this.view(row);
     });
   }
 }
@@ -368,12 +434,21 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.unpublish(req.actor.id, id, body);
   }
-  @Delete("forms/:id/draft")
-  deleteDraft(
+  @Post("form-versions/:id/reopen")
+  @ApiOkResponse({ type: FormDto })
+  reopen(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ): Promise<FormDto> {
+    return this.service.reopen(req.actor.id, id, body);
+  }
+  @Delete("forms/:id")
+  deleteForm(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<{ deleted: boolean }> {
-    return this.service.deleteDraft(req.actor.id, id);
+    return this.service.deleteForm(req.actor.id, id);
   }
   @Post("forms/:id/versions") @ApiCreatedResponse({ type: FormDto }) newVersion(
     @Req() req: AuthRequest,

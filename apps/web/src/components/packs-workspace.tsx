@@ -20,6 +20,7 @@ type PackItem = {
 type Pack = {
   id: string; name: string; description: string; employmentType: string;
   status: string; revision: number; versionNumber: number; rootPackId: string | null; createdAt: string; items: PackItem[];
+  assignmentCount?: number; hasLaterVersion?: boolean;
 };
 type Selected = { formId: string; formVersionId: string; required: boolean };
 const headers = { "Content-Type": "application/json" };
@@ -33,6 +34,7 @@ async function readJson<T>(url: string): Promise<T> {
 export function PacksWorkspace() {
   const { session } = useAuth();
   const [confirmPublish, setConfirmPublish] = useState<Pack | null>(null);
+  const [confirmPack, setConfirmPack] = useState<{ pack: Pack; kind: "unpublish" | "reopen" | "delete" } | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [employmentType, setEmploymentType] = useState("");
@@ -105,6 +107,34 @@ export function PacksWorkspace() {
   function label(item: Selected | PackItem) {
     const form = forms.find(form => form.id === item.formVersionId);
     return form ? `${form.title} · v${form.version} · ${form.recipient.toLowerCase()}` : `Form version ${item.formVersionId.slice(0, 8)}`;
+  }
+
+  async function packAction() {
+    if (!session || busy || !confirmPack) return;
+    const { pack, kind } = confirmPack;
+    setConfirmPack(null);
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(
+        kind === "delete" ? `/api/v1/packs/${encodeURIComponent(pack.id)}` : `/api/v1/packs/${encodeURIComponent(pack.id)}/${kind}`,
+        { method: kind === "delete" ? "DELETE" : "POST", credentials: "same-origin", headers: { "x-csrf-token": session.csrfToken } },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { message?: string };
+        throw new Error(body.message ?? "Could not update this pack. Refresh and try again.");
+      }
+      if (kind === "reopen") {
+        const draft = await response.json() as Pack;
+        await refresh(true);
+        startEdit(draft);
+        setNotice("Pack reopened as a draft. Make your changes, then publish it again.");
+      } else {
+        await refresh(true);
+        setNotice(kind === "delete" ? "Pack deleted." : "Pack unpublished. Employees who already have it keep it.");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update this pack.");
+    } finally { setBusy(false); }
   }
 
   async function startNextVersion(pack: Pack) {
@@ -201,6 +231,26 @@ export function PacksWorkspace() {
 
   return (
     <div className="space-y-7">
+      <Dialog open={confirmPack !== null} onOpenChange={open => { if (!open && !busy) setConfirmPack(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmPack?.kind === "delete" ? "Delete this pack?" : confirmPack?.kind === "reopen" ? "Edit this pack again?" : "Unpublish this pack?"}</DialogTitle>
+            <DialogDescription>
+              {confirmPack?.kind === "delete"
+                ? `Delete "${confirmPack.pack.name}" permanently? It has never been given to an employee. This cannot be undone.`
+                : confirmPack?.kind === "reopen"
+                  ? "The pack goes back to a draft so you can change its forms, then publish it again."
+                  : "This pack can no longer be assigned to new employees. Employees who already have it keep it."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => setConfirmPack(null)}>Cancel</Button>
+            <Button variant={confirmPack?.kind === "delete" ? "destructive" : "default"} disabled={busy} onClick={() => void packAction()}>
+              {confirmPack?.kind === "delete" ? "Delete pack" : confirmPack?.kind === "reopen" ? "Edit again" : "Unpublish pack"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirmPublish !== null} onOpenChange={open => { if (!open && !busy) setConfirmPublish(null); }}>
         <DialogContent>
           <DialogHeader>
@@ -310,16 +360,26 @@ export function PacksWorkspace() {
           {(historyRoot === family.root ? family.versions : family.versions.slice(0,1)).map(pack =>
             <article key={pack.id} className="mb-3 rounded-xl border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{pack.name} <span className="text-xs font-normal text-muted-foreground">v{pack.versionNumber}</span></h3>
-            <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status.toLowerCase()}</span></div>
+            <span className="rounded-md bg-secondary px-2 py-1 text-xs font-semibold">{pack.status === "WITHDRAWN" ? "unpublished" : pack.status.toLowerCase()}</span></div>
           <p className="mt-1 text-xs text-muted-foreground">{pack.employmentType} · {pack.items.length} forms · {pack.items.filter(item => item.required).length} required</p>
           {pack.description && <p className="mt-2 text-sm text-muted-foreground">{pack.description}</p>}
-          {pack.status === "PUBLISHED" && <Button className="mt-3" type="button" variant="outline"
-            size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>}
+          {pack.status === "PUBLISHED" && <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "unpublish" })}>Unpublish</Button>
+            {!pack.assignmentCount && !pack.hasLaterVersion && <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "delete" })}>Delete</Button>}
+          </div>}
+          {pack.status === "WITHDRAWN" && <div className="mt-3 flex flex-wrap gap-2">
+            {!pack.assignmentCount && !pack.hasLaterVersion && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "reopen" })}>Edit again</Button>}
+            {!pack.assignmentCount && !pack.hasLaterVersion && <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "delete" })}>Delete</Button>}
+            {(pack.assignmentCount ?? 0) > 0 && <p className="text-xs text-muted-foreground">Already given to {pack.assignmentCount} employee(s), so it is kept. Create a new version to change it.</p>}
+          </div>}
           {pack.status === "DRAFT" && <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy}
               onClick={() => startEdit(pack)}>Edit draft</Button>
             <Button type="button" size="sm" disabled={busy || pack.items.length === 0}
               onClick={() => setConfirmPublish(pack)}>Publish pack</Button>
+            {!pack.hasLaterVersion && <Button type="button" variant="destructive" size="sm" disabled={busy}
+              onClick={() => setConfirmPack({ pack, kind: "delete" })}>Delete</Button>}
           </div>}
           <ul className="mt-3 space-y-1 text-sm">{pack.items.map(item => <li key={item.id} className="text-muted-foreground">{item.position + 1}. {label(item)} {item.required ? "· required" : "· optional"}</li>)}</ul>
         </article>)}</div>)}</div>}

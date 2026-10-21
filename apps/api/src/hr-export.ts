@@ -7,6 +7,7 @@ import { fieldVisible, isDisplayField, parseTable, type FormField } from "@nolt/
 import { Database } from "./database.js";
 import { FilesService } from "./files.js";
 import { SessionGuard, type AuthRequest } from "./auth.js";
+import { axaWorkbook, hasAxaFields } from "./axa-sheet.js";
 import { appOrigin } from "./security.js";
 import { createFileShareToken } from "./shared-files.js";
 
@@ -15,28 +16,8 @@ const safe = (v: string) => v.replace(/[^\w .-]+/g, "_").slice(0, 90).trim() || 
 const formattedDate = (d: Date) => new Intl.DateTimeFormat("en-GB", {dateStyle:"medium",timeStyle:"short",timeZone:"UTC"}).format(d) + " UTC";
 const ascii = (v: unknown) => String(v ?? "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "?");
 const escapePdf = (v: string) => ascii(v).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-const crcTable = Array.from({ length: 256 }, (_, i) => {
-  let c = i; for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0;
-});
-function crc32(b: Buffer) { let c = 0xffffffff; for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
-export function zipFiles(entries: {name: string; bytes: Buffer}[]): Buffer {
-  const local: Buffer[] = []; const central: Buffer[] = []; let offset = 0;
-  for (const entry of entries) {
-    const name = Buffer.from(entry.name, "utf8"); const data = entry.bytes;
-    const packed = deflateRawSync(data); const checksum = crc32(data);
-    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x800, 6); lh.writeUInt16LE(8, 8);
-    lh.writeUInt32LE(checksum, 14); lh.writeUInt32LE(packed.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(name.length, 26);
-    local.push(lh, name, packed);
-    const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x800, 8);
-    ch.writeUInt16LE(8, 10); ch.writeUInt32LE(checksum, 16); ch.writeUInt32LE(packed.length, 20); ch.writeUInt32LE(data.length, 24);
-    ch.writeUInt16LE(name.length, 28); ch.writeUInt32LE(offset, 42); central.push(ch, name);
-    offset += lh.length + name.length + packed.length;
-  }
-  const directory = Buffer.concat(central); const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...local, directory, end]);
-}
-
+import { zipFiles } from "./zip.js";
+export { zipFiles };
 class PdfDocument {
   private pages: { lines: string[]; images: Image[]; links: {url:string; y:number}[]; y: number }[] = [];
   private page = this.next();
@@ -253,6 +234,28 @@ export class HrExportService {
       employee:safe(a.onboardingCase.employee.fullName),title:safe(a.formVersion.title),
       version:submission.version,review:decision};
   }
+  /** AXA Mansard enrolment spreadsheet built from approved AXA enrolment forms. */
+  async axaEnrolment(userId:string) {
+    const user=await this.db.user.findUnique({where:{id:userId}});
+    if(!user?.active || user.role!=="HR") throw new ForbiddenException("Active HR access required.");
+    const versions=await this.db.formVersion.findMany({
+      where:{status:{in:["PUBLISHED","UNPUBLISHED"]}}, select:{id:true,fields:true}, take:500,
+    });
+    const axaVersions=versions.filter(v=>hasAxaFields(v.fields));
+    if(!axaVersions.length) throw new NotFoundException("No AXA enrolment form has been published yet.");
+    const assignments=await this.db.formAssignment.findMany({
+      where:{formVersionId:{in:axaVersions.map(v=>v.id)},submissions:{some:{}}},
+      orderBy:{createdAt:"asc"},
+      include:{formVersion:{select:{fields:true}},submissions:{orderBy:{version:"desc"},take:1,include:{review:true}}},
+    });
+    const approved=assignments.filter(a=>a.submissions[0]?.review?.decision==="APPROVED");
+    if(!approved.length) throw new NotFoundException("No approved AXA enrolment forms to export yet. Approve the employee's form first.");
+    const buffer=axaWorkbook(approved.map(a=>({
+      fields:a.formVersion.fields as never,
+      answers:a.submissions[0].answers as Record<string,string|boolean|null>,
+    })));
+    return {buffer,count:approved.length};
+  }
   async recordDownload(actorId:string, targetId:string, action:string) {
     await this.db.auditEvent.create({data:{actorId,targetId,action,metadata:{exportedAt:new Date().toISOString()}}});
   }
@@ -351,6 +354,16 @@ export class HrExportController {
     res.setHeader("Content-Disposition",`attachment; filename="${doc.employee}_${doc.title}.pdf"`);
     res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
     res.send(doc.pdf);
+  }
+  @Get("axa-enrolment.xlsx")
+  async axaEnrolment(@Req() req:AuthRequest,@Res() res:Response) {
+    const sheet=await this.exports.axaEnrolment(req.actor.id);
+    await this.exports.recordDownload(req.actor.id, req.actor.id, "AXA_ENROLMENT_EXPORTED");
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition",`attachment; filename="AXA_HMO_Enrolment_${new Date().toISOString().slice(0,10)}.xlsx"`);
+    res.setHeader("X-Row-Count",String(sheet.count));
+    res.setHeader("Cache-Control","private, no-store");res.setHeader("X-Content-Type-Options","nosniff");
+    res.send(sheet.buffer);
   }
   @Get("cases/:id.zip")
   async caseArchive(@Req() req:AuthRequest,@Param("id",ParseUUIDPipe) id:string,@Res() res:Response) {

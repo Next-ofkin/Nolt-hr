@@ -2374,12 +2374,19 @@
                                   "required": {
                                     "default": false,
                                     "type": "boolean"
+                                  },
+                                  "exportKey": {
+                                    "default": null,
+                                    "nullable": true,
+                                    "type": "string",
+                                    "maxLength": 60
                                   }
                                 },
                                 "required": [
                                   "label",
                                   "kind",
-                                  "required"
+                                  "required",
+                                  "exportKey"
                                 ],
                                 "additionalProperties": false
                               }
@@ -2406,6 +2413,12 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 1000
+                            },
+                            "exportKey": {
+                              "default": null,
+                              "nullable": true,
+                              "type": "string",
+                              "maxLength": 60
                             },
                             "prefill": {
                               "default": null,
@@ -2437,6 +2450,7 @@
                             "fixedRows",
                             "maxRows",
                             "totalEquals",
+                            "exportKey",
                             "prefill"
                           ],
                           "additionalProperties": false
@@ -2615,9 +2629,53 @@
         ]
       }
     },
-    "/api/v1/forms/{id}/draft": {
+    "/api/v1/form-versions/{id}/reopen": {
+      "post": {
+        "operationId": "FormsController_reopen",
+        "parameters": [
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "description": "Required for mutations; obtained from the authenticated session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR forms"
+        ]
+      }
+    },
+    "/api/v1/forms/{id}": {
       "delete": {
-        "operationId": "FormsController_deleteDraft",
+        "operationId": "FormsController_deleteForm",
         "parameters": [
           {
             "name": "x-csrf-token",
@@ -2907,6 +2965,32 @@
         "tags": [
           "HR packs"
         ]
+      },
+      "delete": {
+        "operationId": "PacksController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete a pack that has never been given to an employee"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
       }
     },
     "/api/v1/packs/{id}/versions": {
@@ -2925,6 +3009,62 @@
         "responses": {
           "201": {
             "description": "Create a new draft version without altering assigned published packs"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}/unpublish": {
+      "post": {
+        "operationId": "PacksController_unpublish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Stop offering a published pack; employees who have it keep it"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}/reopen": {
+      "post": {
+        "operationId": "PacksController_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Return an unpublished, never-assigned pack to an editable draft"
           }
         },
         "security": [
@@ -4973,6 +5113,20 @@
         ]
       }
     },
+    "/api/v1/exports/axa-enrolment.xlsx": {
+      "get": {
+        "operationId": "HrExportController_axaEnrolment",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR PDF and pack exports"
+        ]
+      }
+    },
     "/api/v1/exports/cases/{id}.zip": {
       "get": {
         "operationId": "HrExportController_caseArchive",
@@ -6403,6 +6557,12 @@
           "publishedAt": {
             "type": "string",
             "nullable": true
+          },
+          "inUse": {
+            "type": "boolean"
+          },
+          "formInUse": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6416,7 +6576,9 @@
           "revision",
           "fields",
           "updatedAt",
-          "publishedAt"
+          "publishedAt",
+          "inUse",
+          "formInUse"
         ]
       },
       "SubmissionReviewDto": {
