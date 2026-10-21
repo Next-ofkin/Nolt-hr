@@ -96,3 +96,33 @@ test("shared-document links expire and are bound to one unchanged file",()=>{
   assert.equal(verifyFileShareToken(id,"b".repeat(64),token,now),false);
   assert.equal(verifyFileShareToken(id,digest,token+"x",now),false);
 });
+
+test("PDF copy prints headings, wording and table rows, and leaves out questions that were hidden",async()=>{
+  process.env.AUTH_ENCRYPTION_KEY ??= Buffer.alloc(32,77).toString("base64");
+  const id=(n:number)=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,"0")}`;
+  const base={helpText:"",required:false,options:[],signatureMethod:"EITHER",attachmentPurpose:"SUPPORTING_DOCUMENT",body:"",columns:[],fixedRows:[],maxRows:10,totalEquals:null,showIf:null,prefill:null};
+  const fields=[
+    {...base,id:id(1),type:"heading",label:"Health information"},
+    {...base,id:id(2),type:"paragraph",label:"Please read",body:"Answer honestly."},
+    {...base,id:id(3),type:"select",label:"Any health issues",options:["Yes","No"]},
+    {...base,id:id(4),type:"textarea",label:"Explain your health issues",showIf:{fieldId:id(3),equals:"Yes"}},
+    {...base,id:id(5),type:"table",label:"Beneficiaries",columns:[{label:"Surname",kind:"text",required:true},{label:"Share",kind:"percent",required:true}]},
+  ];
+  const answers={[id(3)]:"No",[id(4)]:"stale hidden text",[id(5)]:JSON.stringify([["Obi","100"],["",""]])};
+  const db={
+    user:{findUnique:async()=>({active:true,role:"HR"})},
+    formAssignment:{findUnique:async()=>({
+      formVersion:{recipient:"EMPLOYEE",title:"Test",version:1,fields},
+      onboardingCase:{employee:{fullName:"Example Employee",email:"e@example.invalid"}},
+      submissions:[{version:1,submittedAt:new Date("2026-10-19T08:30:00Z"),answers,review:null}],
+    })},
+    storedFile:{findMany:async()=>[]},
+  };
+  const r=await new HrExportService(db as never,{} as never).render(reviewerId,assignmentId);
+  const source=r.pdf.toString("latin1");
+  assert(source.includes("(Health information)"));
+  assert(source.includes("Answer honestly."));
+  assert(source.includes("Surname: Obi"));
+  assert(source.includes("Explain your health issues")===false);
+  assert(source.includes("stale hidden text")===false);
+});

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { SignaturePad } from "./signature-pad";
 import { FileUpload } from "./file-upload";
+import { TableField } from "./table-field";
 
 export function FormPreview({
   content,
@@ -71,7 +72,16 @@ export function FormPreview({
               {field.label}
               {field.required && <span className="text-destructive"> *</span>}
             </Label>
-            {field.type === "textarea" ? (
+            {field.type === "table" ? (
+              <TableField
+                field={field}
+                disabled={disabled}
+                invalid={!!errors[field.id]}
+                {...(answers
+                  ? { value: String(answers[field.id] ?? ""), onChange: (next: string) => onAnswer?.(field.id, next) }
+                  : {})}
+              />
+            ) : field.type === "textarea" ? (
               <Textarea
                 disabled={disabled}
                 id={`preview-${field.id}`}
