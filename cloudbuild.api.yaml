@@ -1,0 +1,5 @@
+# Builds the API image. Used from Google Cloud Shell: gcloud builds submit --config cloudbuild.api.yaml --substitutions=_IMAGE=...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "Dockerfile.api", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]

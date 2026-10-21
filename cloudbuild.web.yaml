@@ -1,0 +1,13 @@
+# Builds the web image. _API_ORIGIN is the API's https address (no trailing slash or path).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.web
+      - --build-arg
+      - API_ORIGIN=${_API_ORIGIN}
+      - -t
+      - ${_IMAGE}
+      - .
+images: ["${_IMAGE}"]
