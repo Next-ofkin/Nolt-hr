@@ -11,7 +11,7 @@ type Submission = {
 };
 type Detail = {
   assignmentId: string; title: string; recipient: string;
-  fields: { id: string; label: string }[];
+  fields: { id: string; label: string; type?: string }[];
   items: Submission[];
 };
 export function ExternalEvidenceReview({
@@ -62,6 +62,7 @@ export function ExternalEvidenceReview({
     } finally { setBusy(false); }
   }
   const fieldLabels = new Map(detail?.fields.map(f => [f.id, f.label]) ?? []);
+  const fieldTypes = new Map(detail?.fields.map(f => [f.id, f.type ?? ""]) ?? []);
   function confirmDecision(id: string, decision: "APPROVED" | "CHANGES_REQUIRED") {
     if (busy) return;
     if (decision === "CHANGES_REQUIRED" && reason.trim().length < 10) {
@@ -85,7 +86,21 @@ export function ExternalEvidenceReview({
       {Object.entries(item.answers).map(([fieldId, value]) =>
         <div key={fieldId} className="border-b pb-2">
           <p className="text-xs font-medium text-muted-foreground">{fieldLabels.get(fieldId) ?? "Response field"}</p>
-          <p className="break-words text-sm">{value === null ? "Not provided" : typeof value === "boolean" ? (value ? "Yes" : "No") : value}</p>
+          {typeof value === "string" && value && ["file", "passport_photo", "signature"].includes(fieldTypes.get(fieldId) ?? "") ? (
+            <div className="mt-1 space-y-2">
+              {fieldTypes.get(fieldId) !== "file" && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/v1/files/${encodeURIComponent(value)}/preview`} alt={fieldTypes.get(fieldId) === "signature" ? "Signature" : "Passport photograph"}
+                  className="max-h-40 rounded-lg border bg-white object-contain p-1" />
+              )}
+              <a href={`/api/v1/files/${encodeURIComponent(value)}/preview`} target="_blank" rel="noreferrer"
+                className="inline-block text-sm font-medium text-primary underline">Open</a>
+              {" · "}
+              <a href={`/api/v1/files/${encodeURIComponent(value)}/download`} className="inline-block text-sm font-medium text-primary underline">Download</a>
+            </div>
+          ) : (
+            <p className="break-words text-sm">{value === null || value === "" ? "Not provided" : typeof value === "boolean" ? (value ? "Yes" : "No") : value}</p>
+          )}
         </div>)}
       {item.decision && <div className="space-y-1 text-sm">
         <p className="font-medium">HR decision: {item.decision.replaceAll("_"," ")}</p>

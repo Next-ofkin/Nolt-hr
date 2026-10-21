@@ -21,7 +21,6 @@ import {
   Put,
   Req,
   Res,
-  ServiceUnavailableException,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -42,8 +41,12 @@ import { createClient } from "@supabase/supabase-js";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+  canonicalAnswersJson,
   formContentSchema,
   saveResponseSchema,
+  signatureIntentSchema,
+  uploadIntentSchema,
+  uploadPayloadSchema,
   submitResponseSchema,
   validateAnswers,
 } from "@nolt/form-schemas";
@@ -65,6 +68,7 @@ import {
   permissionsFor,
 } from "./security.js";
 import { dto as formDto, FormDto } from "./forms.js";
+import { FilesService, SignatureResultDto, StoredFileDto, UploadIntentDto } from "./files.js";
 
 export const createExternalSchema = z
   .object({
@@ -370,17 +374,23 @@ export class ExternalRequestsService {
       });
       if (assignment.onboardingCase.status !== "ACTIVE")
         throw new ForbiddenException("This request is closed.");
-      if (current.state !== "ACTIVE")
+      let expiresAt = current.expiresAt;
+      if (current.state !== "ACTIVE") {
+        // The email link is short-lived, but once the guarantor has opened it
+        // they get a week to finish the form and upload their documents.
+        expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000);
         await tx.externalRequest.update({
           where: { id: current.id },
           data: {
             state: "ACTIVE",
             respondentId: member.id,
             updatedBy: member.id,
+            expiresAt,
           },
         });
+      }
       await this.event(tx, member.id, "EXTERNAL_REQUEST_OPENED", current.id);
-      return this.sessions.issue(tx, member, current.id, current.expiresAt);
+      return this.sessions.issue(tx, member, current.id, expiresAt);
     }, options);
     this.sessions.attach(res, session);
     return { next: "external-workspace" };
@@ -449,6 +459,16 @@ export class ExternalRequestsService {
       answers: r.answers as ExternalWorkspaceDto["answers"],
     };
   }
+  /** The assignment behind the recipient's one-request session. */
+  async assignmentIdFor(req: AuthRequest) {
+    if (!req.externalRequestId)
+      throw new ForbiddenException("A request-scoped recipient session is required.");
+    const r = await this.db.externalRequest.findUniqueOrThrow({
+      where: { id: req.externalRequestId },
+      select: { assignmentId: true },
+    });
+    return r.assignmentId;
+  }
   async get(req: AuthRequest) {
     return this.db.$transaction(async (tx) => {
       const { r, a } = await this.scoped(tx, req);
@@ -472,21 +492,21 @@ export class ExternalRequestsService {
           "This response changed or was submitted. Reload before saving.",
         );
       const fields = formContentSchema.parse(a.formVersion).fields;
-      for (const field of fields)
-        if (
-          ["file", "signature"].includes(field.type) &&
-          p.answers[field.id] != null &&
-          p.answers[field.id] !== ""
-        )
-          throw new BadRequestException(
-            "External file/signature capture is not available yet.",
-          );
       const { answers, issues } = validateAnswers(fields, p.answers, false);
       if (issues.length)
         throw new BadRequestException({
           message: "Check your answers.",
           fields: issues,
         });
+      // A signature covers the other answers: changing them voids it.
+      if (
+        canonicalAnswersJson(
+          fields,
+          (r.answers ?? {}) as Record<string, string | boolean | null>,
+        ) !== canonicalAnswersJson(fields, answers)
+      )
+        for (const field of fields)
+          if (field.type === "signature") delete answers[field.id];
       const saved = await tx.externalRequest.update({
         where: { id: r.id },
         data: { answers, revision: { increment: 1 }, updatedBy: req.actor.id },
@@ -523,13 +543,49 @@ export class ExternalRequestsService {
           "This response changed. Reload before submitting.",
         );
       const fields = formContentSchema.parse(a.formVersion).fields;
-      if (
-        fields.some((f) => ["file", "signature"].includes(f.type) && f.required)
-      )
-        throw new ServiceUnavailableException(
-          "This form requires files or signatures. Submission is blocked until secure external capture is available.",
-        );
       const { issues } = validateAnswers(fields, r.answers, true);
+      // File and signature answers are untrusted ids: check each one belongs to
+      // this request's respondent, field and assignment, and passed scanning.
+      const given = r.answers as Record<string, string | boolean | null>;
+      for (const f of fields) {
+        const val = given[f.id];
+        if (typeof val !== "string" || !val.trim()) continue;
+        if (f.type === "file" || f.type === "passport_photo") {
+          const file = await tx.storedFile.findUnique({ where: { id: val.trim() } });
+          if (
+            !file ||
+            file.assignmentId !== r.assignmentId ||
+            file.fieldId !== f.id ||
+            file.uploadedBy !== req.actor.id
+          )
+            issues.push({ fieldId: f.id, message: "Invalid file attachment reference." });
+          else if (file.status !== "CONFIRMED" || file.scanStatus !== "CLEAN")
+            issues.push({ fieldId: f.id, message: "Attachment has not passed security scanning." });
+        }
+        if (f.type === "signature") {
+          const evidence = await tx.signatureEvidence.findUnique({
+            where: { id: val.trim() },
+            include: { file: true },
+          });
+          if (
+            !evidence ||
+            evidence.assignmentId !== r.assignmentId ||
+            evidence.fieldId !== f.id ||
+            evidence.signerId !== req.actor.id
+          )
+            issues.push({ fieldId: f.id, message: "Invalid signature reference." });
+          else if (evidence.file.status !== "CONFIRMED" || evidence.file.scanStatus !== "CLEAN")
+            issues.push({ fieldId: f.id, message: "Signature image has not passed security scanning." });
+          else if (
+            evidence.contentDigest !==
+            digest("answers:" + canonicalAnswersJson(fields, given))
+          )
+            issues.push({
+              fieldId: f.id,
+              message: "Answers were changed after signing. Please sign again before submitting.",
+            });
+        }
+      }
       if (issues.length)
         throw new BadRequestException({
           message: "Complete the required questions.",
@@ -839,6 +895,7 @@ export class ExternalWorkspaceController {
   private limiter = new LoginLimiter(30);
   constructor(
     @Inject(ExternalRequestsService) private service: ExternalRequestsService,
+    @Inject(FilesService) private files: FilesService,
   ) {}
   private protect(r: Request) {
     assertOrigin(r);
@@ -885,6 +942,37 @@ export class ExternalWorkspaceController {
   @ApiOkResponse({ type: ExternalWorkspaceDto })
   save(@Req() r: AuthRequest, @Body() b: unknown) {
     return this.service.save(r, b);
+  }
+  @Post("request/files/intent")
+  @UseGuards(ExternalSessionGuard)
+  @ApiBody({ schema: schema(uploadIntentSchema) })
+  @ApiCreatedResponse({ type: UploadIntentDto })
+  async createFileIntent(@Req() r: AuthRequest, @Body() b: unknown) {
+    return this.files.createUploadIntent(
+      r.actor.id, await this.service.assignmentIdFor(r), b, r.externalRequestId!,
+    );
+  }
+  @Post("request/files/:fileId/upload")
+  @UseGuards(ExternalSessionGuard)
+  @ApiBody({ schema: schema(uploadPayloadSchema) })
+  @ApiCreatedResponse({ type: StoredFileDto })
+  async uploadFile(
+    @Req() r: AuthRequest,
+    @Param("fileId", ParseUUIDPipe) fileId: string,
+    @Body() b: unknown,
+  ) {
+    return this.files.uploadFile(
+      r.actor.id, await this.service.assignmentIdFor(r), fileId, b, r.externalRequestId!,
+    );
+  }
+  @Post("request/signatures")
+  @UseGuards(ExternalSessionGuard)
+  @ApiBody({ schema: schema(signatureIntentSchema) })
+  @ApiCreatedResponse({ type: SignatureResultDto })
+  async captureSignature(@Req() r: AuthRequest, @Body() b: unknown) {
+    return this.files.captureSignature(
+      r.actor.id, await this.service.assignmentIdFor(r), b, r.externalRequestId!,
+    );
   }
   @Post("request/submit")
   @UseGuards(ExternalSessionGuard)
@@ -933,7 +1021,7 @@ export class ExternalEvidenceReviewService {
         assignmentId,
         title: assignment.formVersion.title,
         recipient: assignment.formVersion.recipient,
-        fields: formContentSchema.parse(assignment.formVersion).fields.map(field => ({ id: field.id, label: field.label })),
+        fields: formContentSchema.parse(assignment.formVersion).fields.map(field => ({ id: field.id, label: field.label, type: field.type })),
         items: requests.map(r => ({
           id: r.id, email: r.email, fullName: r.fullName,
           submittedAt: r.submission!.submittedAt.toISOString(),

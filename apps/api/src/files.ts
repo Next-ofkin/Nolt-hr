@@ -241,14 +241,79 @@ export class FilesService {
     return a;
   }
 
+  /** A guarantor or reference using their one-request secure link. */
+  private async externalAssignment(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    assignmentId: string,
+    externalRequestId: string,
+  ) {
+    const r = await tx.externalRequest.findUnique({ where: { id: externalRequestId } });
+    if (
+      !r ||
+      r.assignmentId !== assignmentId ||
+      r.respondentId !== userId ||
+      r.revokedAt ||
+      r.expiresAt <= new Date() ||
+      r.state !== "ACTIVE"
+    )
+      throw new ForbiddenException(
+        "This request is unavailable, expired or already submitted.",
+      );
+    const a = await tx.formAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { formVersion: true, onboardingCase: true },
+    });
+    if (!a) throw new NotFoundException("Assigned form not found.");
+    if (a.onboardingCase.status !== "ACTIVE")
+      throw new ConflictException("This onboarding case is closed.");
+    if (a.formVersion.recipient === "EMPLOYEE")
+      throw new ForbiddenException("You cannot access this assignment.");
+    return a;
+  }
+
+  private async scopedAssignment(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    assignmentId: string,
+    externalRequestId?: string,
+  ) {
+    return externalRequestId
+      ? this.externalAssignment(tx, userId, assignmentId, externalRequestId)
+      : this.assignment(tx, userId, assignmentId);
+  }
+
+  /** Current draft revision, answers and lock state for an employee or an external request. */
+  private async draftState(
+    tx: Prisma.TransactionClient,
+    assignmentId: string,
+    externalRequestId?: string,
+  ) {
+    if (externalRequestId) {
+      const r = await tx.externalRequest.findUniqueOrThrow({ where: { id: externalRequestId } });
+      return {
+        locked: r.state !== "ACTIVE",
+        revision: r.revision,
+        answers: (r.answers ?? {}) as Record<string, string | boolean | null>,
+      };
+    }
+    const response = await tx.employeeResponse.findUnique({ where: { assignmentId } });
+    return {
+      locked: ["SUBMITTED", "APPROVED"].includes(response?.status ?? ""),
+      revision: response?.revision ?? 0,
+      answers: (response?.answers ?? {}) as Record<string, string | boolean | null>,
+    };
+  }
+
   async createUploadIntent(
     userId: string,
     assignmentId: string,
     input: unknown,
+    externalRequestId?: string,
   ): Promise<UploadIntentDto> {
     const p = uploadIntentSchema.parse(input);
     return this.db.$transaction(async (tx) => {
-      const a = await this.assignment(tx, userId, assignmentId);
+      const a = await this.scopedAssignment(tx, userId, assignmentId, externalRequestId);
       const fields = formContentSchema.parse(a.formVersion).fields;
       const field = fields.find((f) => f.id === p.fieldId);
       if (!field || !["file", "passport_photo", "signature"].includes(field.type)) {
@@ -263,10 +328,7 @@ export class FilesService {
           !["image/jpeg", "image/png"].includes(p.mimeType)) {
         throw new BadRequestException("Passport photos must be JPEG or PNG images.");
       }
-      const response = await tx.employeeResponse.findUnique({
-        where: { assignmentId },
-      });
-      if (["SUBMITTED", "APPROVED"].includes(response?.status ?? ""))
+      if ((await this.draftState(tx, assignmentId, externalRequestId)).locked)
         throw new ConflictException("Response is locked.");
       const existing = await tx.storedFile.findUnique({
         where: {
@@ -333,15 +395,13 @@ export class FilesService {
     assignmentId: string,
     fileId: string,
     input: unknown,
+    externalRequestId?: string,
   ): Promise<StoredFileDto> {
     const p = uploadPayloadSchema.parse(input);
     return this.db.$transaction(
       async (tx) => {
-        await this.assignment(tx, userId, assignmentId);
-        const response = await tx.employeeResponse.findUnique({
-          where: { assignmentId },
-        });
-        if (["SUBMITTED", "APPROVED"].includes(response?.status ?? ""))
+        await this.scopedAssignment(tx, userId, assignmentId, externalRequestId);
+        if ((await this.draftState(tx, assignmentId, externalRequestId)).locked)
           throw new ConflictException("Response is locked.");
         await tx.$queryRaw`SELECT id FROM public."StoredFile" WHERE id=${fileId}::uuid FOR UPDATE`;
         const file = await tx.storedFile.findUnique({
@@ -388,9 +448,9 @@ export class FilesService {
           throw new BadRequestException("Invalid base64 payload.");
         }
 
-        if (buffer.length > 10 * 1024 * 1024) {
+        if (buffer.length > 5 * 1024 * 1024) {
           throw new BadRequestException(
-            "File exceeds maximum allowed size (10MB).",
+            "File exceeds maximum allowed size (5MB).",
           );
         }
 
@@ -405,7 +465,7 @@ export class FilesService {
             await this.storage.scan(buffer);
           }
         }
-        if (buffer.length > 10 * 1024 * 1024) throw new BadRequestException("Normalised file exceeds the size limit.");
+        if (buffer.length > 5 * 1024 * 1024) throw new BadRequestException("Normalised file exceeds the size limit.");
       const sha256 = createHash("sha256").update(buffer).digest("hex");
 
         if (!scan.clean) {
@@ -483,11 +543,12 @@ export class FilesService {
     userId: string,
     assignmentId: string,
     input: unknown,
+    externalRequestId?: string,
   ): Promise<SignatureResultDto> {
     const p = signatureIntentSchema.parse(input);
     return this.db.$transaction(
       async (tx) => {
-        const a = await this.assignment(tx, userId, assignmentId);
+        const a = await this.scopedAssignment(tx, userId, assignmentId, externalRequestId);
         const fields = formContentSchema.parse(a.formVersion).fields;
         const field = fields.find((f) => f.id === p.fieldId);
         if (!field || field.type !== "signature") {
@@ -509,26 +570,16 @@ export class FilesService {
           );
         await tx.$queryRaw`SELECT c.id FROM public."OnboardingCase" c JOIN public."FormAssignment" a ON a."caseId"=c.id WHERE a.id=${assignmentId}::uuid FOR UPDATE OF c`;
         // Verify revision matches current draft
-        const current = await tx.employeeResponse.findUnique({
-          where: { assignmentId },
-        });
-        if (
-          (current?.revision ?? 0) !== p.expectedRevision ||
-          current?.status === "SUBMITTED" ||
-          current?.status === "APPROVED"
-        ) {
+        const state = await this.draftState(tx, assignmentId, externalRequestId);
+        if (state.revision !== p.expectedRevision || state.locked) {
           throw new ConflictException(
             "Response changed or is locked. Reload before signing.",
           );
         }
 
         // Compute content digest over current non-signature answers
-        const currentAnswers = (current?.answers ?? {}) as Record<
-          string,
-          string | boolean | null
-        >;
         const contentDigest = digest(
-          "answers:" + canonicalAnswersJson(fields, currentAnswers),
+          "answers:" + canonicalAnswersJson(fields, state.answers),
         );
 
         const prior = await tx.storedFile.findUnique({
@@ -628,7 +679,7 @@ export class FilesService {
             formVersionId: a.formVersionId,
             fieldId: p.fieldId,
             signerId: userId,
-            signerRole: "EMPLOYEE",
+            signerRole: externalRequestId ? a.formVersion.recipient : "EMPLOYEE",
             signingMethod: p.signingMethod,
             consentVersion: p.consentVersion,
             sourceRevision: p.expectedRevision,
@@ -694,8 +745,10 @@ export class FilesService {
       );
     }
 
+    // A guarantor's documents are private from the employee who asked for them.
     const isOwnEmployee =
-      file.assignment.onboardingCase.employee.userId === userId;
+      file.assignment.onboardingCase.employee.userId === userId &&
+      file.uploadedBy === userId;
 
     if (!isOwnEmployee) {
       // Check reviewer / HR access
