@@ -9,6 +9,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 type Draft = { id: string; name: string; email: string; state: string; createdAt: string; revokedAt: string | null };
 const endpoint = "/api/v1/developer/hr-invitation-drafts";
+const stateLabel: Record<string, string> = {
+  DRAFT: "Saved, not sent", QUEUED: "Sending…", SENDING: "Sending…", SENT: "Sent – waiting for them",
+  UNCERTAIN: "Delivery unconfirmed – check with them", FAILED: "Could not send", EXPIRED: "Expired",
+  ACCEPTED: "Accepted", REVOKED: "Cancelled",
+};
 export function HrInvitationDrafts() {
   const { session } = useAuth();
   const [name, setName] = useState("");
@@ -71,7 +76,7 @@ export function HrInvitationDrafts() {
       if (!queued.ok) {
         setError("The invitation was saved but could not be queued. Use Send invitation email under Recent invitations to retry.");
       } else {
-        setNotice("HR invitation queued for email delivery. The recipient will receive HR access automatically after verifying their email, password and MFA.");
+        setNotice("Invitation on its way. HR access turns on automatically once they confirm their email, set a password and add their authenticator.");
       }
       await load();
     } catch(e) { setError(e instanceof Error ? e.message : "Could not save draft."); }
@@ -130,7 +135,7 @@ export function HrInvitationDrafts() {
       {notice && <p role="status" className="mt-3 text-sm text-primary">{notice}</p>}
       <div className="mt-5 border-t border-border pt-4">
         <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Recent invitations</h3><span className="text-xs text-muted-foreground">Latest 25</span></div>
-        {loading ? <p role="status" className="mt-3 text-xs text-muted-foreground">Loading drafts…</p> : items.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">No drafts created yet.</p> : <div className="mt-3 space-y-2">{items.map(item=><div key={item.id} className="rounded-xl border border-[#dbe9e4] bg-white px-3 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{item.name}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div><span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{item.state === "DRAFT" ? "Draft" : item.state.toLowerCase().replaceAll("_", " ")}</span></div>{item.state === "DRAFT" && sendAvailable && <button type="button" disabled={busy} className="mt-2 mr-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50" onClick={() => setConfirmSendId(item.id)}><UserPlus size={13}/> Send invitation email</button>}{item.state === "DRAFT" && <button type="button" disabled={busy} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline disabled:opacity-50" onClick={()=>void revoke(item.id)}><XCircle size={13}/> Revoke draft</button>}</div>)}</div>}
+        {loading ? <p role="status" className="mt-3 text-xs text-muted-foreground">Loading drafts…</p> : items.length === 0 ? <p className="mt-3 text-xs text-muted-foreground">No drafts created yet.</p> : <div className="mt-3 space-y-2">{items.map(item=><div key={item.id} className="rounded-xl border border-[#dbe9e4] bg-white px-3 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-semibold">{item.name}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div><span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{stateLabel[item.state] ?? item.state.toLowerCase().replaceAll("_", " ")}</span></div>{item.state === "DRAFT" && sendAvailable && <button type="button" disabled={busy} className="mt-2 mr-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50" onClick={() => setConfirmSendId(item.id)}><UserPlus size={13}/> Send invitation email</button>}{item.state === "DRAFT" && <button type="button" disabled={busy} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline disabled:opacity-50" onClick={()=>void revoke(item.id)}><XCircle size={13}/> Revoke draft</button>}</div>)}</div>}
       </div>
       <div className="mt-5 flex items-center gap-2 rounded-xl border border-border bg-white/70 px-3 py-3 text-xs font-medium text-accent-foreground"><Clock3 size={16}/> {sendAvailable ? "Invitations can be emailed to eligible new users. HR access activates automatically after verified registration and MFA." : "HR email delivery is currently unavailable. Please refresh or contact the administrator if the service remains unavailable."}</div>
     </section>
