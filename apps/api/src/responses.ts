@@ -139,6 +139,34 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
     );
   return r.data;
 }
+/** Fill employee-record answers the employee has not touched yet. Their own entries always win. */
+export function withPrefill(
+  fields: unknown,
+  answers: ResponseDto["answers"],
+  employee: {
+    fullName: string; email: string; jobTitle: string; department: string;
+    startDate: Date | null; employmentType: string; employeeNumber: string | null;
+  },
+): ResponseDto["answers"] {
+  if (!Array.isArray(fields)) return answers;
+  const values: Record<string, string | null> = {
+    "employee.fullName": employee.fullName,
+    "employee.email": employee.email,
+    "employee.jobTitle": employee.jobTitle,
+    "employee.department": employee.department,
+    "employee.startDate": employee.startDate ? employee.startDate.toISOString().slice(0, 10) : null,
+    "employee.employmentType": employee.employmentType,
+    "employee.employeeNumber": employee.employeeNumber,
+  };
+  const result = { ...answers };
+  for (const f of fields as { id?: string; prefill?: string | null }[]) {
+    if (!f?.id || !f.prefill || !(f.prefill in values)) continue;
+    const current = result[f.id];
+    const empty = current === undefined || current === null || (typeof current === "string" && current.trim() === "");
+    if (empty && values[f.prefill]) result[f.id] = values[f.prefill];
+  }
+  return result;
+}
 const include = {
   formVersion: true,
   onboardingCase: { include: { employee: true } },
@@ -188,7 +216,11 @@ export class ResponsesService {
       revision: response?.revision ?? 0,
       status: response?.status ?? "NOT_STARTED",
       updatedAt: response?.updatedAt.toISOString() ?? null,
-      answers: (response?.answers ?? {}) as ResponseDto["answers"],
+      answers: withPrefill(
+        a.formVersion.fields,
+        (response?.answers ?? {}) as ResponseDto["answers"],
+        a.onboardingCase.employee,
+      ),
       submissions: submissions.map((s) => ({
         id: s.id,
         version: s.version,

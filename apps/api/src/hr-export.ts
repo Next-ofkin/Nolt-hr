@@ -3,6 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { deflateRawSync } from "node:zlib";
 import sharp from "sharp";
+import { fieldVisible, isDisplayField, type FormField } from "@nolt/form-schemas";
 import { Database } from "./database.js";
 import { FilesService } from "./files.js";
 import { SessionGuard, type AuthRequest } from "./auth.js";
@@ -188,9 +189,17 @@ export class HrExportService {
 
     for (const value of fields) {
       if (!value || typeof value !== "object") continue;
-      const field = value as {id?:string;label?:string;type?:string};
+      const field = value as {id?:string;label?:string;type?:string;body?:string;showIf?:FormField["showIf"]};
       if (!field.id) continue;
       const label = field.label?.trim() || "Form field";
+      // Wording blocks print as written, so the PDF copy reads like the paper form.
+      if (field.type && isDisplayField(field.type)) {
+        if (field.type === "heading") doc.section(label);
+        else { if (label) doc.text(label, 10, true, 6); if (field.body) doc.text(field.body, 9, false, 8); }
+        continue;
+      }
+      // A follow-up question that was not shown to the employee is not part of the copy.
+      if (field.showIf && !fieldVisible(field as FormField, answers as Record<string, string | boolean | null>)) continue;
       const raw = answers[field.id];
       if (raw === null || raw === undefined || raw === "") {
         doc.field(label, "Not provided");

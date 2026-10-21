@@ -29,6 +29,279 @@
         ]
       }
     },
+    "/api/v1/developer/hr-invitation-drafts": {
+      "get": {
+        "operationId": "DeveloperOverviewController_drafts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrDraftListDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Developer administration"
+        ]
+      },
+      "post": {
+        "operationId": "DeveloperOverviewController_prepare",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrDraftDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Developer administration"
+        ]
+      }
+    },
+    "/api/v1/developer/hr-invitation-drafts/{id}/queue": {
+      "post": {
+        "operationId": "DeveloperOverviewController_queue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrDraftDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Developer administration"
+        ]
+      }
+    },
+    "/api/v1/developer/hr-invitation-drafts/{id}/revoke": {
+      "post": {
+        "operationId": "DeveloperOverviewController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrDraftDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Developer administration"
+        ]
+      }
+    },
+    "/api/v1/developer/overview": {
+      "get": {
+        "operationId": "DeveloperOverviewController_overview",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeveloperOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Developer administration"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/verification": {
+      "get": {
+        "operationId": "HrInvitationExchangeController_verification",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/activation-readiness": {
+      "get": {
+        "operationId": "HrInvitationExchangeController_activationReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/password": {
+      "post": {
+        "operationId": "HrInvitationExchangeController_password",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrPasswordResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/resume": {
+      "post": {
+        "operationId": "HrInvitationExchangeController_resume",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrExchangeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/resume-confirm": {
+      "post": {
+        "operationId": "HrInvitationExchangeController_confirmResume",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/activate": {
+      "post": {
+        "operationId": "HrInvitationExchangeController_activate",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
+    "/api/v1/hr-invitations/exchange": {
+      "post": {
+        "operationId": "HrInvitationExchangeController_exchange",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrExchangeResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "HR invitations"
+        ]
+      }
+    },
     "/api/v1/me/assignments/{id}/response": {
       "get": {
         "operationId": "ResponsesController_get",
@@ -1840,6 +2113,45 @@
         ]
       }
     },
+    "/api/v1/forms/published": {
+      "get": {
+        "operationId": "FormsController_listPublished",
+        "parameters": [
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "description": "Required for mutations; obtained from the authenticated session",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR forms"
+        ]
+      }
+    },
     "/api/v1/form-versions/{id}": {
       "get": {
         "operationId": "FormsController_get",
@@ -1961,7 +2273,10 @@
                                 "select",
                                 "checkbox",
                                 "file",
-                                "signature"
+                                "passport_photo",
+                                "signature",
+                                "heading",
+                                "paragraph"
                               ]
                             },
                             "label": {
@@ -2003,6 +2318,47 @@
                                 "SUPPORTING_DOCUMENT",
                                 "SIGNED_DOCUMENT"
                               ]
+                            },
+                            "body": {
+                              "default": "",
+                              "type": "string",
+                              "maxLength": 12000
+                            },
+                            "showIf": {
+                              "default": null,
+                              "nullable": true,
+                              "type": "object",
+                              "properties": {
+                                "fieldId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "equals": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "fieldId",
+                                "equals"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "prefill": {
+                              "default": null,
+                              "nullable": true,
+                              "type": "string",
+                              "enum": [
+                                "employee.fullName",
+                                "employee.email",
+                                "employee.jobTitle",
+                                "employee.department",
+                                "employee.startDate",
+                                "employee.employmentType",
+                                "employee.employeeNumber"
+                              ]
                             }
                           },
                           "required": [
@@ -2013,7 +2369,10 @@
                             "required",
                             "options",
                             "signatureMethod",
-                            "attachmentPurpose"
+                            "attachmentPurpose",
+                            "body",
+                            "showIf",
+                            "prefill"
                           ],
                           "additionalProperties": false
                         }
@@ -2269,6 +2628,294 @@
         ],
         "tags": [
           "HR forms"
+        ]
+      }
+    },
+    "/api/v1/packs": {
+      "get": {
+        "operationId": "PacksController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List pack templates"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      },
+      "post": {
+        "operationId": "PacksController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Create a draft pack from published forms"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/cases/{caseId}": {
+      "get": {
+        "operationId": "PacksController_caseAssignments",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "HR overview of assigned packs and per-form progress"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}/assign": {
+      "post": {
+        "operationId": "PacksController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Assign an entire published pack to an active case"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/assignments/{id}/extend-deadline": {
+      "post": {
+        "operationId": "PacksController_extendDeadline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Extend an unapproved pack deadline with an audit reason"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/assignments/{id}/approve": {
+      "post": {
+        "operationId": "PacksController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Approve a pack only after all required form reviews"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}": {
+      "get": {
+        "operationId": "PacksController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a pack template"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      },
+      "put": {
+        "operationId": "PacksController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update a revision-checked draft pack"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}/versions": {
+      "post": {
+        "operationId": "PacksController_newVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Create a new draft version without altering assigned published packs"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/packs/{id}/publish": {
+      "post": {
+        "operationId": "PacksController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Publish and lock a completed pack"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "HR packs"
+        ]
+      }
+    },
+    "/api/v1/me/packs": {
+      "get": {
+        "operationId": "MyPacksController_my",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Own active-case pack progress without exposing other employees"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "Own onboarding packs"
         ]
       }
     },
@@ -4089,6 +4736,69 @@
         ]
       }
     },
+    "/api/v1/files/{id}/preview": {
+      "get": {
+        "operationId": "FilesController_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated inline preview of a clean PDF or image"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "File uploads and signatures"
+        ]
+      }
+    },
     "/api/v1/files/{id}/download": {
       "get": {
         "operationId": "FilesController_download",
@@ -4149,6 +4859,98 @@
         },
         "tags": [
           "File uploads and signatures"
+        ]
+      }
+    },
+    "/api/v1/shared-files/{id}": {
+      "get": {
+        "operationId": "SharedFilesController_view",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Shareable attachments"
+        ]
+      }
+    },
+    "/api/v1/exports/forms/{id}.pdf": {
+      "get": {
+        "operationId": "HrExportController_form",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR PDF and pack exports"
+        ]
+      }
+    },
+    "/api/v1/exports/cases/{id}.zip": {
+      "get": {
+        "operationId": "HrExportController_caseArchive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR PDF and pack exports"
+        ]
+      }
+    },
+    "/api/v1/exports/packs/{id}.zip": {
+      "get": {
+        "operationId": "HrExportController_pack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR PDF and pack exports"
         ]
       }
     },
@@ -4620,6 +5422,60 @@
         },
         "tags": [
           "External requests"
+        ]
+      }
+    },
+    "/api/v1/employees/assignments/{id}/external-evidence": {
+      "get": {
+        "operationId": "ExternalEvidenceReviewController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR external evidence review"
+        ]
+      }
+    },
+    "/api/v1/employees/assignments/{id}/external-evidence/{requestId}/decision": {
+      "post": {
+        "operationId": "ExternalEvidenceReviewController_decide",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "HR external evidence review"
         ]
       }
     },
@@ -5208,6 +6064,179 @@
       }
     },
     "schemas": {
+      "HrDraftDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "revokedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "state",
+          "createdAt",
+          "revokedAt"
+        ]
+      },
+      "HrDraftListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HrDraftDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AccountSummaryDto": {
+        "type": "object",
+        "properties": {
+          "developers": {
+            "type": "number"
+          },
+          "hr": {
+            "type": "number"
+          },
+          "employees": {
+            "type": "number"
+          },
+          "totalActive": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "developers",
+          "hr",
+          "employees",
+          "totalActive"
+        ]
+      },
+      "HrAccountDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "active",
+          "createdAt"
+        ]
+      },
+      "HrPaginationDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages"
+        ]
+      },
+      "DeveloperOverviewDto": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/AccountSummaryDto"
+          },
+          "hrAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HrAccountDto"
+            }
+          },
+          "hrPagination": {
+            "$ref": "#/components/schemas/HrPaginationDto"
+          },
+          "inviteEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "summary",
+          "hrAccounts",
+          "hrPagination",
+          "inviteEnabled"
+        ]
+      },
+      "HrPasswordResultDto": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "awaiting_activation"
+            ]
+          }
+        },
+        "required": [
+          "next"
+        ]
+      },
+      "HrExchangeResultDto": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "mfa"
+            ]
+          }
+        },
+        "required": [
+          "next"
+        ]
+      },
       "ResponseFieldErrorDto": {
         "type": "object",
         "properties": {
@@ -6163,6 +7192,10 @@
           },
           "email": {
             "type": "string"
+          },
+          "correctionReason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -6171,7 +7204,8 @@
           "state",
           "expiresAt",
           "createdAt",
-          "email"
+          "email",
+          "correctionReason"
         ]
       },
       "ExternalRequestsDto": {

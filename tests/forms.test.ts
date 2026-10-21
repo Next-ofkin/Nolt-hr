@@ -88,3 +88,50 @@ test("only a never-published, never-assigned single draft is deletable", () => {
   assert.equal(canDeleteUnpublishedDraft([{ status: "UNPUBLISHED" }], 0), false);
   assert.equal(canDeleteUnpublishedDraft([{ status: "PUBLISHED" }, { status: "DRAFT" }], 0), false);
 });
+
+import { canonicalAnswersJson, fieldVisible, validateAnswers } from "@nolt/form-schemas";
+import { withPrefill } from "../apps/api/src/responses.js";
+
+test("headings and wording blocks collect no answers and are never required", () => {
+  const heading = { ...createField("heading", randomUUID()), label: "Health information" };
+  const text = { ...createField("paragraph", randomUUID()), body: "Read carefully." };
+  const name = { ...createField("text", randomUUID()), required: true };
+  const { issues } = validateAnswers([heading, text, name], { [name.id]: "Ada" }, true);
+  assert.deepEqual(issues, []);
+  assert.equal(canonicalAnswersJson([heading, text, name], { [name.id]: "Ada" }), JSON.stringify({ [name.id]: "Ada" }));
+});
+
+test("a follow-up question is only required, and only visible, after the matching answer", () => {
+  const yesNo = { ...createField("select", randomUUID()), options: ["Yes", "No"], required: true };
+  const details = { ...createField("textarea", randomUUID()), required: true, showIf: { fieldId: yesNo.id, equals: "Yes" } };
+  const content = { title: "Declaration", recipient: "EMPLOYEE", fields: [yesNo, details] };
+  assert.equal(formContentSchema.safeParse(content).success, true);
+  // The condition must point at a question placed above it.
+  assert.equal(formContentSchema.safeParse({ ...content, fields: [details, yesNo] }).success, false);
+  assert.equal(fieldVisible(details, { [yesNo.id]: "No" }), false);
+  assert.deepEqual(validateAnswers([yesNo, details], { [yesNo.id]: "No" }, true).issues, []);
+  const missing = validateAnswers([yesNo, details], { [yesNo.id]: "Yes" }, true).issues;
+  assert.deepEqual(missing.map((i) => i.fieldId), [details.id]);
+  assert.deepEqual(validateAnswers([yesNo, details], { [yesNo.id]: "Yes", [details.id]: "Explained" }, true).issues, []);
+});
+
+test("employee details fill in only where the employee has not answered", () => {
+  const a = { ...createField("text", randomUUID()), prefill: "employee.fullName" };
+  const b = { ...createField("text", randomUUID()), prefill: "employee.jobTitle" };
+  const employee = { fullName: "Ada Obi", email: "a@x.test", jobTitle: "Analyst", department: "Credit",
+    startDate: new Date("2026-10-01T00:00:00Z"), employmentType: "Full-time", employeeNumber: null };
+  const out = withPrefill([a, b], { [b.id]: "Senior Analyst" }, employee);
+  assert.equal(out[a.id], "Ada Obi");
+  assert.equal(out[b.id], "Senior Analyst");
+});
+
+import { formTemplates } from "@nolt/form-schemas";
+test("every NOLT template is a valid, publishable form with sound conditions", () => {
+  assert.ok(formTemplates.length >= 2);
+  for (const t of formTemplates) {
+    const content = t.build();
+    const parsed = publishContentSchema.safeParse(content);
+    assert.equal(parsed.success, true, `${t.title}: ${parsed.success ? "" : JSON.stringify(parsed.error.issues.slice(0, 2))}`);
+    assert.ok(content.fields.length <= 100, `${t.title} stays within the 100-field limit`);
+  }
+});

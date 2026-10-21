@@ -20,6 +20,8 @@ import {
   Hash,
   ListFilter,
   ListOrdered,
+  AlignLeft,
+  Heading,
   Loader2,
   Mail,
   PenLine,
@@ -43,6 +45,9 @@ import {
   createField,
   fieldTypes,
   formContentSchema,
+  formTemplates,
+  isDisplayField,
+  prefillKeys,
   type FormContent,
   type FormField,
 } from "@nolt/form-schemas";
@@ -79,6 +84,17 @@ const icons = {
   file: FileUp,
   passport_photo: FileUp,
   signature: PenLine,
+  heading: Heading,
+  paragraph: AlignLeft,
+};
+const prefillNames: Record<(typeof prefillKeys)[number], string> = {
+  "employee.fullName": "Full name",
+  "employee.email": "Email address",
+  "employee.jobTitle": "Job title",
+  "employee.department": "Department",
+  "employee.startDate": "Start date",
+  "employee.employmentType": "Type of employment",
+  "employee.employeeNumber": "Staff number",
 };
 const names = {
   text: "Short answer",
@@ -92,6 +108,8 @@ const names = {
   file: "Attachment",
   passport_photo: "Passport photo",
   signature: "Signature",
+  heading: "Section heading",
+  paragraph: "Wording block",
 };
 type Notice = { kind: "success" | "error"; text: string } | null;
 
@@ -103,11 +121,13 @@ export function FormsWorkspace() {
     [notice, setNotice] = useState<Notice>(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("ALL"),
-    [createOpen, setCreateOpen] = useState(false);
+    [createOpen, setCreateOpen] = useState(false),
+    [templateKey, setTemplateKey] = useState("");
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<{
     title: string;
@@ -154,7 +174,20 @@ export function FormsWorkspace() {
         body: values,
       });
       if (error || !data) throw new Error(errorMessage(error));
-      const record = normaliseForm(data);
+      let record = normaliseForm(data);
+      const template = formTemplates.find((t) => t.key === templateKey);
+      if (template) {
+        // Fill the new draft with the template's questions, keeping the title HR typed.
+        const built = template.build();
+        const { data: filledData, error: filledError } = await api.PUT("/api/v1/form-versions/{id}", {
+          params: { path: { id: record.id } },
+          headers: { "x-csrf-token": csrf ?? "" },
+          body: { expectedRevision: record.revision, content: { ...built, title: values.title, recipient: values.recipient } },
+        });
+        if (filledError || !filledData) throw new Error(errorMessage(filledError));
+        record = normaliseForm(filledData);
+      }
+      setTemplateKey("");
       setActive(record);
       setCreateOpen(false);
       reset();
@@ -240,6 +273,29 @@ export function FormsWorkspace() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(create)} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-template">Start from</Label>
+                    <select
+                      id="new-template"
+                      className="native-select"
+                      value={templateKey}
+                      onChange={(e) => {
+                        const t = formTemplates.find((x) => x.key === e.target.value);
+                        setTemplateKey(e.target.value);
+                        if (t) { setValue("title", t.title); setValue("recipient", t.recipient); }
+                      }}
+                    >
+                      <option value="">A blank form</option>
+                      {formTemplates.map((t) => (
+                        <option key={t.key} value={t.key}>NOLT template: {t.title}</option>
+                      ))}
+                    </select>
+                    {templateKey && (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {formTemplates.find((t) => t.key === templateKey)?.description} You can edit everything before publishing.
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="new-title">Form title</Label>
                     <Input
@@ -486,6 +542,11 @@ function FormEditor({
   }
   function add(type: FormField["type"]) {
     const item = createField(type, crypto.randomUUID());
+    setContent((old) => ({ ...old, fields: [...old.fields, item] }));
+    setSelected(item.id);
+  }
+  function addYesNo() {
+    const item = { ...createField("select", crypto.randomUUID()), label: "Yes or No question", options: ["Yes", "No"] };
     setContent((old) => ({ ...old, fields: [...old.fields, item] }));
     setSelected(item.id);
   }
@@ -760,6 +821,10 @@ function FormEditor({
                 </Button>
               );
             })}
+            <Button variant="outline" size="sm" className="justify-start text-xs" disabled={published || busy} onClick={addYesNo}>
+              <CheckCircle2 size={15} />
+              Yes / No
+            </Button>
           </div>
           <p className="mt-5 border-t pt-4 text-xs leading-5 text-muted-foreground">
             Attachments, passport photographs and signatures use secure private storage.
@@ -914,7 +979,7 @@ function FormEditor({
           {field ? (
             <fieldset disabled={published || busy} className="mt-5 space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="field-label">Question label</Label>
+                <Label htmlFor="field-label">{field.type === "heading" ? "Heading text" : field.type === "paragraph" ? "Title (optional)" : "Question label"}</Label>
                 <Input
                   id="field-label"
                   maxLength={200}
@@ -922,28 +987,92 @@ function FormEditor({
                   onChange={(e) => editField({ label: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="field-help">Help text</Label>
-                <Textarea
-                  id="field-help"
-                  maxLength={1000}
-                  value={field.helpText}
-                  onChange={(e) => editField({ helpText: e.target.value })}
-                />
-              </div>
-              <label
-                className="flex items-center justify-between gap-3 text-sm"
-                htmlFor="field-required"
-              >
-                Required field
-                <input
-                  id="field-required"
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={field.required}
-                  onChange={(e) => editField({ required: e.target.checked })}
-                />
-              </label>
+              {field.type === "paragraph" && (
+                <div className="space-y-2">
+                  <Label htmlFor="field-body">Wording shown to the employee</Label>
+                  <Textarea
+                    id="field-body"
+                    className="min-h-40"
+                    maxLength={12000}
+                    value={field.body}
+                    onChange={(e) => editField({ body: e.target.value })}
+                  />
+                </div>
+              )}
+              {!isDisplayField(field.type) && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-help">Help text</Label>
+                    <Textarea
+                      id="field-help"
+                      maxLength={1000}
+                      value={field.helpText}
+                      onChange={(e) => editField({ helpText: e.target.value })}
+                    />
+                  </div>
+                  <label
+                    className="flex items-center justify-between gap-3 text-sm"
+                    htmlFor="field-required"
+                  >
+                    Required field
+                    <input
+                      id="field-required"
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={field.required}
+                      onChange={(e) => editField({ required: e.target.checked })}
+                    />
+                  </label>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-showif">Show this question only when…</Label>
+                    <select
+                      id="field-showif"
+                      className="native-select"
+                      value={field.showIf ? `${field.showIf.fieldId}|${field.showIf.equals}` : ""}
+                      onChange={(e) => {
+                        const [fieldId, ...rest] = e.target.value.split("|");
+                        editField({ showIf: e.target.value ? { fieldId, equals: rest.join("|") } : null });
+                      }}
+                    >
+                      <option value="">Always show</option>
+                      {content.fields
+                        .slice(0, Math.max(0, content.fields.findIndex((f) => f.id === field.id)))
+                        .filter((f) => f.type === "select")
+                        .flatMap((f) =>
+                          f.options.map((o) => (
+                            <option key={`${f.id}|${o}`} value={`${f.id}|${o}`}>
+                              “{f.label}” is {o}
+                            </option>
+                          )),
+                        )}
+                    </select>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      For example, ask for details only when someone answers Yes. Only questions placed above can be used.
+                    </p>
+                  </div>
+                  {["text", "email", "date"].includes(field.type) && (
+                    <div className="space-y-2">
+                      <Label htmlFor="field-prefill">Fill in automatically</Label>
+                      <select
+                        id="field-prefill"
+                        className="native-select"
+                        value={field.prefill ?? ""}
+                        onChange={(e) =>
+                          editField({ prefill: (e.target.value || null) as FormField["prefill"] })
+                        }
+                      >
+                        <option value="">Leave empty</option>
+                        {prefillKeys.map((k) => (
+                          <option key={k} value={k}>{prefillNames[k]}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        Uses the employee record. The employee can still correct it.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
               {field.type === "select" && (
                 <div className="space-y-2">
                   <Label htmlFor="field-options">Options (one per line)</Label>
