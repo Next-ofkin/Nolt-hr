@@ -185,7 +185,7 @@ export const uploadIntentSchema = z
     purpose: z.enum(["SUPPORTING_DOCUMENT", "SIGNED_DOCUMENT", "SIGNATURE_IMAGE"]),
     fileName: z.string().trim().min(1).max(255),
     mimeType: z.string().trim().min(1).max(100),
-    byteSize: z.number().int().positive().max(10485760),
+    byteSize: z.number().int().positive().max(5242880),
     requestKey: z.string().uuid(),
   })
   .strict();
@@ -194,7 +194,7 @@ export type UploadIntentInput = z.infer<typeof uploadIntentSchema>;
 export const uploadPayloadSchema = z
   .object({
     requestKey: z.string().uuid(),
-    payloadBase64: z.string().min(1).max(15000000),
+    payloadBase64: z.string().min(1).max(7500000),
   })
   .strict();
 export type UploadPayloadInput = z.infer<typeof uploadPayloadSchema>;

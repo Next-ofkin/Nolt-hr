@@ -8,6 +8,8 @@ import { useAuth } from "./auth-provider";
 
 interface SignaturePadProps {
   assignmentId: string;
+  /** Set for guarantor and reference forms, which use their own session. */
+  externalCsrfToken?: string;
   fieldId: string;
   allowedMethod?: "DRAW" | "UPLOAD" | "EITHER";
   expectedRevision: number;
@@ -20,6 +22,7 @@ interface SignaturePadProps {
 
 export function SignaturePad({
   assignmentId,
+  externalCsrfToken,
   fieldId,
   allowedMethod = "EITHER",
   expectedRevision,
@@ -92,8 +95,8 @@ export function SignaturePad({
     const current = getCanvasCoordinates(e);
     ctx.strokeStyle = "#0f172a";
     ctx.lineWidth = e.pointerType === "pen" && e.pressure > 0
-      ? Math.max(1.5, Math.min(4.5, e.pressure * 4))
-      : 3;
+      ? Math.max(2, Math.min(6, e.pressure * 5))
+      : 4.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -190,7 +193,8 @@ export function SignaturePad({
   };
 
   const handleConfirm = async () => {
-    if (!session) return;
+    const csrf = externalCsrfToken ?? session?.csrfToken;
+    if (!csrf) return;
     if (!consentConfirmed) {
       setError("You must confirm the legal declaration before signing.");
       return;
@@ -213,20 +217,24 @@ export function SignaturePad({
 
     try {
       const savedRevision = beforeSign ? await beforeSign() : expectedRevision;
-      const res = await api.POST("/api/v1/me/assignments/{id}/signatures", {
-        params: { path: { id: assignmentId } },
-        headers: { "x-csrf-token": session.csrfToken },
-        body: {
-          fieldId,
-          signingMethod: tab,
-          consentVersion: "development-confirmation-v1",
-          consentConfirmed: true,
-          expectedRevision: savedRevision,
-          typedName: tab === "TYPED" ? typedName.trim() : undefined,
-          signatureImageBase64: imageBase64,
-          requestKey: crypto.randomUUID(),
-        },
-      });
+      const body = {
+        fieldId,
+        signingMethod: tab,
+        consentVersion: "development-confirmation-v1",
+        consentConfirmed: true as const,
+        expectedRevision: savedRevision,
+        typedName: tab === "TYPED" ? typedName.trim() : undefined,
+        signatureImageBase64: imageBase64,
+        requestKey: crypto.randomUUID(),
+      };
+      const headers = { "x-csrf-token": csrf };
+      const res = externalCsrfToken
+        ? await api.POST("/api/v1/external/request/signatures", { headers, body })
+        : await api.POST("/api/v1/me/assignments/{id}/signatures", {
+            params: { path: { id: assignmentId } },
+            headers,
+            body,
+          });
 
       if (res.error) {
         throw new Error(errorMessage(res.error));
@@ -279,9 +287,9 @@ export function SignaturePad({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+    <div className="flex flex-col gap-3 rounded-2xl border bg-card p-3 sm:p-4">
       {/* Method tabs */}
-      <div className="flex gap-1 border-b pb-2">
+      <div className="flex gap-2">
         {(allowedMethod === "DRAW" || allowedMethod === "EITHER") && (
           <button
             type="button"
@@ -289,7 +297,7 @@ export function SignaturePad({
               setTab("DRAWN");
               clearCanvas();
             }}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition-colors ${
               tab === "DRAWN"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted"
@@ -299,9 +307,6 @@ export function SignaturePad({
             Draw
           </button>
         )}
-        <p className="text-xs text-muted-foreground">
-          Use your finger, a stylus or mouse. You can clear or undo before confirming.
-        </p>
         {(allowedMethod === "UPLOAD" || allowedMethod === "EITHER") && (
           <button
             type="button"
@@ -309,7 +314,7 @@ export function SignaturePad({
               setTab("UPLOADED");
               clearCanvas();
             }}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition-colors ${
               tab === "UPLOADED"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted"
@@ -326,29 +331,29 @@ export function SignaturePad({
         <div className="relative">
           <canvas
             ref={canvasRef}
-            width={600}
-            height={160}
+            width={900}
+            height={420}
             onPointerDown={startDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
-            className="block w-full touch-none rounded border border-dashed bg-white dark:bg-slate-950"
-            style={{ aspectRatio: "600 / 160" }}
+            className="block w-full touch-none rounded-2xl border-2 border-dashed border-[#a9bde0] bg-white"
+            style={{ aspectRatio: "900 / 420", minHeight: 180 }}
             aria-label="Draw your signature using mouse or finger"
           />
-          {hasDrawn && <button type="button" onClick={undoStroke} disabled={undoCount === 0} className="absolute left-2 top-2 rounded bg-muted/80 px-2 py-1 text-xs text-muted-foreground hover:bg-muted">Undo</button>}
+          {hasDrawn && <button type="button" onClick={undoStroke} disabled={undoCount === 0} className="absolute left-2 top-2 h-10 rounded-xl bg-muted/90 px-4 text-sm font-semibold text-foreground active:bg-muted">Undo</button>}
           {hasDrawn && (
             <button
               type="button"
               onClick={clearCanvas}
-              className="absolute right-2 top-2 rounded bg-muted/80 px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+              className="absolute right-2 top-2 h-10 rounded-xl bg-muted/90 px-4 text-sm font-semibold text-foreground active:bg-muted"
             >
               Clear
             </button>
           )}
           {!hasDrawn && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/60">
-              Draw your signature here
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
+              Sign here with your finger
             </div>
           )}
         </div>
@@ -393,26 +398,25 @@ export function SignaturePad({
       )}
 
       {/* Legal consent check */}
-      <label className="flex items-start gap-2 pt-1 text-xs text-muted-foreground cursor-pointer">
+      <label className="flex cursor-pointer items-start gap-3 pt-1 text-sm leading-5">
         <input
           type="checkbox"
           checked={consentConfirmed}
           onChange={(e) => setConsentConfirmed(e.target.checked)}
-          className="mt-0.5 size-4 rounded border-gray-300 accent-primary"
+          className="mt-0.5 size-6 flex-none rounded border-gray-300 accent-primary"
         />
         <span>
           I confirm this is my signature and I approve the answers saved in this form.
         </span>
       </label>
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
       <Button
         type="button"
-        size="sm"
         disabled={busy || disabled || !consentConfirmed}
         onClick={handleConfirm}
-        className="w-full text-xs font-semibold"
+        className="h-12 w-full text-[15px] font-semibold"
       >
         {busy ? "Securing signature..." : "Confirm & Apply Signature"}
       </Button>

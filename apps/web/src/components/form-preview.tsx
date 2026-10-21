@@ -14,6 +14,7 @@ export function FormPreview({
   onAnswer,
   errors = {},
   assignmentId,
+  externalCsrfToken,
   revision = 0,
   beforeSign,
   disabled = false,
@@ -23,6 +24,8 @@ export function FormPreview({
   onAnswer?: (id: string, value: string | boolean) => void;
   errors?: Record<string, string>;
   assignmentId?: string;
+  /** Guarantor/reference forms pass their own CSRF token instead of an assignment id. */
+  externalCsrfToken?: string;
   revision?: number;
   beforeSign?: () => Promise<number>;
   disabled?: boolean;
@@ -143,9 +146,10 @@ export function FormPreview({
                 <span className="text-sm text-muted-foreground">I confirm</span>
               </div>
             ) : field.type === "signature" ? (
-              assignmentId ? (
+              assignmentId || externalCsrfToken ? (
                 <SignaturePad
-                  assignmentId={assignmentId}
+                  assignmentId={assignmentId ?? ""}
+                  externalCsrfToken={externalCsrfToken}
                   fieldId={field.id}
                   allowedMethod={field.signatureMethod}
                   expectedRevision={revision}
@@ -173,9 +177,10 @@ export function FormPreview({
                 </div>
               )
             ) : field.type === "file" || field.type === "passport_photo" ? (
-              assignmentId ? (
+              assignmentId || externalCsrfToken ? (
                 <FileUpload
-                  assignmentId={assignmentId}
+                  assignmentId={assignmentId ?? ""}
+                  externalCsrfToken={externalCsrfToken}
                   fieldId={field.id}
                   purpose={field.type === "passport_photo" ? "SUPPORTING_DOCUMENT" : field.attachmentPurpose}
                   passportPhoto={field.type === "passport_photo"}

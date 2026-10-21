@@ -14,6 +14,9 @@ import { Database } from "./database.js";
 import type { AuthRequest } from "./sessions.js";
 import { assertOrigin, cookie, digest, setCookie } from "./security.js";
 
+// A session stays alive while the guarantor is active and is cut off at the
+// request's own expiry (7 days after the link was opened).
+const SESSION_IDLE_MS = 24 * 60 * 60_000;
 export class ExternalSessionDto {
   @ApiProperty({ type: String }) requestId!: string;
   @ApiProperty({ type: String }) csrfToken!: string;
@@ -31,7 +34,7 @@ export class ExternalSessions {
     const token = randomBytes(32).toString("hex");
     const createdAt = new Date();
     const expiresAt = new Date(
-      Math.min(createdAt.getTime() + 30 * 60_000, requestExpiry.getTime()),
+      Math.min(createdAt.getTime() + SESSION_IDLE_MS, requestExpiry.getTime()),
     );
     await tx.externalEmailSession.create({
       data: {
@@ -50,7 +53,9 @@ export class ExternalSessions {
       res,
       "external",
       session.token,
-      Math.max(0, session.expiresAt.getTime() - Date.now()),
+      // The server decides when the session really ends; the cookie just has
+      // to outlive the sliding window.
+      7 * 24 * 60 * 60_000,
     );
   }
   async authenticate(req: AuthRequest) {
@@ -84,6 +89,19 @@ export class ExternalSessions {
         "This form request is unavailable or replaced.",
       );
     assertOrigin(req);
+    // Slide the session forward while the person is active.
+    if (s.expiresAt.getTime() - Date.now() < SESSION_IDLE_MS / 2) {
+      const next = new Date(
+        Math.min(Date.now() + SESSION_IDLE_MS, r.expiresAt.getTime()),
+      );
+      if (next > s.expiresAt) {
+        await this.db.externalEmailSession.update({
+          where: { id: s.id },
+          data: { expiresAt: next },
+        });
+        s.expiresAt = next;
+      }
+    }
     const csrfToken = digest("external-csrf:" + token);
     if (
       !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
