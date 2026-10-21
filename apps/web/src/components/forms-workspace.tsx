@@ -1153,7 +1153,7 @@ function FormEditor({
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" disabled={field.columns.length >= 8}
-                    onClick={() => editField({ columns: [...field.columns, { label: "New column", kind: "text", required: false }] })}>
+                    onClick={() => editField({ columns: [...field.columns, { label: "New column", kind: "text", required: false, exportKey: null }] })}>
                     <Plus size={14} /> Add column
                   </Button>
                   <div className="space-y-2">
