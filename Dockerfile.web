@@ -1,4 +1,4 @@
-# NOLT HR web app (Next.js) for Google Cloud Run. Build from the repo root.
+# NOLT HR web app (Next.js). Used by deploy/vps/docker-compose.yml. Build from the repo root.
 # API_ORIGIN is baked in at build time: pass the API's https address without a trailing path.
 FROM node:24-slim
 WORKDIR /app

@@ -1,3 +1,5 @@
+> Note (21 October 2026): references to Railway and Vercel in this page describe the earlier hosting. The app now runs on a VPS ([DEPLOYMENT.md](../DEPLOYMENT.md)). The behaviour described otherwise still applies unless the tracker says it changed.
+
 # One-time Developer bootstrap (feature branch; not activated)
 
 This implementation is **offline only**. It never creates a password, publishes a bootstrap HTTP route, sends invitations, or changes current HR/employee accounts. It does not run automatically on Railway/Vercel. The initial approved account is configured with `DEVELOPER_BOOTSTRAP_EMAIL` (the owner-approved email) and `DEVELOPER_BOOTSTRAP_SUBJECT` (the exact Supabase Auth UUID). Do not commit private runtime values.

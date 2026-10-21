@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time setup for NOLT HR on a fresh Ubuntu 24.04 VPS. Run as root:
-#   bash setup.sh 169-58-148-229.sslip.io
+#   bash setup.sh hr.example.com
 # Before running, create /opt/nolt/deploy/vps/.env.api with the API settings (see env.api.example).
 set -euo pipefail
 HOST="${1:?Usage: bash setup.sh your-site-address}"

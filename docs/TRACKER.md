@@ -1,12 +1,37 @@
 # NOLT HR implementation tracker
 
-## At-a-glance status — updated 18 October 2026
+## At-a-glance status: updated 21 October 2026
 
-**Verified locally:** Prisma client generation, 99/99 Pack-inclusive unit tests on the pre-branding commit, clean TypeScript/backend/frontend build on `06a3827`, and handover preflight/typecheck/build on `7a2a7c7`. GitHub Actions retired. New Packs route compiles. **Not yet verified:** full unit test rerun after branding, Pack database migrations, authenticated end-to-end flows, security dependency triage, release deployment and handover acceptance.
+**Live:** the portal runs on a VPS at `https://hr.dastings.name.ng` (Docker Compose + Caddy). Supabase `Nolthr` holds data and login. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
-**Database:** Existing Supabase Production has 17 complete Prisma migrations with zero incomplete; six new Pack migrations are not applied. Owner has deferred backup discussion and suggested Telegram; no restorable database backup was verified. Do not equate file sharing/Telegram with a database restore, and do not mark recovery or Production readiness complete.
+**Verified locally on the latest `main`:** Prisma generation, clean typecheck and build, **150/150** unit and domain tests, phone-size screenshot review of the employee home, employee form and guarantor form (no sideways overflow). **Not verified:** GitHub Actions (every run fails to start because of a GitHub account billing lock, not because of the code), real-device checks of camera/photo upload and signature drawing, a restorable database backup, secret rotation after the Railway period.
 
-Historical dated snapshots below retain their original context; checkboxes are updated only where newer evidence specifically resolves the action. Some broad tasks remain open because their untested portions are real work, even where code has been written.
+**Database:** production has 32 applied Prisma migrations, none incomplete, the latest `20261021100000_form_and_pack_lifecycle`. All Pack migrations are applied. Active accounts: 1 DEVELOPER, 4 HR, 6 EMPLOYEE. The earlier "17 migrations / Pack migrations not applied" status is obsolete.
+
+### Delivered since the 18 October snapshot
+- [x] Packs: create, version, publish, unpublish, assign, approve, extend deadlines (verified in production).
+- [x] Form and pack lifecycle rules: unpublish before delete; forms inside packs change only by new version; new assignments use the newest published form version ([rules](development/FORM_AND_PACK_RULES.md); 4 rule tests).
+- [x] AXA HMO enrolment form and a spreadsheet export (4 tests). The export button was removed from the HR screen on owner request; the code stays.
+- [x] PDF export text-encoding fixes (curly quotes, line breaks, orphan headings).
+- [x] Phone-first interface: floating bottom navigation, bottom-sheet dialogs, employee panel as a floating sheet, larger touch targets, sticky form actions, branded progress bars.
+- [x] Site icon (`icon.svg`, `apple-icon.png`).
+- [x] Hosting moved from Railway/Vercel to one VPS; Docker images, Compose, Caddy and setup/update scripts under `deploy/vps/`.
+- [x] Three roles only (DEVELOPER, HR, EMPLOYEE); every active HR user can review.
+- [x] Documentation refresh (this update).
+
+### Open items
+- [ ] NOLT logo PNG (`apps/web/public/branding/`, `NEXT_PUBLIC_BRAND_LOGO_PATH`) and brand-font confirmation (Lexend is a working choice).
+- [ ] Verified, restorable database backup and a restore rehearsal.
+- [ ] Rotate secrets that were stored on Railway (Supabase secret key, Resend key, Cloudmersive key); change the server's initial root password and use key-only SSH.
+- [ ] Fix GitHub billing so CI can run; then consider a required status check.
+- [ ] Re-run `npm audit` and triage before onboarding real employees.
+- [ ] Update the outdated HR-activation fixture in `scripts/test-onboarding-db.mjs`.
+- [ ] Dates print as ISO strings in exported PDFs.
+- [ ] End-to-end test of assigning a form that is inside a pack.
+- [ ] Remaining roadmap: policies, agreements, induction, assets, reminders, reports, offboarding.
+- [ ] Optional: delete the old `develop` branch; make the repository private (the server's `git clone` would then need a token).
+
+Older sections below are dated snapshots and keep their original context. Where they mention Railway, Vercel, "Pack migrations not applied", or "GitHub Actions retired", the status above supersedes them.
 
 ---
 

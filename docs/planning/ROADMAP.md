@@ -4,7 +4,7 @@ Prepared 13 October 2026. **Status: local implementation approved 13 October 202
 
 Source: [original PRD](../source/NOLT_HR_Employee_Lifecycle_Portal_Full_PRD%20%283%29.pdf), v1.0, 9 September 2026, all 29 pages. Page numbers below refer to PDF pages. The PRD itself is a stakeholder-review draft. The underlying policy manual, legal agreements, AXA workbook and original forms were not separately supplied or verified; their exact text and field layouts must be obtained before their modules are finalised.
 
-The owner approved local application implementation on 13 October 2026. Cloud provisioning and production deployment remain unapproved. Follow [the implementation tracker](../TRACKER.md) for verified progress. Unresolved business decisions remain tracked separately.
+The owner approved local application implementation on 13 October 2026. **Update, 21 October 2026:** the portal is deployed on a VPS (see [DEPLOYMENT.md](../DEPLOYMENT.md)); milestones for authentication, forms, packs, review, guarantors and files are built, while later modules remain open. Real employee imports still need explicit approval. Follow [the implementation tracker](../TRACKER.md) for verified progress. Unresolved business decisions remain tracked separately.
 
 ## Confirmed owner amendments
 

@@ -1,3 +1,5 @@
+> Note (21 October 2026): references to Railway and Vercel in this page describe the earlier hosting. The app now runs on a VPS ([DEPLOYMENT.md](../DEPLOYMENT.md)). The behaviour described otherwise still applies unless the tracker says it changed.
+
 # Guarantor and reference requests
 
 The first increment delivered unsent recipient preparation. The next increment adds request queueing, replacement/revocation, provider email verification, MFA and a recipient workspace. Its acceptance results are recorded separately below and in the test report; code presence is not completion.

@@ -2,7 +2,7 @@
 
 For planning or implementing this portal, read [skills/nolt-hr-delivery/SKILL.md](skills/nolt-hr-delivery/SKILL.md) and follow the approved scope recorded in [docs/planning/DECISIONS.md](docs/planning/DECISIONS.md).
 
-The owner approved local implementation on 13 October 2026. Follow the roadmap and maintain [docs/TRACKER.md](docs/TRACKER.md): check off only implemented, verified work and record remaining limits. Preserve the supplied PDF and existing protected Git/tool directories. Production deployment and real employee imports remain unapproved.
+The owner approved local implementation on 13 October 2026. Follow the roadmap and maintain [docs/TRACKER.md](docs/TRACKER.md): check off only implemented, verified work and record remaining limits. Preserve the supplied PDF and existing protected Git/tool directories. The portal is live on a VPS (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)); real employee imports and paid-service changes still need explicit owner approval.
 
 ## Core Rules
 
@@ -19,23 +19,25 @@ The owner approved local implementation on 13 October 2026. Follow the roadmap a
 9. **Test before checking tracker boxes.** Record unfinished work and verification limits honestly.
 10. **Protect secrets and existing work.** Preserve the PRD, Git/tool configuration and historical records.
 11. **Push verified checkpoints when requested.**
-12. **Keep production separate.** Deployment, paid services and real employee imports require explicit approval.
+12. **Keep production separate.** Production data lives in the Supabase project `Nolthr`. Never drop or recreate its tables, never edit `_prisma_migrations`, and never delete evidence tables without a reviewed plan and the owner's explicit yes. Test migrations on a disposable database first.
+13. **Never put secrets or server details in this public repository** (keys, passwords, IP addresses). Server settings live in the untracked `deploy/vps/.env.api`.
+14. **Verify before merging:** `npm run typecheck`, `npm test` and `npm run build`. GitHub Actions is currently blocked by a billing lock, so run these locally.
 
 *HR controls the forms; the application enforces security, validation and workflow rules.*
 
 ## Current Position & Working Workflows
 
-The project currently supports **HR setup → employee invitation → onboarding checklist → employee form submission** (verified in development):
-- **Real authentication:** Supabase signup, email confirmation, password login, authenticator MFA, logout and session revocation.
-- **HR form builder:** Create/edit drafts, configure questions and recipients, preview, publish and create new versions. Published versions stay immutable.
-- **Employee management:** Create employee records, edit employment details and open onboarding cases.
-- **Form assignment:** Assign an exact published version, mark required/optional and set due dates.
-- **Invitations:** Send through Supabase/Resend, resend, revoke and activate intended employee account. Real email delivery and activation confirmed.
-- **Employee workspace:** See own checklist, fill forms, save incomplete drafts, reopen and submit.
-- **Submission protection:** Validate answers, prevent stale overwrites, lock submitted answers and retain submission history.
-- **Foundations:** Database migrations, access checks, audit records and delivery queue. Responsive across six viewport widths.
+Working and verified in the live system (21 October 2026):
+- **Real authentication:** Supabase email/password, email confirmation and mandatory authenticator MFA. Three roles only: DEVELOPER, HR, EMPLOYEE. Every active HR user can review.
+- **Forms:** HR builds drafts, previews, publishes, unpublishes, and creates new versions. Published versions are immutable. Rules: [FORM_AND_PACK_RULES](docs/development/FORM_AND_PACK_RULES.md).
+- **Packs:** versioned bundles of forms, assigned to an employee's onboarding case. Assignments use the newest published form versions at assignment time; employees keep what they were given. Deadlines can be extended with a recorded reason.
+- **Employees and invitations:** directory, onboarding cases, invitations through Supabase/Resend, activation.
+- **Employee workspace:** own checklist, drafts, validated submissions, immutable submission history, private uploads and signatures.
+- **HR review:** mandatory correction reasons, versioned resubmission, approvals.
+- **Guarantor/reference requests:** the employee sends a secure email link; the guarantor completes and signs their own form through a one-request session. Employees cannot answer for them.
+- **Interface:** phone-first layout (floating bottom navigation, bottom-sheet dialogs, 48px touch targets on phones), site icon, brand colours from `apps/web/src/lib/brand.ts`.
+- **Hosting:** Docker Compose + Caddy on one VPS.
 
-## Current Delivery Focus
+## Open items
 
-**HR review and corrections:**
-`employee submits → authorised HR reviews → requests changes with a reason → employee corrects/resubmits → HR decides, while preserving every version.`
+Policies, agreements, induction, assets, offboarding, reminders, report exports, verified database backup/restore, secret rotation after the Railway period, and a working CI (billing lock). See the tracker.

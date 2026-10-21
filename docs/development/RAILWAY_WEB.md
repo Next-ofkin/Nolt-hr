@@ -1,3 +1,5 @@
+> **Superseded (21 October 2026).** NOLT HR no longer runs on Railway. It now runs on a single VPS; see [DEPLOYMENT.md](../DEPLOYMENT.md). This page is kept as history of the earlier staging set-up and must not be followed for new work.
+
 # Railway frontend staging
 
 Use the existing web service created from `Next-ofkin/Nolt-hr`, branch `main`. Keep the root directory empty (repository root), one replica, and the Free/Trial plan. Do not attach the root API-only `railway.toml` to this service. No database or secret key belongs in frontend variables.

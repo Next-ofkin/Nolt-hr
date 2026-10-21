@@ -1,3 +1,5 @@
+> **Superseded (21 October 2026).** NOLT HR no longer runs on Vercel. It now runs on a single VPS; see [DEPLOYMENT.md](../DEPLOYMENT.md). This page is kept as history of the earlier staging set-up and must not be followed for new work.
+
 # Vercel frontend staging
 
 Owner selected Vercel for the frontend on 15 October 2026 to conserve Railway credits, and chose Hobby for now after being informed that it is restricted to personal/non-commercial use. This records the preference, not confirmation of eligibility for a company portal. Do not represent Hobby as approved commercial hosting or purchase an upgrade automatically. Production release and real employee imports remain unapproved.

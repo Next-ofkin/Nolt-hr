@@ -1,3 +1,11 @@
+# Current status (21 October 2026)
+
+Latest run on `main`: `npm run typecheck` clean, `npm run build` clean, `npm test` **150 passed, 0 failed** (about 30 seconds). New coverage since the earlier reports: form and pack lifecycle rules (`tests/form-pack-rules.test.ts`), AXA spreadsheet (`tests/axa-sheet.test.ts`), pack rules and grouping, HR export. Phone-size (390 px) screenshots of the employee home, employee form and guarantor form show no horizontal overflow.
+
+GitHub Actions cannot start because of a GitHub account billing lock, so these checks are run locally before each merge. Not covered by automation: camera/photo upload and signature drawing on a real phone, and a database restore. The dated reports below are historical evidence for the code at that time.
+
+---
+
 # Simple external form invitation ? D25, 15 October 2026
 
 Owner confirmed receipt of the single Supabase/Resend SMTP guarantor test email (SENT, one attempt) but rejected staff-style signup/MFA for external respondents. That receipt does not establish completed activation/submission. D25 replaces the prototype with direct, verified-email form access and a custom Resend invitation. Staff password/TOTP requirements remain in place.
@@ -138,7 +146,7 @@ See [onboarding details](ONBOARDING_SLICE.md) and [tracker](../TRACKER.md).
 
 ## Previous authentication acceptance - historical record
 
-﻿# Current implementation test report
+# Current implementation test report
 
 Date: 13 October 2026 (Africa/Lagos). The current implementation uses real Supabase Auth. The earlier synthetic-provider results are superseded for authentication acceptance.
 
