@@ -1,6 +1,6 @@
 import {
   BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject,
-  Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Put, Req, UseGuards,
+  Delete, Injectable, NotFoundException, Param, ParseUUIDPipe, Post, Put, Req, UseGuards,
 } from "@nestjs/common";
 import { ApiBody, ApiCookieAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma } from "@prisma/client";
@@ -20,21 +20,90 @@ const packAssignmentInclude = {
 export class PacksService {
   constructor(@Inject(Database) private readonly db: Database) {}
 
+  /** Packs plus how many employees were given each one (a given pack is locked for good). */
+  private withUse<T extends { _count: { assignments: number }; laterVersions: { id: string }[] }>(pack: T) {
+    const { _count, laterVersions, ...rest } = pack;
+    return { ...rest, assignmentCount: _count.assignments, hasLaterVersion: laterVersions.length > 0 };
+  }
+  private readonly useInclude = {
+    items: { orderBy: { position: "asc" as const } },
+    _count: { select: { assignments: true } },
+    laterVersions: { select: { id: true }, take: 1 },
+  };
+
   async list() {
-    return this.db.packTemplate.findMany({
-      take: 100, orderBy: { createdAt: "desc" },
-      include: { items: { orderBy: { position: "asc" } } },
+    const packs = await this.db.packTemplate.findMany({
+      take: 100, orderBy: { createdAt: "desc" }, include: this.useInclude,
     });
+    return packs.map(p => this.withUse(p));
   }
 
   async get(id: string) {
-    const pack = await this.db.packTemplate.findUnique({
-      where: { id }, include: { items: { orderBy: { position: "asc" } } },
-    });
+    const pack = await this.db.packTemplate.findUnique({ where: { id }, include: this.useInclude });
     if (!pack) throw new NotFoundException("Pack not found.");
-    return pack;
+    return this.withUse(pack);
   }
 
+  /** Stop offering a published pack. Employees who already have it keep it. */
+  async unpublish(actorId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException("Pack not found.");
+      const updated = await tx.packTemplate.updateMany({
+        where: { id, status: "PUBLISHED" },
+        data: { status: "WITHDRAWN", updatedAt: new Date() },
+      });
+      if (updated.count !== 1) throw new ConflictException("This pack is not published.");
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_UNPUBLISHED", targetId: id } });
+      await tx.outboxEvent.create({ data: { type: "PACK_UNPUBLISHED", targetId: id } });
+      return tx.packTemplate.findUniqueOrThrow({ where: { id }, include: this.useInclude }).then(p => this.withUse(p));
+    });
+  }
+
+  /** Put a never-assigned pack with no newer version back to an editable draft. */
+  private async toDraft(tx: Prisma.TransactionClient, id: string) {
+    const pack = await tx.packTemplate.findUnique({ where: { id }, include: this.useInclude });
+    if (!pack) throw new NotFoundException("Pack not found.");
+    if (pack._count.assignments > 0)
+      throw new ConflictException("This pack has already been given to an employee, so it stays as it is. Create a new version to make changes.");
+    if (pack.laterVersions.length > 0)
+      throw new ConflictException("A newer version of this pack exists. Use that one instead.");
+    if (pack.status === "DRAFT") return pack;
+    const updated = await tx.packTemplate.updateMany({
+      where: { id, status: pack.status },
+      data: { status: "DRAFT", publishedAt: null, revision: { increment: 1 }, updatedAt: new Date() },
+    });
+    if (updated.count !== 1) throw new ConflictException("This pack changed. Reload it.");
+    return tx.packTemplate.findUniqueOrThrow({ where: { id }, include: this.useInclude });
+  }
+
+  async reopen(actorId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException("Pack not found.");
+      const before = await tx.packTemplate.findUniqueOrThrow({ where: { id }, select: { status: true } });
+      if (before.status === "PUBLISHED")
+        throw new ConflictException("Unpublish this pack before editing it.");
+      const pack = await this.toDraft(tx, id);
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_REOPENED", targetId: id } });
+      await tx.outboxEvent.create({ data: { type: "PACK_REOPENED", targetId: id } });
+      return this.withUse(pack);
+    });
+  }
+
+  /** Delete a pack that was never given to anyone. */
+  async remove(actorId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException("Pack not found.");
+      const pack = await this.toDraft(tx, id);
+      await tx.packItem.deleteMany({ where: { packId: id } });
+      await tx.packTemplate.delete({ where: { id } });
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_DELETED", targetId: id, metadata: { name: pack.name, versionNumber: pack.versionNumber } } });
+      await tx.outboxEvent.create({ data: { type: "PACK_DELETED", targetId: id } });
+      return { deleted: true };
+    });
+  }
 
   private async lockAndVerifyVersions(
     tx: Prisma.TransactionClient,
@@ -452,6 +521,24 @@ export class PacksController {
   @ApiCreatedResponse({ description: "Create a new draft version without altering assigned published packs" })
   newVersion(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.newVersion(req.actor.id, id);
+  }
+
+  @Post(":id/unpublish")
+  @ApiCreatedResponse({ description: "Stop offering a published pack; employees who have it keep it" })
+  unpublish(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.packs.unpublish(req.actor.id, id);
+  }
+
+  @Post(":id/reopen")
+  @ApiCreatedResponse({ description: "Return an unpublished, never-assigned pack to an editable draft" })
+  reopen(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.packs.reopen(req.actor.id, id);
+  }
+
+  @Delete(":id")
+  @ApiOkResponse({ description: "Delete a pack that has never been given to an employee" })
+  remove(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.packs.remove(req.actor.id, id);
   }
 
   @Post(":id/publish")
