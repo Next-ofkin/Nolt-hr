@@ -34,7 +34,7 @@ export function PackAssignmentPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [confirmation, setConfirmation] = useState<"mismatch" | "approve" | null>(null);
+  const [confirmation, setConfirmation] = useState<"approve" | null>(null);
   const [approvalId, setApprovalId] = useState<string | null>(null);
 
   const libraryKey = ["hr-pack-library", session?.id];
@@ -85,7 +85,6 @@ export function PackAssignmentPanel({
     return Number(bMatch) - Number(aMatch) || a.name.localeCompare(b.name);
   });
   const selectedPack = options.find(pack => pack.id === packId);
-  const mismatch = !!selectedPack && selectedPack.employmentType.trim().toLowerCase() !== employmentType.trim().toLowerCase();
 
   async function latestCaseRevision(): Promise<number> {
     const response = await fetch(`/api/v1/employees/${encodeURIComponent(employeeId)}`, {
@@ -98,12 +97,8 @@ export function PackAssignmentPanel({
     return detail.onboardingCase.revision;
   }
 
-  async function assign(confirmedMismatch = false) {
+  async function assign() {
     if (!packId || busy) return;
-    if (mismatch && !confirmedMismatch) {
-      setConfirmation("mismatch");
-      return;
-    }
     const requestedPackId = packId;
     setConfirmation(null);
     setBusy(true); setError(""); setNotice("");
@@ -129,7 +124,7 @@ export function PackAssignmentPanel({
         response = await fetch(`/api/v1/packs/${encodeURIComponent(requestedPackId)}/assign`, {
           method: "POST", credentials: "same-origin",
           headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
-          body: JSON.stringify({ caseId, expectedCaseRevision: revision, dueDate: dueDate || null, confirmEmploymentTypeMismatch: confirmedMismatch }),
+          body: JSON.stringify({ caseId, expectedCaseRevision: revision, dueDate: dueDate || null }),
         });
         if (response.status !== 409) break;
         // A 409 can also mean an already-assigned form or a changed pack.
@@ -192,7 +187,7 @@ export function PackAssignmentPanel({
   const { assignmentsById: assignmentMap, standalone: standaloneForms } = splitAssignmentsByPack(assignments, existing);
 
   return <section className="space-y-4 rounded-xl border bg-muted/20 p-4 sm:p-5">
-    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>{confirmation === "mismatch" ? "Employment type mismatch" : "Approve onboarding pack?"}</DialogTitle><DialogDescription>{confirmation === "mismatch" ? `This pack is for ${selectedPack?.employmentType ?? "another employment type"}, but this employee is listed as ${employmentType}. Assigning it anyway will be recorded in the audit history.` : "Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (confirmation === "mismatch") void assign(true); else if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>{confirmation === "mismatch" ? "Assign anyway" : "Approve pack"}</Button></div></DialogContent></Dialog>
+    <Dialog open={confirmation !== null} onOpenChange={open => { if (!open && !busy) setConfirmation(null); }}><DialogContent><DialogHeader><DialogTitle>Approve onboarding pack?</DialogTitle><DialogDescription>{"Confirm that every required form has been approved. This action will be recorded in the audit history."}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={busy} onClick={() => { if (approvalId) { const id = approvalId; setConfirmation(null); void approve(id); } }}>Approve pack</Button></div></DialogContent></Dialog>
     <div><h4 className="font-semibold">Employee onboarding packs</h4>
       <p className="mt-1 text-xs text-muted-foreground">Assign all forms from a published pack to this active onboarding case.</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -211,10 +206,6 @@ export function PackAssignmentPanel({
     </div>
     {options.length === 0 && !error && <p className="text-xs text-muted-foreground">
       No available published packs. Publish a pack with forms in the Packs workspace; already assigned pack versions are hidden.
-    </p>}
-    {mismatch && <p role="status" className="text-xs text-amber-700">
-      This pack is for {selectedPack!.employmentType}; the employee's employment type is {employmentType}.
-      Confirm the mismatch when assigning. The selection is recorded in the audit history.
     </p>}
     <Button type="button" disabled={!packId || busy} onClick={()=>void assign()}>
       {busy ? "Assigning…" : "Assign selected pack"}
