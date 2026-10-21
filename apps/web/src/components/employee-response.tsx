@@ -294,15 +294,16 @@ export function EmployeeResponse({
                 }}
               />
               {!isLocked && (
-                <div className="flex flex-wrap gap-3">
+                <div className="sticky bottom-24 z-20 -mx-1 flex gap-3 rounded-2xl border bg-white/95 p-3 shadow-lg backdrop-blur lg:bottom-4">
                   <Button
                     type="button"
                     variant="outline"
+                    className="flex-1"
                     onClick={() => void persist(false)}
                   >
                     Save draft
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" className="flex-[1.3]">
                     {changesRequired ? "Resubmit for review" : "Submit form"}
                   </Button>
                 </div>
