@@ -36,11 +36,24 @@ export default function Page() {
       });
       if (r.error) throw Error(errorMessage(r.error));
       location.replace("/external");
-    })().catch((e) =>
+    })().catch(async (e) => {
+      // If this device already has an open form session, just carry on to it.
+      try {
+        const existing = await api.GET("/api/v1/external/session");
+        if (existing.data?.requestId) {
+          location.replace("/external");
+          return;
+        }
+      } catch {
+        /* fall through to the message */
+      }
+      const raw = e instanceof Error ? e.message : "";
       setError(
-        e instanceof Error ? e.message : "Could not verify your request.",
-      ),
-    );
+        /already used|failed|expired|incomplete/i.test(raw) || !raw
+          ? "This link has already been used or has expired. Each email link works once. If you already opened the form on this phone, open this page again from the same browser. Otherwise, please ask the person who invited you to send a new link. Nothing has been lost."
+          : raw,
+      );
+    });
   }, []);
   return (
     <AuthFrame

@@ -64,6 +64,21 @@ try {
   console.log("ok: opening the link extends the request to 7 days");
   assert.match(await fails(step(third, "SENDING", `,"expiresAt"=now()+interval '3 days'`)) ?? "", /expiry is immutable/);
   console.log("ok: expiry cannot change at any other time");
+  // The guarantor's browser session: up to a day, sliding, never past the request.
+  const tok = () => Array.from({ length: 64 }, () => "abcdef0123456789"[Math.floor(Math.random() * 16)]).join("");
+  const session = (expires) => db.query(`INSERT INTO "ExternalEmailSession"("tokenHash","requestId","userId","authVersion","expiresAt")
+    VALUES ('${tok()}','${second}','${g2}',(SELECT "authVersion" FROM "User" WHERE id='${g2}'),${expires}) RETURNING id`).then(r => r.rows[0].id);
+  const sid = await session("now() + interval '24 hours'");
+  console.log("ok: a guarantor session can last 24 hours");
+  assert.match(await fails(session("now() + interval '9 days'")) ?? "", /window_check|scope/);
+  console.log("ok: a session cannot outlast the request");
+  await db.query(`UPDATE "ExternalEmailSession" SET "expiresAt"=now()+interval '25 hours' WHERE id='${sid}'`);
+  console.log("ok: an active session slides forward");
+  assert.match(await fails(db.query(`UPDATE "ExternalEmailSession" SET "expiresAt"=now()+interval '1 hour' WHERE id='${sid}'`)) ?? "", /only be extended/);
+  assert.match(await fails(db.query(`UPDATE "ExternalEmailSession" SET "expiresAt"=now()+interval '3 days' WHERE id='${sid}'`)) ?? "", /only be extended/);
+  console.log("ok: a session cannot be shortened or pushed past a day ahead");
+  assert.match(await fails(db.query(`UPDATE "ExternalEmailSession" SET "userId"='${g1}' WHERE id='${sid}'`)) ?? "", /immutable/);
+  console.log("ok: a session cannot change owner");
   console.log("All multi-guarantor database checks passed.");
 } finally {
   await db?.end().catch(() => {}); await server.stop().catch(() => {});
