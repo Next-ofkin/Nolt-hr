@@ -25,6 +25,7 @@ model User {
   reviewDecisions SubmissionReview[] @relation("ReviewActor")
   uploadedFiles StoredFile[]
   externalContacts ExternalContactDraft[]
+  guarantorRules AssignmentGuarantorRule[]
   externalRequestsCreated ExternalRequest[] @relation("ExternalCreator")
   externalRequestsAnswered ExternalRequest[] @relation("ExternalRespondent")
   externalSubmissions ExternalSubmission[]
@@ -168,10 +169,20 @@ model FormAssignment {
   signatures SignatureEvidence[]
   @@unique([id,formVersionId])
   externalContact ExternalContactDraft?
+  guarantorRule AssignmentGuarantorRule?
   externalRequests ExternalRequest[]
   @@unique([caseId,formId])
   @@index([formVersionId,formId])
   @@index([formId])
+}
+model AssignmentGuarantorRule {
+  assignmentId String @id @db.Uuid
+  assignment FormAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  required Int @default(1) @db.SmallInt
+  updatedBy String @db.Uuid
+  updater User @relation(fields:[updatedBy],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  @@index([updatedBy])
 }
 model ExternalContactDraft {
   assignmentId String @id @db.Uuid
@@ -191,6 +202,7 @@ model ExternalRequest {
   requestKey String @db.Uuid
   requestHash String
   contactRevision Int
+  slot Int @default(1) @db.SmallInt
   fullName String @db.VarChar(160)
   email String @db.VarChar(254)
   createdBy String @db.Uuid

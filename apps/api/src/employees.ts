@@ -1,3 +1,4 @@
+import { externalAssignmentStatus } from "./external-status.js";
 import {
   BadRequestException,
   Body,
@@ -162,7 +163,7 @@ const caseInclude = {
   assignments: {
     orderBy: { createdAt: "asc" as const },
     include: { formVersion: true, response: { select: { status: true } },
-      externalRequests: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], select: { state: true, evidenceReview: { select: { decision: true } } }, take: 1 } },
+      externalRequests: { orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }], select: { id: true, slot: true, createdAt: true, state: true, evidenceReview: { select: { decision: true } } }, take: 40 }, guarantorRule: { select: { required: true } } },
   },
 };
 type CaseRow = Prisma.OnboardingCaseGetPayload<{ include: typeof caseInclude }>;
@@ -183,10 +184,7 @@ const caseDto = (c: CaseRow): CaseDto => ({
     required: a.required,
     dueDate: a.dueDate?.toISOString().slice(0, 10) ?? null,
     status: a.formVersion.recipient !== "EMPLOYEE"
-      ? a.externalRequests[0]?.evidenceReview?.decision === "APPROVED" ? "APPROVED"
-        : a.externalRequests[0]?.evidenceReview?.decision === "CHANGES_REQUIRED" ? "CHANGES_REQUIRED"
-        : a.externalRequests[0]?.state === "SUBMITTED" ? "EXTERNAL_SUBMITTED"
-        : "NOT_STARTED"
+      ? externalAssignmentStatus(a.externalRequests, a.guarantorRule?.required ?? 1)
       : a.response?.status ?? "NOT_STARTED",
   })),
 });

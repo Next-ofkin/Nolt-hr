@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import { Button } from "./ui/button";
-import { ExternalContact } from "./external-contact";
+import { GuarantorSlots } from "./guarantor-slots";
 import { StatusChip } from "./status-chip";
 import { groupForDisplay, needsAttention, sections } from "@/lib/onboarding-list";
 
@@ -18,7 +18,7 @@ export type MyAssignment = {
 };
 
 const chipLabel = (status: string) =>
-  status === "EXTERNAL_SUBMITTED" ? "Guarantor submitted" : status === "SUBMITTED" ? "Sent to HR" : status === "CHANGES_REQUIRED" ? "Changes requested" : undefined;
+  status === "EXTERNAL_SUBMITTED" ? "Submitted. Waiting for HR" : status === "SUBMITTED" ? "Sent to HR" : status === "CHANGES_REQUIRED" ? "Changes requested" : undefined;
 const buttonLabel = (status: string) =>
   status === "APPROVED" ? "View" : status === "CHANGES_REQUIRED" ? "Fix and resend" : status === "SUBMITTED" ? "View" : status === "DRAFT" ? "Continue" : "Start";
 
@@ -61,7 +61,7 @@ export function MyOnboardingList({
           <div className="min-w-0 flex-1">
             <p className="break-words font-semibold leading-snug">{a.title}</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
-              <StatusChip status={a.status} label={chipLabel(a.status)} />
+              <StatusChip status={a.status} label={!mine && a.status === "DRAFT" ? "In progress" : chipLabel(a.status)} />
               <span>{a.required ? "Required" : "Optional"}{a.dueDate ? ` · Due ${a.dueDate}` : ""}</span>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function MyOnboardingList({
             </button>
           )
         ) : (
-          <div className="mt-3 border-t pt-3"><ExternalContact assignmentId={a.id} recipient={a.recipient as "GUARANTOR" | "REFERENCE"} /></div>
+          <div className="mt-3 border-t pt-3"><GuarantorSlots assignmentId={a.id} recipient={a.recipient} /></div>
         )}
       </li>
     );

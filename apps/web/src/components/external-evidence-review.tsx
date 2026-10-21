@@ -5,12 +5,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "./ui/textarea";
 
 type Submission = {
-  id: string; email: string; fullName: string; submittedAt: string;
+  id: string; email: string; fullName: string; slot: number; canReview: boolean; submittedAt: string;
   answers: Record<string, string | boolean | null>;
   decision: string | null; reason: string | null; reviewedAt: string | null;
 };
 type Detail = {
   assignmentId: string; title: string; recipient: string;
+  required: number;
+  slots: { slot: number; status: string; fullName: string | null; email: string | null }[];
   fields: { id: string; label: string; type?: string }[];
   items: Submission[];
 };
@@ -35,6 +37,24 @@ export function ExternalEvidenceReview({
     setDetail(null); setError(""); setReason(""); setNotice("");
     void load().catch(e => setError(e instanceof Error ? e.message : "Unable to load evidence"));
   }, [assignmentId]);
+  async function setRequired(required: number) {
+    if (busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(
+        `/api/v1/employees/assignments/${encodeURIComponent(assignmentId)}/external-evidence/required`,
+        { method: "PUT", credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+          body: JSON.stringify({ required }) });
+      if (!response.ok) throw new Error(response.status === 409
+        ? "Finish or cancel the second guarantor before going back to one."
+        : "Could not change the number of guarantors.");
+      setNotice(required === 2 ? "Two guarantors are now needed." : "One guarantor is now needed.");
+      await load(); await onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not change the number.");
+    } finally { setBusy(false); }
+  }
   async function decide(id: string, decision: "APPROVED" | "CHANGES_REQUIRED") {
     if (busy) return;
     if (decision === "CHANGES_REQUIRED" && reason.trim().length < 10) {
@@ -76,12 +96,29 @@ export function ExternalEvidenceReview({
     <h3 className="text-lg font-semibold">Guarantor / reference evidence</h3>
     <p className="text-sm text-muted-foreground">Review answers sent directly by the verified recipient.
       Approvals are final. Corrections require a new link; previous submissions remain preserved.</p>
+    {detail && (
+      <div className="space-y-2 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">Guarantors needed</span>
+          {[1, 2].map(n => <Button key={n} type="button" size="sm" variant={detail.required === n ? "default" : "outline"}
+            disabled={busy || detail.required === n} onClick={() => void setRequired(n)}>{n}</Button>)}
+        </div>
+        <ul className="space-y-1 text-sm">
+          {detail.slots.map(s => <li key={s.slot}>
+            <b>{detail.required > 1 ? `Guarantor ${s.slot}` : "Guarantor"}:</b>{" "}
+            {s.fullName ? `${s.fullName} (${s.email}) — ` : ""}
+            {({ NONE: "not sent yet", IN_PROGRESS: "sent, not submitted yet", SUBMITTED: "submitted, needs your review",
+              CHANGES_REQUIRED: "corrections requested", APPROVED: "approved" } as Record<string, string>)[s.status] ?? s.status}
+          </li>)}
+        </ul>
+      </div>
+    )}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
     {!detail && !error && <p role="status">Loading submitted evidence…</p>}
     {detail && detail.items.length === 0 && <p>No submitted evidence to review yet.</p>}
-    {detail?.items.map((item, index) => <article key={item.id} className="space-y-3 rounded-lg border p-4">
-      <div><p className="font-medium">{item.fullName} · {item.email}</p>
+    {detail?.items.map((item) => <article key={item.id} className="space-y-3 rounded-lg border p-4">
+      <div><p className="font-medium">{detail.required > 1 ? `Guarantor ${item.slot}: ` : ""}{item.fullName} · {item.email}</p>
         <p className="text-xs text-muted-foreground">Submitted {new Date(item.submittedAt).toLocaleString()}</p></div>
       {Object.entries(item.answers).map(([fieldId, value]) =>
         <div key={fieldId} className="border-b pb-2">
@@ -107,7 +144,7 @@ export function ExternalEvidenceReview({
         {item.reason && <p>Corrections: {item.reason}</p>}
         {item.reviewedAt && <p className="text-xs text-muted-foreground">Reviewed {new Date(item.reviewedAt).toLocaleString()}</p>}
       </div>}
-      {!item.decision && index === 0 && <div className="space-y-2">
+      {!item.decision && item.canReview && <div className="space-y-2">
         <label className="block text-sm font-medium">Corrections needed (required if returning)</label>
         <Textarea value={reason}
           onChange={e => setReason(e.target.value)} maxLength={1000} rows={3}

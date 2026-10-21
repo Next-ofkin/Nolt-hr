@@ -634,3 +634,9 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Autosave on employee and guarantor forms: server save about 2 s after typing stops, plus a local backup of typed answers only (never files), restored on request, wiped on submit, logout or after 7 days.
 - [x] Employee onboarding list grouped by pack with To do / Waiting for HR / Done (collapsed); changes-requested forms first. `MyPackProgress` replaced by `MyOnboardingList`.
 
+## 2026-10-21 (evening) — Several guarantors per form
+- [x] Up to two guarantors per guarantor/reference form. Each has a slot; one open request per slot (`ExternalRequest.slot`, index `ExternalRequest_current_slot`). HR sets how many are needed (1 or 2, default 1) via `AssignmentGuarantorRule`; the form is approved only when every needed slot is approved (`apps/api/src/external-status.ts`).
+- [x] One-step sending: the request carries the name and email; the saved contact draft is no longer used by the screens. Change guarantor, send a new link and cancel are available until the guarantor submits. Duplicate emails across slots and self-guarantee are refused.
+- [x] Migration `20261021180000_multi_guarantor`: also fixes the 7-day extension, which the old trigger blocked (expiry may now move later only when the recipient opens the link, capped at 8 days).
+- [x] Visible status per guarantor (queued, sending, sent, opened, submitted, approved), with polling while an email is on its way.
+

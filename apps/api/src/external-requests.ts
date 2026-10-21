@@ -68,14 +68,25 @@ import {
   permissionsFor,
 } from "./security.js";
 import { dto as formDto, FormDto } from "./forms.js";
+import { latestPerSlot, slotStatus } from "./external-status.js";
 import { FilesService, SignatureResultDto, StoredFileDto, UploadIntentDto } from "./files.js";
 
 export const createExternalSchema = z
   .object({
-    expectedContactRevision: z.number().int().positive(),
+    slot: z.number().int().min(1).max(2),
+    fullName: z.string().trim().min(1).max(160),
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(254)
+      .transform((v) => v.toLowerCase()),
     requestKey: z.string().uuid(),
     replaceRequestId: z.string().uuid().optional(),
   })
+  .strict();
+export const guarantorsRequiredSchema = z
+  .object({ required: z.number().int().min(1).max(2) })
   .strict();
 export const externalExchangeSchema = z
   .object({
@@ -112,10 +123,13 @@ export class ExternalRequestDto {
   @ApiProperty({ type: String }) expiresAt!: string;
   @ApiProperty({ type: String }) createdAt!: string;
   @ApiProperty({ type: String }) email!: string;
+  @ApiProperty({ type: String }) fullName!: string;
+  @ApiProperty({ type: Number }) slot!: number;
   @ApiProperty({ type: String, nullable: true }) correctionReason!: string | null;
 }
 export class ExternalRequestsDto {
   @ApiProperty({ type: [ExternalRequestDto] }) items!: ExternalRequestDto[];
+  @ApiProperty({ type: Number }) required!: number;
 }
 export class ExternalWorkspaceDto {
   @ApiProperty({ type: String }) requestId!: string;
@@ -139,6 +153,8 @@ function dto(r: ExternalRequest & { evidenceReview?: { decision: string; reason:
         ? "EXPIRED"
         : r.state),
     email: r.email,
+    fullName: r.fullName,
+    slot: r.slot,
     correctionReason: r.evidenceReview?.reason ?? null,
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
@@ -191,7 +207,9 @@ export class ExternalRequestsService {
   ): Promise<ExternalRequestsDto> {
     return this.db.$transaction(async (tx) => {
       await this.own(tx, actorId, assignmentId);
+      const rule = await tx.assignmentGuarantorRule.findUnique({ where: { assignmentId } });
       return {
+        required: rule?.required ?? 1,
         items: (
           await tx.externalRequest.findMany({
             where: { assignmentId },
@@ -221,15 +239,31 @@ export class ExternalRequestsService {
           );
         return dto(replay);
       }
-      const contact = await tx.externalContactDraft.findUnique({
-        where: { assignmentId },
-      });
-      if (!contact || contact.revision !== p.expectedContactRevision)
+      const rule = await tx.assignmentGuarantorRule.findUnique({ where: { assignmentId } });
+      if (p.slot > (rule?.required ?? 1))
         throw new ConflictException(
-          "Save and reload the recipient details before sending.",
+          "HR has asked for fewer guarantors on this form. Reload and try again.",
         );
+      const [actor, owner] = await Promise.all([
+        tx.user.findUniqueOrThrow({ where: { id: actorId }, select: { email: true } }),
+        tx.formAssignment.findUniqueOrThrow({
+          where: { id: assignmentId },
+          select: { onboardingCase: { select: { employee: { select: { email: true } } } } },
+        }),
+      ]);
+      if (p.email === actor.email.toLowerCase() || p.email === owner.onboardingCase.employee.email.toLowerCase())
+        throw new ConflictException("Use someone else's email. You cannot be your own guarantor.");
+      // Each guarantor on a form must be a different person.
+      const others = await tx.externalRequest.findMany({
+        where: { assignmentId, slot: { not: p.slot } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, slot: true, createdAt: true, state: true, email: true },
+      });
+      for (const o of latestPerSlot(others).values())
+        if (o.email === p.email && !["REVOKED", "EXPIRED", "FAILED"].includes(o.state))
+          throw new ConflictException("Each guarantor needs a different email address.");
       const current = await tx.externalRequest.findFirst({
-        where: { assignmentId, state: { notIn: terminal },
+        where: { assignmentId, slot: p.slot, state: { notIn: terminal },
           OR: [{ evidenceReview: { is: null } }, { evidenceReview: { is: { decision: "APPROVED" } } }] },
       });
       if (current) {
@@ -259,7 +293,7 @@ export class ExternalRequestsService {
         await this.event(tx, actorId, "EXTERNAL_REQUEST_REPLACED", current.id);
       } else if (p.replaceRequestId) {
         const old = await tx.externalRequest.findFirst({
-          where: { id: p.replaceRequestId, assignmentId },
+          where: { id: p.replaceRequestId, assignmentId, slot: p.slot },
         });
         if (!old || ["SUBMITTED", "APPROVED"].includes(old.state))
           throw new ConflictException("Replacement target is invalid.");
@@ -269,9 +303,10 @@ export class ExternalRequestsService {
           assignmentId,
           requestKey: p.requestKey,
           requestHash: hash,
-          contactRevision: contact.revision,
-          fullName: contact.fullName,
-          email: contact.email,
+          contactRevision: 1,
+          slot: p.slot,
+          fullName: p.fullName,
+          email: p.email,
           createdBy: actorId,
           updatedBy: actorId,
           expiresAt: new Date(Date.now() + inviteTtlMinutes() * 60_000),
@@ -1017,13 +1052,38 @@ export class ExternalEvidenceReviewService {
         include: { submission: true, evidenceReview: true },
         take: 20,
       });
+      const rule = await tx.assignmentGuarantorRule.findUnique({ where: { assignmentId } });
+      const required = rule?.required ?? 1;
+      const everything = await tx.externalRequest.findMany({
+        where: { assignmentId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: { evidenceReview: { select: { decision: true } } },
+        take: 40,
+      });
+      const latest = latestPerSlot(everything);
+      const seenSlot = new Set<number>();
       return {
         assignmentId,
+        required,
+        slots: Array.from({ length: required }, (_, i) => {
+          const r = latest.get(i + 1);
+          return {
+            slot: i + 1,
+            status: slotStatus(r),
+            fullName: r?.fullName ?? null,
+            email: r?.email ?? null,
+          };
+        }),
         title: assignment.formVersion.title,
         recipient: assignment.formVersion.recipient,
         fields: formContentSchema.parse(assignment.formVersion).fields.map(field => ({ id: field.id, label: field.label, type: field.type })),
-        items: requests.map(r => ({
-          id: r.id, email: r.email, fullName: r.fullName,
+        items: requests.map(r => {
+          const first = !seenSlot.has(r.slot);
+          seenSlot.add(r.slot);
+          return { first, r };
+        }).map(({ first, r }) => ({
+          id: r.id, email: r.email, fullName: r.fullName, slot: r.slot,
+          canReview: first && latest.get(r.slot)?.id === r.id && !r.evidenceReview,
           submittedAt: r.submission!.submittedAt.toISOString(),
           answers: r.submission!.answers,
           decision: r.evidenceReview?.decision ?? null,
@@ -1031,6 +1091,36 @@ export class ExternalEvidenceReviewService {
           reviewedAt: r.evidenceReview?.reviewedAt.toISOString() ?? null,
         })),
       };
+    }, options);
+  }
+  async setRequired(actorId: string, assignmentId: string, input: unknown) {
+    const p = parse(guarantorsRequiredSchema, input);
+    return this.db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT c.id FROM public."OnboardingCase" c
+        JOIN public."FormAssignment" a ON a."caseId"=c.id
+        WHERE a.id=${assignmentId}::uuid FOR UPDATE OF c`;
+      const assignment = await this.authorised(tx, actorId, assignmentId);
+      if (assignment.onboardingCase.status !== "ACTIVE")
+        throw new ConflictException("The onboarding case is no longer active.");
+      const latest = latestPerSlot(await tx.externalRequest.findMany({
+        where: { assignmentId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: { evidenceReview: { select: { decision: true } } },
+      }));
+      // Lowering the number is refused while a guarantor in a higher slot is still in play.
+      for (const [slot, r] of latest)
+        if (slot > p.required && slotStatus(r) !== "NONE")
+          throw new ConflictException("Revoke or finish the extra guarantor before lowering the number.");
+      await tx.assignmentGuarantorRule.upsert({
+        where: { assignmentId },
+        create: { assignmentId, required: p.required, updatedBy: actorId },
+        update: { required: p.required, updatedBy: actorId },
+      });
+      await tx.auditEvent.create({ data: {
+        actorId, action: "EXTERNAL_GUARANTORS_REQUIRED_SET", targetId: assignmentId,
+        metadata: { required: p.required },
+      } });
+      return { assignmentId, required: p.required };
     }, options);
   }
   async decide(actorId: string, assignmentId: string, requestId: string, input: unknown) {
@@ -1049,7 +1139,7 @@ export class ExternalEvidenceReviewService {
       if (!r?.submission || r.evidenceReview || r.state !== "SUBMITTED")
         throw new ConflictException("This submitted guarantor evidence is unavailable or already reviewed.");
       const latest = await tx.externalRequest.findFirst({
-        where: { assignmentId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        where: { assignmentId, slot: r.slot }, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         select: { id: true },
       });
       if (latest?.id !== r.id)
@@ -1077,6 +1167,11 @@ export class ExternalEvidenceReviewController {
   @Get()
   read(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.review.detail(req.actor.id, id);
+  }
+  @Put("required")
+  @ApiBody({ schema: schema(guarantorsRequiredSchema) })
+  setRequired(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.review.setRequired(req.actor.id, id, body);
   }
   @Post(":requestId/decision")
   decide(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
