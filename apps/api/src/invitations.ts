@@ -44,6 +44,7 @@ import {
   type AuthRequest,
 } from "./auth.js";
 import { EmployeesGuard } from "./employees.js";
+import { inviteEmail, inviteTtlMinutes, resendConfigured, sendViaResend } from "./invite-email.js";
 import { Sessions } from "./sessions.js";
 import { SupabaseAuth } from "./supabase-auth.js";
 import {
@@ -236,11 +237,12 @@ export class InvitationsService {
           });
           await this.event(tx, actorId, "INVITATION_REPLACED", i.id);
         }
-        const minutes = Number(process.env.INVITATION_TTL_MINUTES ?? 60);
-        if (!Number.isInteger(minutes) || minutes < 5 || minutes > 60)
-          throw new BadRequestException(
-            "Invitation expiry configuration is invalid.",
-          );
+        let minutes: number;
+        try {
+          minutes = inviteTtlMinutes();
+        } catch {
+          throw new BadRequestException("Invitation expiry configuration is invalid.");
+        }
         const passwordState = await tx.$queryRaw<
           { required: boolean }[]
         >`SELECT nolt_private.employee_password_required(${employee.email}) AS required`;
@@ -466,6 +468,27 @@ export class InvitationsService {
     return { next: "workspace" };
   }
   // Claim briefly; never hold a database transaction open during the provider email call.
+  /** NOLT-branded invitation: Supabase supplies the one-time proof, Resend delivers the email. */
+  private async sendBranded(
+    client: { auth: { admin: { generateLink: (p: any) => Promise<any> } } },
+    employee: { email: string; fullName: string; userId: string | null },
+    invitationId: string,
+    expiresAt: Date,
+  ): Promise<{ error: { code?: string; status?: number } | null }> {
+    const generated = await client.auth.admin.generateLink(
+      employee.userId
+        ? { type: "magiclink", email: employee.email }
+        : { type: "invite", email: employee.email },
+    );
+    const props = generated.data?.properties;
+    if (generated.error || !props?.hashed_token || !["invite", "magiclink"].includes(props.verification_type))
+      return { error: { code: generated.error?.code ?? "PROOF_GENERATION_FAILED", status: generated.error?.status ?? 400 } };
+    const link =
+      appOrigin() + "/invitations/accept?id=" + encodeURIComponent(invitationId) +
+      "#token_hash=" + encodeURIComponent(props.hashed_token) + "&type=" + encodeURIComponent(props.verification_type);
+    const failed = await sendViaResend(employee.email, inviteEmail("EMPLOYEE", { name: employee.fullName, link, expiresAt }));
+    return failed ? { error: { code: failed.code, status: failed.status || undefined } } : { error: null };
+  }
   async deliverNext(onlyInvitationId?: string) {
     const expired = await this.db.invitationDelivery.findMany({
       where: { state: "SENDING", leaseUntil: { lt: new Date() } },
@@ -552,7 +575,7 @@ export class InvitationsService {
           appOrigin() + "/invitations/accept?id=" + job.invitation.id;
         const client = createClient(
           process.env.SUPABASE_URL!,
-          !job.invitation.employee.userId
+          !job.invitation.employee.userId || resendConfigured()
             ? process.env.SUPABASE_SECRET_KEY!
             : process.env.SUPABASE_PUBLISHABLE_KEY!,
           {
@@ -568,15 +591,16 @@ export class InvitationsService {
             },
           },
         );
-        const result = !job.invitation.employee.userId
-          ? await client.auth.admin.inviteUserByEmail(
-              job.invitation.employee.email,
-              { redirectTo },
-            )
-          : await client.auth.signInWithOtp({
-              email: job.invitation.employee.email,
-              options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
-            });
+        const employee = job.invitation.employee;
+        const result: { error: { code?: string; status?: number } | null } =
+          resendConfigured()
+            ? await this.sendBranded(client, employee, job.invitation.id, job.invitation.expiresAt)
+            : !employee.userId
+              ? await client.auth.admin.inviteUserByEmail(employee.email, { redirectTo })
+              : await client.auth.signInWithOtp({
+                  email: employee.email,
+                  options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
+                });
         if (result.error) {
           code = /^[a-z0-9_]+$/i.test(result.error.code ?? "")
             ? result.error.code!

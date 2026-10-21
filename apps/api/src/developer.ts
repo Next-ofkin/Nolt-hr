@@ -7,6 +7,7 @@ import type { AuthRequest } from "./auth.js";
 import { Database } from "./database.js";
 import { canQueueHrInvitation, canRevokeHrInvitation } from "./hr-invitation-rules.js";
 import { DeveloperGuard, SessionGuard } from "./auth.js";
+import { inviteTtlMinutes } from "./invite-email.js";
 
 const draftInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -123,7 +124,7 @@ export class DeveloperOverviewService {
       if (employee) throw new ConflictException("An employee record already uses this email.");
       const updated = await tx.hrInvitation.update({
         where: { id },
-        data: { state: "QUEUED", requestKey, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+        data: { state: "QUEUED", requestKey, expiresAt: new Date(Date.now() + inviteTtlMinutes() * 60_000) },
       });
       await tx.auditEvent.create({ data: { actorId, action: "HR_INVITATION_QUEUED", targetId: id } });
       await tx.outboxEvent.create({ data: { type: "HR_INVITATION_QUEUED", targetId: id } });
