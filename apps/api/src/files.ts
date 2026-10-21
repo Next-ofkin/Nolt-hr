@@ -52,7 +52,7 @@ import {
 } from "@nolt/form-schemas";
 import { Database } from "./database.js";
 import { AuthErrorDto, SessionGuard, type AuthRequest } from "./auth.js";
-import { digest } from "./security.js";
+import { digest, permissionsFor } from "./security.js";
 
 export class UploadIntentDto {
   @ApiProperty({ format: "uuid" }) fileId!: string;
@@ -209,6 +209,16 @@ export function inspectFileHeader(
     actualMime: declaredMime,
     reason: "Only verified PDF, PNG, or JPEG documents are permitted.",
   };
+}
+
+/**
+ * Guarantor and reference documents are private from the employee who asked for them.
+ * They are opened by the same HR accounts that can review guarantor evidence.
+ */
+export function canOpenExternalFile(
+  user: { active: boolean; role: string; permissions: string[] } | null | undefined,
+): boolean {
+  return !!user && user.active && user.role !== "EMPLOYEE" && permissionsFor(user).includes("forms.manage");
 }
 
 @Injectable()
@@ -732,6 +742,7 @@ export class FilesService {
       include: {
         assignment: {
           include: {
+            formVersion: { select: { recipient: true } },
             onboardingCase: { include: { employee: true } },
           },
         },
@@ -745,12 +756,22 @@ export class FilesService {
       );
     }
 
-    // A guarantor's documents are private from the employee who asked for them.
+    const external = file.assignment.formVersion.recipient !== "EMPLOYEE";
+    if (external) {
+      const viewer = await this.db.user.findUnique({
+        where: { id: userId },
+        select: { active: true, role: true, permissions: true },
+      });
+      if (!canOpenExternalFile(viewer))
+        throw new ForbiddenException("You are not authorized to access this file.");
+    }
+    // An employee form's files: the employee who uploaded them, or a reviewing HR user.
     const isOwnEmployee =
+      !external &&
       file.assignment.onboardingCase.employee.userId === userId &&
       file.uploadedBy === userId;
 
-    if (!isOwnEmployee) {
+    if (!external && !isOwnEmployee) {
       // Check reviewer / HR access
       const isReviewer = await this.db.$queryRaw<{ exists: boolean }[]>`
         SELECT public.can_review_assignment(${userId}::uuid, ${file.assignmentId}::uuid) AS exists
