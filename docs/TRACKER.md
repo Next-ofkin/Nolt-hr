@@ -627,3 +627,10 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Added DEVELOPER role grants and DeveloperGuard only; no provisioning endpoints or role migration.
 - [ ] CI: latest observed workflow concluded `startup_failure` with zero jobs. Build, npm ci, generated OpenAPI drift, migrations, unit/domain/e2e all remain unverified.
 - [ ] Do not merge PR #3; verify actual Supabase/PostgreSQL integration and account migration with synthetic users first.
+
+## 2026-10-21 — Guarantor files and signature, autosave, tidy list
+- [x] Guarantors and references can upload files (JPG/PNG/PDF, 5 MB) and sign through their secure link; migration `20261021120000_external_signature_guard` widens the signature guard to the one active request's respondent. HR sees the files and signature on the evidence review; the employee cannot open a guarantor's files.
+- [x] Guarantor link: once opened, valid 7 days; session slides while active (24 h idle window, capped at the request expiry).
+- [x] Autosave on employee and guarantor forms: server save about 2 s after typing stops, plus a local backup of typed answers only (never files), restored on request, wiped on submit, logout or after 7 days.
+- [x] Employee onboarding list grouped by pack with To do / Waiting for HR / Done (collapsed); changes-requested forms first. `MyPackProgress` replaced by `MyOnboardingList`.
+

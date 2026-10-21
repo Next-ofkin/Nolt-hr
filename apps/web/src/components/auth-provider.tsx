@@ -1,4 +1,5 @@
 "use client";
+import { clearAllBackups } from "@/lib/draft-backup";
 import {
   createContext,
   useCallback,
@@ -90,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (result.error && result.response.status !== 401)
       throw new Error(errorMessage(result.error));
     queryClient.clear();
+    clearAllBackups();
     setSession(null);
     setError(null);
     window.location.assign("/login");

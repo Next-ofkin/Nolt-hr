@@ -5,6 +5,8 @@ import type { components } from "@nolt/api-client/schema";
 import type { Answers } from "@nolt/form-schemas";
 import { FormPreview } from "@/components/form-preview";
 import { Button } from "@/components/ui/button";
+import { backupDiffers, clearBackup, readBackup, saveBackup, type Backup } from "@/lib/draft-backup";
+import { useAutosave } from "@/lib/use-autosave";
 export default function Page() {
   const [session, setSession] = useState<
     components["schemas"]["ExternalSessionDto"] | null
@@ -33,6 +35,7 @@ export default function Page() {
       headers: { "x-csrf-token": session.csrfToken },
     });
     if (r.error) throw Error(errorMessage(r.error));
+    if (data) clearBackup(`external:${data.requestId}`);
     setSession(null);
     setData(null);
     setAnswers({});
@@ -47,6 +50,9 @@ export default function Page() {
     [notice, setNotice] = useState("");
   const submitKey = useRef<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [version, setVersion] = useState(0);
+  const [restore, setRestore] = useState<Backup | null>(null);
+  const live = useRef({ answers: {} as Answers, revision: 0, edits: 0 });
   const load = useCallback(async () => {
     setBusy(true);
     setError("");
@@ -57,6 +63,14 @@ export default function Page() {
       setAnswers(r.data.answers);
       setDirty(false);
       submitKey.current = null;
+      // Offer to bring back typed answers that never reached the server.
+      const fields = normaliseForm(r.data.form).fields;
+      const backup = readBackup(`external:${r.data.requestId}`);
+      if (backup && backupDiffers(backup, r.data.answers, fields)) setRestore(backup);
+      else {
+        setRestore(null);
+        clearBackup(`external:${r.data.requestId}`);
+      }
     } catch (e) {
       setData(null);
       setError(e instanceof Error ? e.message : "Could not load this request.");
@@ -109,6 +123,7 @@ export default function Page() {
         if (r.error) throw Error(errorMessage(r.error));
         setData(r.data);
         setAnswers(r.data.answers);
+        clearBackup(`external:${current.requestId}`);
         setNotice("Your form was submitted directly to HR.");
       } else {
         submitKey.current = null;
@@ -122,6 +137,36 @@ export default function Page() {
       setBusy(false);
     }
   }
+  live.current.answers = answers;
+  live.current.revision = data?.revision ?? 0;
+  async function autoSave() {
+    if (!session || busy) throw Error("not ready");
+    const edits = live.current.edits;
+    const r = await api.PUT("/api/v1/external/request/draft", {
+      headers: { "x-csrf-token": session.csrfToken },
+      body: { expectedRevision: live.current.revision, answers: live.current.answers },
+    });
+    if (r.error) throw Error(errorMessage(r.error));
+    setData(r.data); // keep what is on screen; only the revision moves forward
+    if (live.current.edits === edits) setDirty(false);
+  }
+  const autoState = useAutosave({
+    enabled: !!data && !!session && !busy && data.state !== "SUBMITTED",
+    dirty,
+    version,
+    save: autoSave,
+  });
+  useEffect(() => {
+    if (version === 0 || !data) return;
+    saveBackup(`external:${data.requestId}`, answers, normaliseForm(data.form).fields);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version, answers]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const content = data ? normaliseForm(data.form) : null;
   const locked = !data || data.state === "SUBMITTED";
   return (
@@ -137,7 +182,7 @@ export default function Page() {
           <h1 className="mt-1 text-2xl font-semibold leading-tight">{content?.title ?? "Your form"}</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Only you can complete this request. Your answers are private from the employee who sent it.
-            Tap Save draft to keep your work. This link stays open for 7 days.
+            Your answers save by themselves as you go. This link stays open for 7 days.
           </p>
         </div>
         {session && (
@@ -158,6 +203,26 @@ export default function Page() {
                 <b>Please have ready:</b> your documents or a phone camera, and your finger to sign.
               </p>
             ) : null}
+            {restore && data.state !== "SUBMITTED" && (
+              <div role="status" className="space-y-3 rounded-2xl border border-[#bcd6f7] bg-[#e6f1ff] p-4 text-sm text-[#0a3a7a]">
+                <p><b>We kept your unsaved answers.</b> They were typed on this phone on {new Date(restore.savedAt).toLocaleString()}. Bring them back?</p>
+                <div className="flex gap-2">
+                  <Button type="button" className="h-11 flex-1" onClick={() => {
+                    setAnswers((old) => ({ ...old, ...restore.answers }));
+                    live.current.edits += 1;
+                    setVersion((v) => v + 1);
+                    setDirty(true);
+                    setRestore(null);
+                  }}>Bring them back</Button>
+                  <Button type="button" variant="outline" className="h-11 flex-1" onClick={() => { clearBackup(`external:${data.requestId}`); setRestore(null); }}>Start from saved copy</Button>
+                </div>
+              </div>
+            )}
+            {dirty && data.state !== "SUBMITTED" && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {autoState === "saving" ? "Saving…" : autoState === "failed" ? "Could not save yet. We will try again. Your answers are kept on this phone." : "Saving soon…"}
+              </p>
+            )}
             <div className="rounded-3xl border border-[#dbe6f7] bg-white p-4 sm:p-5">
               <FormPreview
                 content={content}
@@ -167,7 +232,15 @@ export default function Page() {
                 beforeSign={saveForSigning}
                 disabled={busy || locked}
                 onAnswer={(id, value) => {
-                  setAnswers((old) => ({ ...old, [id]: value }));
+                  setAnswers((old) => {
+                    const next = { ...old, [id]: value };
+                    // Changing an answer cancels any signature given on the old answers.
+                    if (content.fields.find((f) => f.id === id)?.type !== "signature")
+                      for (const f of content.fields) if (f.type === "signature") next[f.id] = "";
+                    return next;
+                  });
+                  live.current.edits += 1;
+                  setVersion((v) => v + 1);
                   setDirty(true);
                   setNotice("");
                   submitKey.current = null;

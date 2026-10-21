@@ -6,6 +6,8 @@ import type { Answers } from "@nolt/form-schemas";
 import { useAuth } from "./auth-provider";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
+import { backupDiffers, clearBackup, readBackup, saveBackup, type Backup } from "@/lib/draft-backup";
+import { useAutosave } from "@/lib/use-autosave";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 type Response = components["schemas"]["ResponseDto"];
 export function EmployeeResponse({
@@ -25,7 +27,11 @@ export function EmployeeResponse({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [errors, setErrors] = useState<Record<string, string>>({}),
-    [confirmDiscard, setConfirmDiscard] = useState<"close" | "reload" | null>(null);
+    [confirmDiscard, setConfirmDiscard] = useState<"close" | "reload" | null>(null),
+    [version, setVersion] = useState(0),
+    [restore, setRestore] = useState<Backup | null>(null);
+  const backupKey = `employee:${assignmentId}`;
+  const live = useRef({ data: null as Response | null, answers: {} as Answers, edits: 0 });
   const started = useRef(false),
     section = useRef<HTMLElement>(null),
     request = useRef<{ revision: number; key: string } | null>(null);
@@ -42,6 +48,15 @@ export function EmployeeResponse({
       setDirty(false);
       setErrors({});
       request.current = null;
+      // Offer to bring back typed answers that never reached the server.
+      const fields = normaliseForm(r.data.form).fields;
+      const backup = readBackup(backupKey);
+      const newer = !r.data.updatedAt || backup === null || backup.savedAt > Date.parse(r.data.updatedAt);
+      if (backup && newer && backupDiffers(backup, r.data.answers, fields)) setRestore(backup);
+      else {
+        setRestore(null);
+        clearBackup(backupKey);
+      }
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not load your response.",
@@ -49,7 +64,7 @@ export function EmployeeResponse({
     } finally {
       setBusy(false);
     }
-  }, [assignmentId]);
+  }, [assignmentId, backupKey]);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -64,6 +79,11 @@ export function EmployeeResponse({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  useEffect(() => {
+    if (version === 0 || !data) return;
+    saveBackup(backupKey, answers, normaliseForm(data.form).fields);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version, answers]);
   useEffect(() => {
     if (busy) return;
     const first = Object.keys(errors).find((id) => errors[id]);
@@ -127,6 +147,7 @@ export function EmployeeResponse({
         setAnswers(current.answers);
         setDirty(false);
         request.current = null;
+        clearBackup(backupKey);
       }
       setNotice(
         submit
@@ -144,6 +165,27 @@ export function EmployeeResponse({
       setBusy(false);
     }
   }
+  live.current.data = data;
+  live.current.answers = answers;
+  async function autoSave() {
+    const { data: d, answers: a, edits } = live.current;
+    if (!d || !session || busy) throw Error("not ready");
+    const r = await api.PUT("/api/v1/me/assignments/{id}/response", {
+      params: { path: { id: assignmentId } },
+      headers: { "x-csrf-token": session.csrfToken },
+      body: { expectedRevision: d.revision, answers: a },
+    });
+    if (r.error) throw Error(errorMessage(r.error));
+    // Keep what is on screen; only the revision moves forward.
+    setData(r.data);
+    if (live.current.edits === edits) setDirty(false);
+  }
+  const autoState = useAutosave({
+    enabled: !!data && !!session && !busy && data.status !== "SUBMITTED" && data.status !== "APPROVED",
+    dirty,
+    version,
+    save: autoSave,
+  });
   const content = data ? normaliseForm(data.form) : null,
     submitted = data?.status === "SUBMITTED",
     approved = data?.status === "APPROVED",
@@ -236,11 +278,41 @@ export function EmployeeResponse({
                 : changesRequired
                   ? "Changes requested — edit and resubmit"
                   : dirty
-                    ? "Unsaved changes"
+                    ? autoState === "saving"
+                      ? "Saving…"
+                      : autoState === "failed"
+                        ? "Could not save yet. We will try again. Your answers are kept on this device."
+                        : "Saving soon…"
                     : data.status === "DRAFT"
                       ? "Saved draft"
                       : "Not started"}
           </p>
+          {restore && !isLocked && (
+            <div role="status" className="space-y-3 rounded-2xl border border-[#bcd6f7] bg-[#e6f1ff] p-4 text-sm text-[#0a3a7a]">
+              <p>
+                <b>We kept your unsaved answers.</b> They were typed on this device on{" "}
+                {new Date(restore.savedAt).toLocaleString()} and did not reach HR's copy. Bring them back?
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="h-11 flex-1"
+                  onClick={() => {
+                    setAnswers((old) => ({ ...old, ...restore.answers }));
+                    live.current.edits += 1;
+                    setVersion((v) => v + 1);
+                    setDirty(true);
+                    setRestore(null);
+                  }}
+                >
+                  Bring them back
+                </Button>
+                <Button type="button" variant="outline" className="h-11 flex-1" onClick={() => { clearBackup(backupKey); setRestore(null); }}>
+                  Start from saved copy
+                </Button>
+              </div>
+            </div>
+          )}
           <form
             noValidate
             onSubmit={(e) => {
@@ -289,6 +361,8 @@ export function EmployeeResponse({
                     return next;
                   });
                   setDirty(true);
+                  live.current.edits += 1;
+                  setVersion((v) => v + 1);
                   setNotice("");
                   setErrors((previous) => ({ ...previous, [id]: "" }));
                 }}
