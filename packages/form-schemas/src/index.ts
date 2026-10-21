@@ -14,7 +14,9 @@ export const fieldTypes = [
   "signature",
   "heading",
   "paragraph",
+  "table",
 ] as const;
+export const tableColumnKinds = ["text", "number", "date", "email", "phone", "percent"] as const;
 /** Display-only blocks: they show text to the respondent and never collect an answer. */
 export const displayFieldTypes = ["heading", "paragraph"] as const;
 export const isDisplayField = (type: string) =>
@@ -48,6 +50,21 @@ export const fieldSchema = z.object({
     .object({ fieldId: z.string().uuid(), equals: z.string().trim().min(1).max(200) })
     .nullable()
     .default(null),
+  /** "table" fields: the columns, optional fixed first-column rows, and row limits. */
+  columns: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(80),
+        kind: z.enum(tableColumnKinds).default("text"),
+        required: z.boolean().default(false),
+      }),
+    )
+    .max(8)
+    .default([]),
+  fixedRows: z.array(z.string().trim().min(1).max(120)).max(30).default([]),
+  maxRows: z.number().int().min(1).max(30).default(10),
+  /** When set, the "percent" column of the filled rows must add up to this number (e.g. 100). */
+  totalEquals: z.number().int().min(1).max(1000).nullable().default(null),
   /** Fill from the employee record when the form is first opened. */
   prefill: z.enum(prefillKeys).nullable().default(null),
 });
@@ -66,6 +83,12 @@ export const formContentSchema = z
         message: "Each field must have a unique ID.",
       });
     data.fields.forEach((field, index) => {
+      if (field.type === "table" && (field.columns.length < 1 || (field.fixedRows.length === 0 && field.maxRows < 1)))
+        ctx.addIssue({
+          code: "custom",
+          path: ["fields", index, "columns"],
+          message: "A table needs at least one column.",
+        });
       if (field.showIf) {
         const at = data.fields.findIndex((f) => f.id === field.showIf!.fieldId);
         if (at < 0 || at >= index)
@@ -186,6 +209,27 @@ export const signatureIntentSchema = z
   .strict();
 export type SignatureIntentInput = z.infer<typeof signatureIntentSchema>;
 
+/** A table answer is stored as JSON text: a list of rows, each a list of cell texts. */
+export function parseTable(value: unknown, field: Pick<FormField, "columns" | "fixedRows" | "maxRows">): string[][] | "invalid" {
+  if (value === undefined || value === null || (typeof value === "string" && value.trim() === "")) return [];
+  if (typeof value !== "string") return "invalid";
+  let data: unknown;
+  try {
+    data = JSON.parse(value);
+  } catch {
+    return "invalid";
+  }
+  const limit = Math.max(field.maxRows, field.fixedRows.length);
+  if (!Array.isArray(data) || data.length > limit) return "invalid";
+  const rows: string[][] = [];
+  for (const row of data) {
+    if (!Array.isArray(row) || row.length !== field.columns.length) return "invalid";
+    if (!row.every((c) => typeof c === "string" && c.length <= 500)) return "invalid";
+    rows.push(row as string[]);
+  }
+  return rows;
+}
+
 /** Whether a question is shown, given the current answers. Hidden questions are never required. */
 export function fieldVisible(field: FormField, answers: Answers): boolean {
   if (!field.showIf) return true;
@@ -255,6 +299,36 @@ export function validateAnswers(
       }
       continue;
     }
+    if (f.type === "table") {
+      const rows = parseTable(v, f);
+      if (rows === "invalid") {
+        add("The table could not be read. Please re-enter it.");
+        continue;
+      }
+      if (!final) continue;
+      const used = rows.filter((r) => r.some((c, i) => !(f.fixedRows.length && i === 0) && c.trim() !== ""));
+      if (f.required && used.length < 1) add("Fill in at least one row.");
+      for (const r of used) {
+        f.columns.forEach((col, i) => {
+          const cell = (r[i] ?? "").trim();
+          if (i === 0 && f.fixedRows.length) return;
+          if (cell === "") {
+            if (col.required) add(`"${col.label}" is needed in every row you fill in.`);
+            return;
+          }
+          if ((col.kind === "number" || col.kind === "percent") && !/^\d+(\.\d+)?$/.test(cell)) add(`"${col.label}" must be a number.`);
+          if (col.kind === "email" && !z.email().safeParse(cell).success) add(`"${col.label}" must be a valid email address.`);
+          if (col.kind === "date" && !z.iso.date().safeParse(cell).success) add(`"${col.label}" must be a valid date.`);
+          if (col.kind === "phone" && !/^\+?[\d ()\-.]{6,40}$/.test(cell)) add(`"${col.label}" must be a valid phone number.`);
+        });
+      }
+      const pct = f.columns.findIndex((c) => c.kind === "percent");
+      if (f.totalEquals && pct >= 0 && used.length) {
+        const total = used.reduce((n, r) => n + (Number(r[pct]) || 0), 0);
+        if (Math.abs(total - f.totalEquals) > 0.001) add(`The "${f.columns[pct].label}" column must add up to ${f.totalEquals} (it adds up to ${total}).`);
+      }
+      continue;
+    }
     if (empty) {
       if (final && f.required) add("This question is required.");
       continue;
@@ -298,6 +372,7 @@ export function createField(type: FormField["type"], id: string): FormField {
     signature: "Your signature",
     heading: "Section heading",
     paragraph: "Information for the employee",
+    table: "Table",
   };
   return {
     id,
@@ -309,6 +384,13 @@ export function createField(type: FormField["type"], id: string): FormField {
     signatureMethod: "EITHER",
     attachmentPurpose: "SUPPORTING_DOCUMENT",
     body: "",
+    columns:
+      type === "table"
+        ? [{ label: "Item", kind: "text" as const, required: true }, { label: "Details", kind: "text" as const, required: false }]
+        : [],
+    fixedRows: [],
+    maxRows: 10,
+    totalEquals: null,
     showIf: null,
     prefill: null,
   };
