@@ -1411,6 +1411,7 @@ export interface components {
             publishedAt: string | null;
             inUse: boolean;
             formInUse: boolean;
+            inPack: boolean;
         };
         SubmissionReviewDto: {
             id: string;

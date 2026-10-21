@@ -753,9 +753,11 @@ function FormEditor({
             {published
               ? record.status === "UNPUBLISHED" && !record.inUse
                 ? "Unpublished. Choose Edit again to change it, or Delete it."
-                : record.inUse
-                  ? "This version has been used, so it is locked. Create a new version to make changes."
-                  : "Unpublish this form to edit it again, or delete it."
+                : record.inPack
+                  ? "This form is in a pack, so it can't be unpublished or deleted. Choose New version to edit it: packs use the newest published version for new assignments."
+                  : record.inUse
+                    ? "This version has been used, so it is locked. Create a new version to make changes."
+                    : "Unpublish this form to edit it again or delete it."
               : dirty
                 ? "Unsaved changes · save before leaving"
                 : "All changes saved"}
@@ -768,7 +770,7 @@ function FormEditor({
           </Button>
           {published ? (
             <>
-            {record.status === "PUBLISHED" && (
+            {record.status === "PUBLISHED" && !record.inPack && (
               <Button variant="outline" disabled={busy} onClick={() => setConfirmAction("unpublish")}>
                 Unpublish
               </Button>
@@ -778,7 +780,7 @@ function FormEditor({
                 <Pencil size={16} /> Edit again
               </Button>
             )}
-            {!record.formInUse && (
+            {record.status === "UNPUBLISHED" && !record.formInUse && !record.inPack && (
               <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
                 <Trash2 size={16} /> Delete
               </Button>
@@ -790,7 +792,7 @@ function FormEditor({
             </>
           ) : (
             <>
-              {!record.formInUse && (
+              {!record.formInUse && !record.inPack && (
                 <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
                   <Trash2 size={16} /> Delete
                 </Button>

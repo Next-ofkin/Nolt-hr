@@ -6563,6 +6563,9 @@
           },
           "formInUse": {
             "type": "boolean"
+          },
+          "inPack": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6578,7 +6581,8 @@
           "updatedAt",
           "publishedAt",
           "inUse",
-          "formInUse"
+          "formInUse",
+          "inPack"
         ]
       },
       "SubmissionReviewDto": {

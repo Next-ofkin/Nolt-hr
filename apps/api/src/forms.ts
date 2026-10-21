@@ -79,6 +79,8 @@ export class FormDto {
   @ApiProperty({ type: Boolean }) inUse!: boolean;
   /** Some version of this form has been used, so the form cannot be deleted. */
   @ApiProperty({ type: Boolean }) formInUse!: boolean;
+  /** Some version of this form is inside a pack: it cannot be unpublished or deleted, only edited. */
+  @ApiProperty({ type: Boolean }) inPack!: boolean;
 }
 export function dto(row: Parameters<typeof dtoWithUse>[0]): FormDto {
   return dtoWithUse(row);
@@ -95,11 +97,12 @@ export function dtoWithUse(row: {
   fields: Prisma.JsonValue;
   updatedAt: Date;
   publishedAt: Date | null;
-}, use: { inUse?: boolean; formInUse?: boolean } = {}): FormDto {
+}, use: { inUse?: boolean; formInUse?: boolean; inPack?: boolean } = {}): FormDto {
   return {
     ...row,
     inUse: use.inUse ?? false,
     formInUse: use.formInUse ?? false,
+    inPack: use.inPack ?? false,
     fields: row.fields as unknown[],
     updatedAt: row.updatedAt.toISOString(),
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -152,11 +155,12 @@ export class FormsService {
     ]);
     const forms = new Set([...a, ...p].map((r) => r.formId));
     const versions = new Set([...av, ...pv].map((r) => r.formVersionId));
-    return { forms, versions };
+    const packForms = new Set(p.map((r) => r.formId));
+    return { forms, versions, packForms };
   }
   private async view(row: Parameters<typeof dtoWithUse>[0]): Promise<FormDto> {
     const use = await this.usage([row.formId]);
-    return dtoWithUse(row, { inUse: use.versions.has(row.id), formInUse: use.forms.has(row.formId) });
+    return dtoWithUse(row, { inUse: use.versions.has(row.id), formInUse: use.forms.has(row.formId), inPack: use.packForms.has(row.formId) });
   }
   async list() {
     const forms = await this.db.form.findMany({
@@ -166,7 +170,7 @@ export class FormsService {
     });
     const use = await this.usage(forms.map((f) => f.id));
     return forms.flatMap((f) =>
-      f.versions.map((v) => dtoWithUse(v, { inUse: use.versions.has(v.id), formInUse: use.forms.has(f.id) })),
+      f.versions.map((v) => dtoWithUse(v, { inUse: use.versions.has(v.id), formInUse: use.forms.has(f.id), inPack: use.packForms.has(f.id) })),
     );
   }
   async listPublished() {
@@ -281,6 +285,10 @@ export class FormsService {
     return this.db.$transaction(async (tx) => {
       const row = await tx.formVersion.findUnique({ where: { id } });
       if (!row) throw new NotFoundException("Form version not found.");
+      if ((await tx.packItem.count({ where: { formId: row.formId } })) > 0)
+        throw new ConflictException(
+          "This form is inside a pack, so it cannot be unpublished. Create a new version instead: packs use the newest published version.",
+        );
       const updated = await tx.formVersion.updateMany({
         where: { id, revision: expectedRevision, status: "PUBLISHED" },
         data: { status: "UNPUBLISHED", revision: { increment: 1 } },
@@ -301,10 +309,12 @@ export class FormsService {
         tx.formAssignment.count({ where: { formId } }),
         tx.packItem.count({ where: { formId } }),
       ]);
+      if (form.versions.some((v) => v.status === "PUBLISHED"))
+        throw new ConflictException("This form is published. Unpublish it first, then delete it.");
       if (!canDeleteForm(assignments, packItems))
         throw new ConflictException(
-          packItems > 0 && assignments === 0
-            ? "This form is part of a pack. Delete or change the pack first."
+          packItems > 0
+            ? "This form is inside a pack, so it cannot be deleted. You can still edit it: packs use the newest published version."
             : "This form has already been sent to an employee, so its record is kept. Unpublish it instead.",
         );
       const latest = form.versions.reduce((a, b) => (b.version > a.version ? b : a));
