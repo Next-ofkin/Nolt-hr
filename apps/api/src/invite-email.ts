@@ -65,14 +65,59 @@ const copy: Record<InviteKind, Copy> = {
   },
 };
 
-export function inviteEmail(kind: InviteKind, input: { name?: string; title?: string; link: string; expiresAt: Date }) {
+/** Who asked a guarantor or referee to fill the form, so the email is recognisable. */
+export type Requester = {
+  name: string;
+  jobTitle?: string | null;
+  department?: string | null;
+  /** "GUARANTOR" or "REFERENCE" */
+  role?: string;
+};
+const roleWord = (role?: string) => (role === "REFERENCE" ? "referee" : "guarantor");
+
+/** One short sentence about the person who asked, e.g. "Ada Okoye, who is joining NOLT Finance as Credit Officer in Operations,". */
+export function requesterPhrase(r: Requester): string {
+  const name = r.name.trim();
+  const job = (r.jobTitle ?? "").trim();
+  const dept = (r.department ?? "").trim();
+  if (job && dept) return `${name}, who is joining NOLT Finance as ${job} in ${dept},`;
+  if (job) return `${name}, who is joining NOLT Finance as ${job},`;
+  return `${name}, who is joining NOLT Finance,`;
+}
+export function externalSubject(r?: Requester): string {
+  return r?.name.trim()
+    ? `${r.name.trim()} named you as a ${roleWord(r.role)} - NOLT Finance`
+    : "NOLT Finance has asked you to complete a form";
+}
+
+export function inviteEmail(
+  kind: InviteKind,
+  input: {
+    name?: string; title?: string; link: string; expiresAt: Date;
+    requester?: Requester; contact?: string;
+  },
+) {
   const c = copy[kind];
   const name = (input.name ?? "").trim() || "there";
   const title = (input.title ?? "").trim() || "a form";
-  const intro = c.intro(name, title);
+  const rq = kind === "EXTERNAL" && input.requester?.name.trim() ? input.requester : undefined;
+  let host = "";
+  try { host = new URL(input.link).host; } catch { /* leave blank */ }
+  const intro = rq
+    ? `Hello ${name}, ${requesterPhrase(rq)} has named you as a ${roleWord(rq.role)}. NOLT Finance has asked you to complete: ${title}. This takes only a few minutes and your answers go directly to the HR team.`
+    : c.intro(name, title);
+  // Short, plain checks that let a careful person confirm the email is genuine.
+  const contact = (input.contact ?? "").trim();
+  const checks = rq ? [
+    host ? `The button and link go to ${host} and nowhere else.` : "Check the link address before you open it.",
+    "NOLT Finance never asks for your password, card number, bank PIN or any payment.",
+    contact ? `Not sure? Contact HR: ${contact}, or ask ${rq.name.trim()} directly.` : `Not sure? Ask ${rq.name.trim()} directly or contact the NOLT Finance HR team.`,
+    `If you do not know ${rq.name.trim()}, ignore this email and nothing happens.`,
+  ] : [];
   const expiry = lagosTime(input.expiresAt);
   const text = [
     c.heading, "", intro, "", "What to expect:", ...c.steps.map((s, i) => `${i + 1}. ${s}`), "",
+    ...(checks.length ? ["Is this email real?", ...checks.map((x) => `- ${x}`), ""] : []),
     `${c.button}: ${input.link}`, "", `This link expires on ${expiry}.`, c.note,
     "", "NOLT Finance - a CBN-licensed lender and investment firm.",
   ].join("\n");
@@ -86,11 +131,12 @@ export function inviteEmail(kind: InviteKind, input: { name?: string; title?: st
 <tr><td style="background:#010b2f;padding:22px 28px"><span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#ffffff">NOLT</span><span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#2aa3fc"> Finance</span></td></tr>
 <tr><td style="padding:30px 28px 8px"><h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#010b2f">${esc(c.heading)}</h1><p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#334155">${esc(intro)}</p></td></tr>
 <tr><td style="padding:0 28px"><table role="presentation" cellpadding="0" cellspacing="0" style="background:#f3f6fb;border-radius:12px;padding:16px 16px 6px;width:100%"><tr><td colspan="2" style="padding:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b">What to expect</td></tr>${steps}</table></td></tr>
+${checks.length ? `<tr><td style="padding:16px 28px 0"><table role="presentation" cellpadding="0" cellspacing="0" style="background:#eaf6ee;border-radius:12px;padding:14px 16px;width:100%"><tr><td style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#166534;padding:0 0 8px">Is this email real?</td></tr>${checks.map((x) => `<tr><td style="font-size:13px;line-height:1.5;color:#14532d;padding:0 0 6px">&#10003;&nbsp; ${esc(x)}</td></tr>`).join("")}</table></td></tr>` : ""}
 <tr><td style="padding:24px 28px 8px"><a href="${esc(input.link)}" style="display:inline-block;background:#0b63ce;color:#ffffff;text-decoration:none;padding:13px 30px;border-radius:10px;font-weight:700;font-size:15px">${esc(c.button)}</a></td></tr>
 <tr><td style="padding:12px 28px 4px"><p style="margin:0;font-size:13px;line-height:1.6;color:#475569">This link expires on <strong>${esc(expiry)}</strong>. If the button does not work, copy this address into your browser:</p><p style="margin:6px 0 0;font-size:12px;line-height:1.5;word-break:break-all;color:#0b63ce">${esc(input.link)}</p></td></tr>
 <tr><td style="padding:20px 28px 28px"><hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 14px"><p style="margin:0;font-size:12px;line-height:1.6;color:#64748b">${esc(c.note)} If you were not expecting this email, you can safely ignore it.</p><p style="margin:10px 0 0;font-size:12px;color:#94a3b8">NOLT Finance - a CBN-licensed lender and investment firm.</p></td></tr>
 </table></td></tr></table></body></html>`;
-  return { subject: c.subject, text, html };
+  return { subject: kind === "EXTERNAL" ? externalSubject(rq) : c.subject, text, html };
 }
 
 export function resendConfigured(env: NodeJS.ProcessEnv = process.env): boolean {

@@ -41,3 +41,15 @@ export function progressLabel(state: string): string {
 export function stillSending(items: SlotItem[]): boolean {
   return items.some((i) => i.state === "QUEUED" || i.state === "SENDING");
 }
+
+/** A ready-to-send note for the employee to give the guarantor before the email arrives. */
+export function headsUpMessage(o: { guarantorName: string; employeeName: string; role: "GUARANTOR" | "REFERENCE" | string; host: string }): string {
+  const role = o.role === "REFERENCE" ? "referee" : "guarantor";
+  const first = o.guarantorName.trim().split(/\s+/)[0] || "there";
+  const me = o.employeeName.trim() || "your friend";
+  return [
+    `Hi ${first}, it's ${me}. I have named you as my ${role} for my new job at NOLT Finance.`,
+    `You will get an email from NOLT Finance titled "${me} named you as a ${role} - NOLT Finance". Please open it and tap "Open form". The link starts with https://${o.host}.`,
+    `It takes about 10 minutes. Keep your phone camera ready for a photo of your ID and proof of address, and your finger for the signature. Thank you!`,
+  ].join("\n\n");
+}

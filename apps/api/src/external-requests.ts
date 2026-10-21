@@ -697,7 +697,7 @@ export class ExternalRequestsService {
       };
     const row = await this.db.externalRequest.findUniqueOrThrow({
       where: { id: requestId },
-      include: { assignment: { include: { formVersion: true } } },
+      include: { assignment: { include: { formVersion: true, onboardingCase: { include: { employee: true } } } } },
     });
     const proofType = generated.data.properties.verification_type;
     if (!["magiclink", "invite", "signup", "email"].includes(proofType))
@@ -711,10 +711,21 @@ export class ExternalRequestsService {
       encodeURIComponent(generated.data.properties.hashed_token) +
       "&type=" +
       encodeURIComponent(proofType);
+    const employee = row.assignment.onboardingCase.employee;
     const message = externalInvitation(
       row.assignment.formVersion.title,
       link,
       row.expiresAt,
+      {
+        recipientName: row.fullName,
+        requester: {
+          name: employee.fullName,
+          jobTitle: employee.jobTitle,
+          department: employee.department,
+          role: row.assignment.formVersion.recipient,
+        },
+        contact: process.env.HR_CONTACT_LINE,
+      },
     );
     const failed = await sendViaResend(email, message);
     if (failed) return failed;

@@ -640,3 +640,8 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Migration `20261021180000_multi_guarantor`: also fixes the 7-day extension, which the old trigger blocked (expiry may now move later only when the recipient opens the link, capped at 8 days).
 - [x] Visible status per guarantor (queued, sending, sent, opened, submitted, approved), with polling while an email is on its way.
 
+## 2026-10-21 (night) — Guarantor link fix and trusted email
+- [x] Fixed: opening a guarantor link failed (database capped the session at 30 minutes; the app asked for 24 hours). Migration `20261021210000_external_session_window` allows up to 24 h, sliding, never past the request expiry. The used-link page now explains what to do.
+- [x] Guarantor email now names the employee who asked (name, job title, department), shows an "Is this email real?" box (link host, no passwords or payments, how to check) and an optional HR contact line (`HR_CONTACT_LINE`). Subject: "<Employee> named you as a guarantor - NOLT Finance". Only applies when email is sent through Resend; Supabase's own mail template cannot be customised here.
+- [x] Employee sees "Tell <guarantor> to expect it" with Send on WhatsApp / Copy the message.
+

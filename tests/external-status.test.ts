@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { externalAssignmentStatus, latestPerSlot } from "../apps/api/src/external-status.js";
-import { latestForSlot, progressLabel, stillSending, viewOf } from "../apps/web/src/lib/guarantor-slots.js";
+import { headsUpMessage, latestForSlot, progressLabel, stillSending, viewOf } from "../apps/web/src/lib/guarantor-slots.js";
 
 const t = (n: number) => new Date(2026, 9, 21, 10, n);
 const r = (slot: number, state: string, min: number, decision?: string) =>
@@ -42,4 +42,12 @@ test("employee-facing wording", () => {
   assert.equal(stillSending([item("QUEUED")]), true);
   assert.equal(stillSending([item("SENT")]), false);
   assert.match(progressLabel("UNCERTAIN"), /send it again/);
+});
+
+test("the heads-up note names who is asking and what to look for", () => {
+  const m = headsUpMessage({ guarantorName: "Bola Ade", employeeName: "Ada Okoye", role: "GUARANTOR", host: "hr.example.test" });
+  assert.match(m, /^Hi Bola, it's Ada Okoye\./);
+  assert.match(m, /Ada Okoye named you as a guarantor - NOLT Finance/);
+  assert.match(m, /starts with https:\/\/hr\.example\.test/);
+  assert.match(headsUpMessage({ guarantorName: "", employeeName: "Ada", role: "REFERENCE", host: "h" }), /^Hi there.*referee/s);
 });
