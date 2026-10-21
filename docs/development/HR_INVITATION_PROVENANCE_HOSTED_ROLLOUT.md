@@ -1,3 +1,5 @@
+> Note (21 October 2026): references to Railway and Vercel in this page describe the earlier hosting. The app now runs on a VPS ([DEPLOYMENT.md](../DEPLOYMENT.md)). The behaviour described otherwise still applies unless the tracker says it changed.
+
 # HR invitation provenance trigger — hosted rollout checklist (2026-10-19)
 
 ## Why

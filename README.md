@@ -2,9 +2,9 @@
 
 A secure portal for NOLT Finance to manage employee pre-onboarding, HR reviews, policy acknowledgements, agreements, benefits, induction, company assets and offboarding.
 
-**Current status:** local implementation approved and started. The first working slice is HR form authoring: create/save/reopen, field configuration, respondent preview, immutable publication and new versions. Supabase PostgreSQL stores the records. Real Supabase Auth now handles password login and authenticator MFA; signup/email delivery and MFA are owner-verified. Password recovery remains a separate check. Employee directory, onboarding cases, fixed published-form assignments and private employee checklists are now verified against hosted Supabase. Employee invitations, real email delivery and activation are also verified. Employee form drafts, validated submissions and immutable submission history are now verified. HR review, mandatory correction reasons and versioned resubmission are now verified with explicitly scoped review access. Next: private uploads and signature capture.
+**Current status (21 October 2026):** live on a single VPS at `https://hr.dastings.name.ng`, using Supabase for login, PostgreSQL and private file storage. Working end to end: HR form builder (draft, publish, unpublish, new versions), onboarding **Packs** (versioned bundles of forms), employee directory, invitations by email, employee forms with drafts and submissions, HR review with mandatory correction reasons, guarantor/reference requests completed by the guarantor through a secure link, private uploads and signatures, and a phone-first interface. Three roles exist: DEVELOPER, HR and EMPLOYEE. Real employee imports and the remaining roadmap modules (policies, agreements, induction, assets, offboarding) are not done.
 
-**Track progress:** [implementation checklist](docs/TRACKER.md), also visible at `/tracker` in the local app. Completed boxes require verification evidence.
+**Track progress:** [implementation checklist](docs/TRACKER.md). Completed boxes require verification evidence. Deployment: [VPS runbook](docs/DEPLOYMENT.md). Rules for forms and packs: [lifecycle rules](docs/development/FORM_AND_PACK_RULES.md).
 
 ## Run locally
 
@@ -18,11 +18,13 @@ npm run db:hosted:status
 npm run dev
 ```
 
-Keep `.env` and `.env.supabase` configured privately as described in the setup guide. Open **http://127.0.0.1:3000/signup**, choose your own password, confirm your email in the same browser, then set up an authenticator app. The approved bootstrap email receives HR after verification; other signups receive EMPLOYEE access. There is no synthetic shortcut. Resend SMTP is configured by the owner in Supabase; signup and MFA are confirmed working. API docs: **http://127.0.0.1:4000/api/docs**.
+Keep `.env` and `.env.supabase` configured privately as described in the setup guide. Open **http://127.0.0.1:3000/signup**, choose your own password, confirm your email in the same browser, then set up an authenticator app. There is no synthetic login shortcut. API docs: **http://127.0.0.1:4000/api/docs**.
 
-See [identity/session setup and limits](docs/development/IDENTITY.md). Production deployment remains gated.
+Checks before any change goes to `main`: `npm run typecheck`, `npm test` (150 tests at the last run) and `npm run build`. See [identity/session setup and limits](docs/development/IDENTITY.md).
 
-Private Supabase file/signature code is implemented and domain-tested, but live scanning and upload/browser acceptance remain blocked by scanner definition downloads. Third-party sending remains pending. See [Railway API staging setup](docs/development/RAILWAY_STAGING.md) for the prepared API deployment configuration; no hosted API deployment is claimed.
+## Deployment
+
+Production runs with Docker Compose on one VPS: `web` (Next.js), `api` (NestJS, not exposed publicly) and `caddy` (automatic HTTPS). Update with `bash /opt/nolt/deploy/vps/update.sh` on the server. Full steps, settings and checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Branding and handover: [docs/BRANDING_AND_DEPLOYMENT.md](docs/BRANDING_AND_DEPLOYMENT.md). The earlier Railway and Vercel set-up is retired. GitHub Actions currently cannot start because of a GitHub account billing lock; see [main branch protection](docs/MAIN_BRANCH_PROTECTION.md).
 
 ## Languages, frameworks and tools
 
@@ -37,14 +39,15 @@ Private Supabase file/signature code is implemented and domain-tested, but live 
 | API contract | **REST + OpenAPI** | Versioned `/api/v1` endpoints and generated TypeScript client |
 | Database | **PostgreSQL / SQL** | Employee records, requirements, submissions, decisions and audit history |
 | Database access | **Prisma** | Typed queries and version-controlled migrations |
-| Background processing | **TypeScript worker on Node.js** | Transactional outbox, email, file scanning, exports and reminders |
+| Background processing | **TypeScript worker on Node.js** | Transactional outbox and invitation delivery; reminders and exports remain on the roadmap |
 | Authentication | **Supabase Auth** | Real email/password access, PKCE email flows and authenticator MFA |
 | Authentication email | **Resend through Supabase SMTP** | Owner-managed sender configuration; signup delivery owner-verified |
-| File storage | **Supabase private Storage** | Protected uploads and signature objects; live scanning/acceptance pending |
-| Automated verification | **Unit/integration tests + Playwright** | Domain rules, API permissions and complete browser journeys |
+| File storage | **Supabase private Storage** | Protected uploads and signature objects, scanned before use |
+| Hosting | **Docker Compose + Caddy on a VPS** | One server runs web, API and HTTPS; data stays in Supabase |
+| Automated verification | **Unit/integration tests + Playwright** | Domain rules, API permissions and browser journeys |
 | Local document utilities | **Python + pypdf + PyYAML** | PRD extraction and skill validation only; Python is not the proposed application backend |
 
-Supabase Auth/PostgreSQL and Resend SMTP are selected. App hosting, scanning and the private-file integration remain to be completed. Installed versions are locked in `package-lock.json`; the build currently uses Next.js 16.4, React 19.3, NestJS 12.1 and Prisma 7.10. The table describes the complete target stack; the invitation delivery worker is implemented; private file and remaining managed integrations are pending.
+Installed versions are locked in `package-lock.json`; the build currently uses Next.js 16.4, React 19, NestJS 12 and Prisma 7. Supabase Auth/PostgreSQL, Resend (email) and Cloudmersive (file scanning) are in use.
 
 ## Confirmed product requirements
 
@@ -82,11 +85,14 @@ Nolt-hr/
   packages/form-schemas/             Shared versioned form validation
   packages/api-client/               Generated OpenAPI types and fetch client
   database/                          Prisma schema, SQL migrations and seed
-  scripts/                           Local database and readiness tooling
+  scripts/                           Database, readiness and QA tooling
+  deploy/vps/                        Docker Compose, Caddy and setup/update scripts for the server
+  Dockerfile.api, Dockerfile.web     Container images for the API and the web app
   tests/                             Domain, real-DB API and browser checks
-  .github/workflows/                 CI check configuration
+  .github/workflows/                 CI check configuration (blocked by a billing lock)
   docs/TRACKER.md                    Implementation checklist
-  docs/development/                  Local setup and initial data model
+  docs/DEPLOYMENT.md                 Server runbook
+  docs/development/                  Setup, identity, forms/packs, data model, test reports
   docs/api/                          Executable initial OpenAPI contract
   docs/planning/                     Roadmap, connections and requirements
   docs/source/                       Preserved PRD PDF and extracted text
@@ -97,11 +103,11 @@ Nolt-hr/
   .agents/, .codex/, .git/            Preserved skills, settings and history
 ```
 
-The supplied PDF is preserved under `docs/source/`. Existing protected configuration/history folders are retained. Implemented application code is under `apps/web` and `apps/api`; shared contracts/client are under `packages`, migrations under `database`, checks under `tests`, and local tooling under `scripts`. The worker and remaining modules follow the tracker. See the [initial data model](docs/development/DATA_MODEL.md).
+The supplied PDF is preserved under `docs/source/`. Application code is under `apps/web` and `apps/api`; shared contracts and the generated client are under `packages`, migrations under `database`, checks under `tests`, and tooling under `scripts`. See the [data model](docs/development/DATA_MODEL.md).
 
 ## Planning documents
 
-Hosted database setup: [Supabase setup](docs/development/SUPABASE_SETUP.md). The schema, trusted TLS connection and actual application journeys are verified. Use `npm run dev:hosted` to review against Supabase; `npm run dev` retains the local database. See the [current test report](docs/development/TEST_REPORT.md) for results and review steps.
+Database setup: [Supabase setup](docs/development/SUPABASE_SETUP.md). All application migrations are applied to the production Supabase project. Use `npm run dev:hosted` to review against Supabase. See the [test report](docs/development/TEST_REPORT.md).
 
 1. [Roadmap](docs/planning/ROADMAP.md): scope, architecture, frontend/backend responsibilities, milestone order and release gates.
 2. [API and connections](docs/planning/API_AND_CONNECTIONS.md): proposed endpoints, sessions, uploads, notifications and service configuration.
@@ -115,9 +121,9 @@ Hosted database setup: [Supabase setup](docs/development/SUPABASE_SETUP.md). The
 | Phase | Scope |
 |---|---|
 | Foundation | Confirm decisions, designs, permissions, data model and API contracts |
-| Phase 1 | Authentication, invitations, checklist, biodata/declarations, files, HR form builder, signature fields, drafts, review/correction, progress and audit |
-| Phase 2A | Guarantors/references, policies, confidentiality/indemnity and beneficiaries |
-| Phase 2B | HMO/AXA exports, induction, assets and reports; core builder belongs to Phase 1 |
+| Phase 1 | Authentication, invitations, checklist, biodata/declarations, files, HR form builder, signature fields, drafts, review/correction, progress and audit. **Built.** |
+| Phase 2A | Guarantors/references (**built**), policies, confidentiality/indemnity and beneficiaries |
+| Phase 2B | HMO/AXA, induction, assets and reports. The AXA enrolment form and a spreadsheet export were built, but the export button was removed from the HR screen by owner decision; the code remains. |
 | Phase 3 | Handover, asset returns, departmental clearance, exit interview and closure |
 
 The roadmap flags the PRD's conflicting placement of induction in its MVP description. Proposed delivery follows the PRD release table and places full induction in Phase 2B. Local implementation is now approved. Unresolved HR/legal/provider decisions remain in the decision log and do not imply production approval.

@@ -55,3 +55,21 @@ Migration 006 adds EmployeeInvitation and InvitationDelivery, with request-key i
 ## Employee onboarding extension
 
 Migration 005 adds Employee, OnboardingCase and FormAssignment. Employee stores employment details, a revision and an optional unique verified-account link. OnboardingCase belongs to an employee; a partial unique index permits one active case. FormAssignment belongs to a case and references an exact published FormVersion through a composite form/version foreign key. A trigger rejects unpublished assignments and all assignment updates/deletes. Case/form uniqueness prevents duplicates. Runtime permissions permit employee/case reads, inserts and updates, and assignment reads/inserts; public API roles receive no table access. Private verified-email lookup/linking SQL handles registration before or after HR profile creation, without transferring a previously linked profile. See [onboarding acceptance](ONBOARDING_SLICE.md).
+
+---
+
+## Current tables (21 October 2026)
+
+The diagram above shows the first slice only. The production `public` schema now has 32 application tables (plus `_prisma_migrations`):
+
+| Area | Tables |
+|---|---|
+| Accounts and sessions | `User`, `Identity`, `Session`, `AuthFlow`, `OidcAttempt`, `HrInvitation` |
+| Employees | `Employee`, `EmployeeInvitation`, `InvitationDelivery`, `OnboardingCase` |
+| Forms | `Form`, `FormVersion`, `FormAssignment`, `EmployeeResponse`, `FormSubmission`, `SubmissionReview`, `AssignmentReviewAccess` |
+| Packs | `PackTemplate`, `PackItem`, `PackAssignment`, `PackAssignmentForm`, `PackDeadlineChange` |
+| Guarantors and references | `ExternalContactDraft`, `ExternalRequest`, `ExternalDelivery`, `ExternalEmailSession`, `ExternalSubmission`, `ExternalEvidenceReview` |
+| Files | `StoredFile`, `SignatureEvidence` |
+| Audit and queue | `AuditEvent`, `OutboxEvent` |
+
+Roles are DEVELOPER, HR and EMPLOYEE. Published form versions, submissions, reviews and evidence are protected by database triggers; foreign keys are mostly `ON DELETE RESTRICT`. The schema source is `database/schema.prisma`; the ordered SQL is in `database/migrations`. Pack and form rules: [FORM_AND_PACK_RULES](FORM_AND_PACK_RULES.md).

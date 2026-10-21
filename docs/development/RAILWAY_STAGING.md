@@ -1,3 +1,5 @@
+> **Superseded (21 October 2026).** NOLT HR no longer runs on Railway. It now runs on a single VPS; see [DEPLOYMENT.md](../DEPLOYMENT.md). This page is kept as history of the earlier staging set-up and must not be followed for new work.
+
 # Railway API staging
 
 This is a testing environment, not approval for production use, paid plans or real employee imports. The frontend is currently local. API health/database checks can be verified first; full browser authentication still requires an HTTPS frontend using the existing same-origin `/api` proxy.

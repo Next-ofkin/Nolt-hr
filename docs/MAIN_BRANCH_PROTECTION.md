@@ -1,29 +1,35 @@
-# Main branch protection — NOLT HR
+# Main branch protection: NOLT HR
+
+Updated 21 October 2026.
 
 **Repository:** Next-ofkin/Nolt-hr
-**Production branch:** main. This branch deploys Railway and Vercel automatically.
+**Production branch:** `main`. Merging to `main` does **not** deploy anything by itself any more. The server is updated by hand with `bash /opt/nolt/deploy/vps/update.sh` (see [deployment](DEPLOYMENT.md)). Railway and Vercel are no longer used.
 
-## GitHub admin action required
+## Working rule
+
+Every change goes through a pull request from a short-lived branch, is checked locally (`npm run typecheck`, `npm test`, `npm run build`) and then merged. Do not commit straight to `main`.
+
+## GitHub Actions: currently blocked
+
+The CI workflow (`.github/workflows/ci.yml`) runs install, typecheck, build and tests. Every run currently stops after a few seconds with *"The job was not started because your account is locked due to a billing issue."* This is a GitHub account billing problem, not a code failure. Fix it under GitHub → Settings → Billing and plans (check for a failed payment, expired card or a $0 spending limit). Until then, the local checks above are the gate. Do not make the CI check a required status check while it cannot start, because that would block every merge.
+
+## GitHub admin action (optional hardening)
 
 GitHub Settings → Rules → Rulesets → New branch ruleset.
 
-- Name: `Protect main production`
-- Enforcement: **Active**
-- Target branches: **Include by pattern: `main`**
+- Name: `Protect main production`; enforcement **Active**; target `main`.
 - Restrict deletions, block force pushes, require a pull request before merging.
-- Require **1 approval** from a person other than the author (if at least two repository contributors are available).
-- Require code owner review after reviewers have been assigned and `.github/CODEOWNERS` is present.
-- Dismiss stale approvals after new commits and require resolution of conversations.
-- Do **not** set required status checks until there is a reliable check to select: previous GitHub Actions checks were intentionally retired and requiring a missing check would permanently block merges.
-- Do not grant a broad bypass to contributors. Ensure an authorised admin can recover or revise rules in emergencies.
+- Require 1 approval from someone other than the author only if there are at least two contributors.
+- Require code-owner review once reviewers are assigned (`.github/CODEOWNERS` exists and lists the owner).
+- Dismiss stale approvals after new commits; require conversations to be resolved.
+- Add a required status check only after CI runs reliably again.
+- Grant least privilege: owner **Admin**, developers **Write**, reviewers **Triage** or **Read**.
 
-Under Settings → Collaborators and teams, grant least privilege: owner **Admin**, trusted release maintainer **Maintain** (if necessary), developers **Write**, reviewers **Triage** or **Read** if they only need issue management. Make any access changes directly in GitHub only after verifying the intended GitHub usernames.
+Adding CODEOWNERS alone does not protect `main`; a repository admin must activate the ruleset.
 
-**Important:** Adding CODEOWNERS does not itself protect main or change collaborator permissions. This connector cannot install a ruleset or grant roles because it does not have repository administration access. A repository admin must activate the rule in GitHub.
+## Release checklist
 
-## Human test release
-
-- PR reviewed and local typecheck/tests/build completed.
-- Supabase migrations reviewed and deployed before any incompatible main merge.
-- Rails and Vercel deployment statuses verified; operator confirms login and HR/employee/guarantor acceptance.
-- Do not enable `HR_INVITATION_DELIVERY_ENABLED` and `HR_INVITATION_ACCEPTANCE_ENABLED` in Production without controlled email allowlist, validated redirect and sender, verified rollback and operator activation procedure.
+- Pull request reviewed; typecheck, tests and build pass locally.
+- Any database migration is reviewed, tested on a disposable database and applied **before** the code that needs it is deployed.
+- After `update.sh`: `docker compose ps` healthy, login works, HR / employee / guarantor spot checks pass.
+- Invitation delivery and acceptance switches (`HR_INVITATION_*`) change only with a controlled recipient list and a rollback plan.

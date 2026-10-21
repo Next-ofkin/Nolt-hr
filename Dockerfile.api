@@ -1,4 +1,4 @@
-# NOLT HR API (NestJS) for Google Cloud Run. Build from the repo root.
+# NOLT HR API (NestJS). Used by deploy/vps/docker-compose.yml. Build from the repo root.
 FROM node:24-slim
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
