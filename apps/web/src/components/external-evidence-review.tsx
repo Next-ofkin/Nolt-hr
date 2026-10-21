@@ -125,11 +125,12 @@ export function ExternalEvidenceReview({
           <p className="text-xs font-medium text-muted-foreground">{fieldLabels.get(fieldId) ?? "Response field"}</p>
           {typeof value === "string" && value && ["file", "passport_photo", "signature"].includes(fieldTypes.get(fieldId) ?? "") ? (
             <div className="mt-1 space-y-2">
-              {fieldTypes.get(fieldId) !== "file" && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/v1/files/${encodeURIComponent(value)}/preview`} alt={fieldTypes.get(fieldId) === "signature" ? "Signature" : "Passport photograph"}
-                  className="max-h-40 rounded-lg border bg-white object-contain p-1" />
-              )}
+              {/* Pictures show here. A PDF or other document cannot, so the image hides itself and the links below are used. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/v1/files/${encodeURIComponent(value)}/preview`}
+                alt={fieldTypes.get(fieldId) === "signature" ? "Signature" : fieldTypes.get(fieldId) === "passport_photo" ? "Passport photograph" : "Uploaded document"}
+                onError={e => { e.currentTarget.style.display = "none"; }}
+                className="max-h-40 rounded-lg border bg-white object-contain p-1" />
               <a href={`/api/v1/files/${encodeURIComponent(value)}/preview`} target="_blank" rel="noreferrer"
                 className="inline-block text-sm font-medium text-primary underline">Open</a>
               {" · "}

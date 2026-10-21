@@ -645,3 +645,7 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Guarantor email now names the employee who asked (name, job title, department), shows an "Is this email real?" box (link host, no passwords or payments, how to check) and an optional HR contact line (`HR_CONTACT_LINE`). Subject: "<Employee> named you as a guarantor - NOLT Finance". Only applies when email is sent through Resend; Supabase's own mail template cannot be customised here.
 - [x] Employee sees "Tell <guarantor> to expect it" with Send on WhatsApp / Copy the message.
 
+## 2026-10-21 (late) — HR can open guarantor files; thank-you page
+- [x] Fixed: HR got 403 opening a guarantor's photo, signature or documents (`can_review_assignment` only covers employee forms). Guarantor/reference files now open for the same HR accounts that review guarantor evidence (`forms.manage`); the employee still cannot open them. Code only, no migration. Review screen shows pictures inline and Open/Download links for every file.
+- [x] Guarantors now see a Thank-you screen after submitting.
+

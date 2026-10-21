@@ -168,6 +168,7 @@ export default function Page() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
   const content = data ? normaliseForm(data.form) : null;
+  const done = data?.state === "SUBMITTED";
   const locked = !data || data.state === "SUBMITTED";
   return (
     <div className="min-h-screen bg-[#f3f8ff]">
@@ -180,10 +181,10 @@ export default function Page() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your requested form</p>
           <h1 className="mt-1 text-2xl font-semibold leading-tight">{content?.title ?? "Your form"}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {!done && (<p className="mt-2 text-sm leading-6 text-muted-foreground">
             Only you can complete this request. Your answers are private from the employee who sent it.
             Your answers save by themselves as you go. This link stays open for 7 days.
-          </p>
+          </p>)}
         </div>
         {session && (
           <Button variant="outline" className="h-11" onClick={() => void signOut().catch(() => setError("Could not sign out. Try again."))}>
@@ -194,7 +195,18 @@ export default function Page() {
         {!loading && !session && <p>Open the private form link in your invitation email to continue.</p>}
         {error && <p role="alert" className="break-words rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
-        {data && content && (
+        {done && (
+          <section className="space-y-4 rounded-3xl border border-emerald-200 bg-white p-6 text-center" aria-label="Form submitted">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700" aria-hidden="true">&#10003;</div>
+            <h2 className="text-2xl font-semibold">Thank you</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Your form was sent to the NOLT Finance HR team. You do not need to do anything else.
+              If HR needs a correction, the employee will send you a new link.
+            </p>
+            <p className="text-sm font-medium">You can close this page now.</p>
+          </section>
+        )}
+        {data && content && !done && (
           <>
             {data.state === "SUBMITTED" ? (
               <p className="rounded-xl border border-[#bcd6f7] bg-[#e6f1ff] p-3 text-sm text-[#0a3a7a]">Submitted. HR will review it.</p>
