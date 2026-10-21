@@ -23,6 +23,7 @@ import {
   AlignLeft,
   Heading,
   Loader2,
+  Pencil,
   Table2,
   Mail,
   PenLine,
@@ -515,7 +516,7 @@ function FormEditor({
     ),
     [busy, setBusy] = useState(false),
     [preview, setPreview] = useState(false),
-    [confirmAction, setConfirmAction] = useState<"delete" | "unpublish" | null>(null),
+    [confirmAction, setConfirmAction] = useState<"delete" | "unpublish" | "reopen" | null>(null),
     [confirmLeave, setConfirmLeave] = useState(false);
   const published = record.status !== "DRAFT",
     dirty =
@@ -660,16 +661,16 @@ function FormEditor({
     try {
       const response = await fetch(
         operation === "delete"
-          ? `/api/v1/forms/${record.formId}/draft`
-          : `/api/v1/form-versions/${record.id}/unpublish`,
+          ? `/api/v1/forms/${record.formId}`
+          : `/api/v1/form-versions/${record.id}/${operation}`,
         {
           method: operation === "delete" ? "DELETE" : "POST",
           headers: {
             "x-csrf-token": csrf,
-            ...(operation === "unpublish" ? { "content-type": "application/json" } : {}),
+            ...(operation !== "delete" ? { "content-type": "application/json" } : {}),
           },
           credentials: "same-origin",
-          ...(operation === "unpublish"
+          ...(operation !== "delete"
             ? { body: JSON.stringify({ expectedRevision: record.revision }) }
             : {}),
         },
@@ -678,12 +679,17 @@ function FormEditor({
         const error = await response.json().catch(() => ({}));
         throw new Error(errorMessage(error));
       }
-      if (operation === "unpublish") {
-        onChange(normaliseForm(await response.json()));
-        onNotice({ kind: "success", text: "Form unpublished. Existing assigned copies are preserved." });
-      } else {
-        onNotice({ kind: "success", text: "Unpublished draft permanently deleted." });
+      if (operation === "delete") {
+        onNotice({ kind: "success", text: "Form permanently deleted." });
         onBack();
+      } else {
+        onChange(normaliseForm(await response.json()));
+        onNotice({
+          kind: "success",
+          text: operation === "unpublish"
+            ? "Form unpublished. Anything already sent to employees is preserved."
+            : "Form reopened as a draft. You can edit it now.",
+        });
       }
       setConfirmAction(null);
     } catch (error) {
@@ -708,18 +714,20 @@ function FormEditor({
       <Dialog open={confirmAction !== null} onOpenChange={(open) => { if (!open && !busy) setConfirmAction(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{confirmAction === "delete" ? "Delete this draft?" : "Unpublish this form?"}</DialogTitle>
+            <DialogTitle>{confirmAction === "delete" ? "Delete this form?" : confirmAction === "reopen" ? "Edit this form again?" : "Unpublish this form?"}</DialogTitle>
             <DialogDescription>
               {confirmAction === "delete"
-                ? "This permanently deletes a form that has never been published or assigned. This cannot be undone."
-                : "This version can no longer be assigned to new employees. Existing assignments, answers and evidence remain unchanged."}
+                ? "This permanently deletes the form and all of its versions. It has never been sent to an employee or put in a pack. This cannot be undone."
+                : confirmAction === "reopen"
+                  ? "The form goes back to a draft so you can change it, then publish it again. It has never been sent to an employee."
+                  : "This version can no longer be assigned to new employees. Anything already sent, with its answers and evidence, remains unchanged."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
             <Button variant="outline" disabled={busy} onClick={() => setConfirmAction(null)}>Cancel</Button>
             <Button variant={confirmAction === "delete" ? "destructive" : "default"} disabled={busy} onClick={() => void changePublication()}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-              {confirmAction === "delete" ? "Delete draft" : "Unpublish version"}
+              {confirmAction === "delete" ? "Delete form" : confirmAction === "reopen" ? "Edit again" : "Unpublish version"}
             </Button>
           </div>
         </DialogContent>
@@ -743,7 +751,11 @@ function FormEditor({
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
             {published
-              ? "This version is locked. Create a new draft to make changes."
+              ? record.status === "UNPUBLISHED" && !record.inUse
+                ? "Unpublished. Choose Edit again to change it, or Delete it."
+                : record.inUse
+                  ? "This version has been used, so it is locked. Create a new version to make changes."
+                  : "Unpublish this form to edit it again, or delete it."
               : dirty
                 ? "Unsaved changes · save before leaving"
                 : "All changes saved"}
@@ -756,9 +768,21 @@ function FormEditor({
           </Button>
           {published ? (
             <>
-            <Button variant="outline" disabled={busy} onClick={() => setConfirmAction("unpublish")}>
-              Unpublish
-            </Button>
+            {record.status === "PUBLISHED" && (
+              <Button variant="outline" disabled={busy} onClick={() => setConfirmAction("unpublish")}>
+                Unpublish
+              </Button>
+            )}
+            {record.status === "UNPUBLISHED" && !record.inUse && (
+              <Button variant="outline" disabled={busy} onClick={() => setConfirmAction("reopen")}>
+                <Pencil size={16} /> Edit again
+              </Button>
+            )}
+            {!record.formInUse && (
+              <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
+                <Trash2 size={16} /> Delete
+              </Button>
+            )}
             <Button onClick={nextVersion} disabled={busy}>
               <CopyPlus size={16} />
               New version
@@ -766,9 +790,9 @@ function FormEditor({
             </>
           ) : (
             <>
-              {record.version === 1 && (
+              {!record.formInUse && (
                 <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
-                  <Trash2 size={16} /> Delete draft
+                  <Trash2 size={16} /> Delete
                 </Button>
               )}
               <Button

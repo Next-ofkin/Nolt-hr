@@ -564,7 +564,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/forms/{id}/draft": {
+    "/api/v1/form-versions/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FormsController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -574,7 +590,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["FormsController_deleteDraft"];
+        delete: operations["FormsController_deleteForm"];
         options?: never;
         head?: never;
         patch?: never;
@@ -686,7 +702,7 @@ export interface paths {
         get: operations["PacksController_get"];
         put: operations["PacksController_update"];
         post?: never;
-        delete?: never;
+        delete: operations["PacksController_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -702,6 +718,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PacksController_newVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packs/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PacksController_unpublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packs/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PacksController_reopen"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1044,6 +1092,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports/axa-enrolment.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HrExportController_axaEnrolment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/cases/{id}.zip": {
         parameters: {
             query?: never;
@@ -1345,6 +1409,8 @@ export interface components {
             }[];
             updatedAt: string;
             publishedAt: string | null;
+            inUse: boolean;
+            formInUse: boolean;
         };
         SubmissionReviewDto: {
             id: string;
@@ -3221,6 +3287,8 @@ export interface operations {
                                 kind: "text" | "number" | "date" | "email" | "phone" | "percent";
                                 /** @default false */
                                 required: boolean;
+                                /** @default null */
+                                exportKey: string | null;
                             }[];
                             /** @default [] */
                             fixedRows: string[];
@@ -3228,6 +3296,8 @@ export interface operations {
                             maxRows: number;
                             /** @default null */
                             totalEquals: number | null;
+                            /** @default null */
+                            exportKey: string | null;
                             /**
                              * @default null
                              * @enum {string|null}
@@ -3309,7 +3379,31 @@ export interface operations {
             };
         };
     };
-    FormsController_deleteDraft: {
+    FormsController_reopen: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required for mutations; obtained from the authenticated session */
+                "x-csrf-token"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDto"];
+                };
+            };
+        };
+    };
+    FormsController_deleteForm: {
         parameters: {
             query?: never;
             header?: {
@@ -3517,6 +3611,26 @@ export interface operations {
             };
         };
     };
+    PacksController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete a pack that has never been given to an employee */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PacksController_newVersion: {
         parameters: {
             query?: never;
@@ -3529,6 +3643,46 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Create a new draft version without altering assigned published packs */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PacksController_unpublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stop offering a published pack; employees who have it keep it */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PacksController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return an unpublished, never-assigned pack to an editable draft */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4841,6 +4995,23 @@ export interface operations {
             path: {
                 id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    HrExportController_axaEnrolment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

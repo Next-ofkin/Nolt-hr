@@ -191,6 +191,10 @@ export function EmployeesWorkspace() {
         <p className="mt-2 text-sm text-muted-foreground">
           Create employee records, send invitations and assign published onboarding packs.
         </p>
+        <a href="/api/v1/exports/axa-enrolment.xlsx" download
+          className="mt-3 inline-flex min-h-10 items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
+          Download AXA HMO enrolment sheet (approved forms)
+        </a>
       </div>
       {error && (
         <p

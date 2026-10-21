@@ -12,7 +12,7 @@ export type FormTemplate = {
   build: () => FormContent;
 };
 
-type Opts = Partial<Pick<FormField, "required" | "helpText" | "options" | "showIf" | "prefill" | "body" | "columns" | "fixedRows" | "maxRows" | "totalEquals" | "attachmentPurpose">>;
+type Opts = Partial<Pick<FormField, "required" | "helpText" | "options" | "showIf" | "prefill" | "body" | "columns" | "exportKey" | "fixedRows" | "maxRows" | "totalEquals" | "attachmentPurpose">>;
 
 function builder() {
   const fields: FormField[] = [];
@@ -36,7 +36,8 @@ function builder() {
     signature: (label: string, o?: Opts) => add("signature", label, o),
     photo: (label: string, o?: Opts) => add("passport_photo", label, o),
     file: (label: string, o?: Opts) => add("file", label, o),
-    table: (label: string, columns: FormField["columns"], o?: Opts) => add("table", label, { ...o, columns }),
+    table: (label: string, columns: (Omit<FormField["columns"][number], "exportKey"> & { exportKey?: string | null })[], o?: Opts) =>
+      add("table", label, { ...o, columns: columns.map((c) => ({ ...c, exportKey: c.exportKey ?? null })) }),
     when: (field: FormField, equals: string) => ({ fieldId: field.id, equals }),
   };
 }
@@ -440,6 +441,57 @@ function policyAcknowledgement(): FormContent {
   };
 }
 
+
+function axaEnrolment(): FormContent {
+  const b = builder();
+  const key = (k: string, o: Opts = {}): Opts => ({ ...o, exportKey: `axa.${k}` });
+  b.note(
+    "AXA Mansard HMO consent",
+    "We hereby give our consent to AXA Mansard to control and process our personal data (Surname, First Name, Date of Birth, Email and Phone number) for the purpose of health management in accordance with the HMO scheme agreed with NOLT FINANCE COMPANY LIMITED.\n\nWe are aware and informed that we may withdraw consent at any time by contacting AXA Mansard Health either by email at healthcare@axamansard.com or by telephone on 0700AXAMANSARD (07002926267273).\n\nWe are aware that personal data shall be forwarded to our employer for verification, transferred to selected AXA Mansard In-Network Hospitals for processing where required. We further grant our consent for this purpose. We also give consent for personal data to be transferred to other third party as we may recommend to AXA Mansard in furtherance of the HMO scheme.\n\nThe HR Team can be contacted by Email: hr@noltfinance.com, Phone: 08033227220.\n\nWe affirm that we are aware and take cognizance of our rights under the relevant Data protection Laws in Nigeria and other terms detailed in the Data Protection and privacy policy of AXA Mansard, available at https://www.axamansard.com/privacy-policy/.",
+  );
+  b.confirm("I agree that my staff personal information can be used in line with AXA Mansard’s Data Privacy Policy.", { required: true });
+  b.heading("Your details");
+  b.text("Surname", key("surname", { required: true }));
+  b.text("First name", key("firstName", { required: true }));
+  b.text("Middle name", key("middleName"));
+  b.text("Staff ID", key("staffId", { required: true, prefill: "employee.employeeNumber", helpText: "Your staff number. This is compulsory for AXA." }));
+  b.text("Enrollee number", key("enrolleeNumber", { helpText: "Only if you are already enrolled with AXA Mansard (for additions). Otherwise leave empty." }));
+  b.text("Plan", key("plan", { required: true, helpText: "The AXA plan you were given, as written by HR." }));
+  b.choice("Plan type", ["Individual", "Family"], key("planType", { required: true }));
+  b.date("Enrollment date", key("enrollmentDate", { required: true, prefill: "employee.startDate" }));
+  b.choice("Sex", ["Male", "Female"], key("sex", { required: true }));
+  b.date("Date of birth", key("dob", { required: true }));
+  b.phone("Phone number", key("phone", { required: true }));
+  b.email("Official e-mail", key("email", { required: true, prefill: "employee.email" }));
+  b.long("Address", key("address", { required: true }));
+  b.long("Pre-existing condition", key("preExisting", { required: true, helpText: "Compulsory. Write None if you have no pre-existing condition." }));
+  b.text("Primary hospital", key("primaryHospital", { required: true }));
+  b.text("Secondary hospital", key("secondaryHospital", { required: true }));
+  const family = b.fields.find((f) => f.exportKey === "axa.planType")!;
+  b.heading("Dependants");
+  b.table(
+    "Dependants",
+    [
+      { label: "Surname", kind: "text", required: true, exportKey: "axa.dep.surname" },
+      { label: "First name", kind: "text", required: true, exportKey: "axa.dep.firstName" },
+      { label: "Middle name", kind: "text", required: false, exportKey: "axa.dep.middleName" },
+      { label: "Relationship (Husband / Wife / Son / Daughter)", kind: "text", required: true, exportKey: "axa.dep.relationship" },
+      { label: "Sex", kind: "text", required: true, exportKey: "axa.dep.sex" },
+      { label: "Date of birth", kind: "date", required: true, exportKey: "axa.dep.dob" },
+      { label: "Pre-existing condition (write None if none)", kind: "text", required: true, exportKey: "axa.dep.preExisting" },
+      { label: "Primary hospital", kind: "text", required: true, exportKey: "axa.dep.primaryHospital" },
+    ],
+    { maxRows: 8, exportKey: "axa.dependants", showIf: b.when(family, "Family"), helpText: "Add one row for each family member to be covered." },
+  );
+  b.signature("Signature", { required: true });
+  return {
+    title: "AXA Mansard HMO Enrolment",
+    description: "Your health insurance (HMO) enrolment and consent. HR sends this information to AXA Mansard.",
+    recipient: "EMPLOYEE",
+    fields: b.fields,
+  };
+}
+
 export const formTemplates: FormTemplate[] = [
   { key: "employee-data", title: "Employee Data Form", recipient: "EMPLOYEE", description: "Personal, contact, bank, next of kin and health details.", build: employeeDataForm },
   { key: "employee-declaration", title: "Employee Declaration & Background Information", recipient: "EMPLOYEE", description: "Criminal record disclosure, integrity declaration, consent and signature.", build: employeeDeclaration },
@@ -450,4 +502,5 @@ export const formTemplates: FormTemplate[] = [
   { key: "beneficiary", title: "Beneficiary Nomination Form", recipient: "EMPLOYEE", description: "Group life nomination with beneficiary table (must total 100%) and guardian table.", build: beneficiaryNomination },
   { key: "induction", title: "New Employee Induction Checklist", recipient: "EMPLOYEE", description: "Nine-section checklist of induction items, with employee confirmation.", build: inductionChecklist },
   { key: "policy-ack", title: "HR Policy Manual Acknowledgement", recipient: "EMPLOYEE", description: "Declaration that the HR Policy Manual has been read.", build: policyAcknowledgement },
+  { key: "axa-hmo", title: "AXA Mansard HMO Enrolment", recipient: "EMPLOYEE", description: "AXA consent, member details and dependants. HR can download the AXA enrolment spreadsheet from approved forms.", build: axaEnrolment },
 ];

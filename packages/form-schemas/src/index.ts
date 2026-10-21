@@ -57,6 +57,8 @@ export const fieldSchema = z.object({
         label: z.string().trim().min(1).max(80),
         kind: z.enum(tableColumnKinds).default("text"),
         required: z.boolean().default(false),
+        /** Lets an HR export (e.g. the AXA sheet) find this column. */
+        exportKey: z.string().trim().max(60).nullable().default(null),
       }),
     )
     .max(8)
@@ -65,6 +67,8 @@ export const fieldSchema = z.object({
   maxRows: z.number().int().min(1).max(30).default(10),
   /** When set, the "percent" column of the filled rows must add up to this number (e.g. 100). */
   totalEquals: z.number().int().min(1).max(1000).nullable().default(null),
+  /** Lets an HR export (e.g. the AXA enrolment sheet) find this answer. Not shown to employees. */
+  exportKey: z.string().trim().max(60).nullable().default(null),
   /** Fill from the employee record when the form is first opened. */
   prefill: z.enum(prefillKeys).nullable().default(null),
 });
@@ -386,12 +390,13 @@ export function createField(type: FormField["type"], id: string): FormField {
     body: "",
     columns:
       type === "table"
-        ? [{ label: "Item", kind: "text" as const, required: true }, { label: "Details", kind: "text" as const, required: false }]
+        ? [{ label: "Item", kind: "text" as const, required: true, exportKey: null }, { label: "Details", kind: "text" as const, required: false, exportKey: null }]
         : [],
     fixedRows: [],
     maxRows: 10,
     totalEquals: null,
     showIf: null,
+    exportKey: null,
     prefill: null,
   };
 }
