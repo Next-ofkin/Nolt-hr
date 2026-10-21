@@ -1,0 +1,31 @@
+# NOLT HR web app (Next.js) for Google Cloud Run. Build from the repo root.
+# API_ORIGIN is baked in at build time: pass the API's https address without a trailing path.
+FROM node:24-slim
+WORKDIR /app
+ARG API_ORIGIN
+ARG NEXT_PUBLIC_BRAND_NAME
+ARG NEXT_PUBLIC_PRODUCT_NAME
+ARG NEXT_PUBLIC_BRAND_TAGLINE
+ARG NEXT_PUBLIC_BRAND_DESCRIPTION
+ARG NEXT_PUBLIC_BRAND_PRIMARY
+ARG NEXT_PUBLIC_BRAND_LOGO_PATH
+ENV API_ORIGIN=$API_ORIGIN \
+    NEXT_PUBLIC_BRAND_NAME=$NEXT_PUBLIC_BRAND_NAME \
+    NEXT_PUBLIC_PRODUCT_NAME=$NEXT_PUBLIC_PRODUCT_NAME \
+    NEXT_PUBLIC_BRAND_TAGLINE=$NEXT_PUBLIC_BRAND_TAGLINE \
+    NEXT_PUBLIC_BRAND_DESCRIPTION=$NEXT_PUBLIC_BRAND_DESCRIPTION \
+    NEXT_PUBLIC_BRAND_PRIMARY=$NEXT_PUBLIC_BRAND_PRIMARY \
+    NEXT_PUBLIC_BRAND_LOGO_PATH=$NEXT_PUBLIC_BRAND_LOGO_PATH \
+    NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages ./packages
+RUN npm ci
+COPY apps/web ./apps/web
+COPY scripts ./scripts
+COPY docs/TRACKER.md ./docs/TRACKER.md
+RUN npm run contracts:build && npm run build -w @nolt/web
+ENV NODE_ENV=production
+EXPOSE 8080
+CMD ["npm", "run", "start:railway", "-w", "@nolt/web"]
