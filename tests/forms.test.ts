@@ -135,3 +135,58 @@ test("every NOLT template is a valid, publishable form with sound conditions", (
     assert.ok(content.fields.length <= 100, `${t.title} stays within the 100-field limit`);
   }
 });
+
+import { isDisplayField } from "@nolt/form-schemas";
+import type { FormField } from "@nolt/form-schemas";
+
+function completeAnswers(fields: FormField[]) {
+  const a: Record<string, string | boolean> = {};
+  for (const f of fields) {
+    if (isDisplayField(f.type)) continue;
+    if (f.type === "checkbox") a[f.id] = true;
+    else if (f.type === "select") a[f.id] = f.options[0];
+    else if (f.type === "email") a[f.id] = "a@b.co";
+    else if (f.type === "phone") a[f.id] = "08012345678";
+    else if (f.type === "number") a[f.id] = "1";
+    else if (f.type === "date") a[f.id] = "2026-01-01";
+    else if (["file", "passport_photo", "signature"].includes(f.type)) a[f.id] = randomUUID();
+    else if (f.type === "table") {
+      const row = (label?: string) => f.columns.map((c, i) =>
+        label && i === 0 ? label : c.kind === "percent" ? String(f.totalEquals ?? 100) : c.kind === "email" ? "a@b.co"
+        : c.kind === "number" ? "1" : c.kind === "date" ? "2026-01-01" : c.kind === "phone" ? "08012345678" : "x");
+      a[f.id] = JSON.stringify(f.fixedRows.length ? f.fixedRows.map(row) : [row()]);
+    } else a[f.id] = "x";
+  }
+  return a;
+}
+
+test("every template can be fully and correctly completed, and blank required forms are refused", () => {
+  for (const t of formTemplates) {
+    const c = t.build();
+    const ok = validateAnswers(c.fields, completeAnswers(c.fields), true);
+    assert.deepEqual(ok.issues, [], `${t.title} should accept a complete set of answers`);
+    const blank = validateAnswers(c.fields, {}, true);
+    assert.ok(blank.issues.length > 0, `${t.title} should require answers`);
+  }
+});
+
+test("tables: percentages must total 100, rows must be complete, and work tools are fixed", () => {
+  const ben = formTemplates.find((t) => t.key === "beneficiary")!.build();
+  const table = ben.fields.find((f) => f.type === "table" && f.label === "Beneficiaries")!;
+  const answers = completeAnswers(ben.fields);
+  const row = (pct: string) => ["Obi", "Ada", "Sister", pct, "2000-01-01", "0801", "Lagos"];
+  answers[table.id] = JSON.stringify([row("60"), row("30")]);
+  const bad = validateAnswers(ben.fields, answers, true).issues;
+  assert.ok(bad.some((i) => i.fieldId === table.id && /add up to 100/.test(i.message)));
+  answers[table.id] = JSON.stringify([row("60"), row("40")]);
+  assert.deepEqual(validateAnswers(ben.fields, answers, true).issues, []);
+  answers[table.id] = JSON.stringify([["Obi", "", "Sister", "100", "2000-01-01", "0801", "Lagos"]]);
+  assert.ok(validateAnswers(ben.fields, answers, true).issues.length > 0);
+  answers[table.id] = "not json";
+  assert.ok(validateAnswers(ben.fields, answers, true).issues.some((i) => i.fieldId === table.id));
+  const tools = formTemplates.find((t) => t.key === "work-tools")!.build();
+  const fixed = tools.fields.find((f) => f.label === "Work tools assigned to me")!;
+  assert.equal(fixed.fixedRows.length, 7);
+  // Leaving every tool empty is allowed (nothing received yet).
+  assert.deepEqual(validateAnswers(tools.fields, { ...completeAnswers(tools.fields), [fixed.id]: "" }, true).issues, []);
+});

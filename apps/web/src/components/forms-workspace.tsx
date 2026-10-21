@@ -23,6 +23,7 @@ import {
   AlignLeft,
   Heading,
   Loader2,
+  Table2,
   Mail,
   PenLine,
   Phone,
@@ -42,6 +43,7 @@ import {
   type FormRecord,
 } from "@nolt/api-client";
 import {
+  tableColumnKinds,
   createField,
   fieldTypes,
   formContentSchema,
@@ -86,6 +88,7 @@ const icons = {
   signature: PenLine,
   heading: Heading,
   paragraph: AlignLeft,
+  table: Table2,
 };
 const prefillNames: Record<(typeof prefillKeys)[number], string> = {
   "employee.fullName": "Full name",
@@ -110,6 +113,7 @@ const names = {
   signature: "Signature",
   heading: "Section heading",
   paragraph: "Wording block",
+  table: "Table",
 };
 type Notice = { kind: "success" | "error"; text: string } | null;
 
@@ -1083,6 +1087,76 @@ function FormEditor({
                       editField({ options: e.target.value.split("\n") })
                     }
                   />
+                </div>
+              )}
+              {field.type === "table" && (
+                <div className="space-y-3">
+                  <Label>Columns</Label>
+                  {field.columns.map((col, i) => (
+                    <div key={i} className="space-y-2 rounded-lg border p-2">
+                      <Input
+                        aria-label={`Column ${i + 1} name`}
+                        maxLength={80}
+                        value={col.label}
+                        onChange={(e) =>
+                          editField({ columns: field.columns.map((c, j) => (j === i ? { ...c, label: e.target.value } : c)) })
+                        }
+                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          aria-label={`Column ${i + 1} type`}
+                          className="native-select"
+                          value={col.kind}
+                          onChange={(e) =>
+                            editField({ columns: field.columns.map((c, j) => (j === i ? { ...c, kind: e.target.value as typeof col.kind } : c)) })
+                          }
+                        >
+                          {tableColumnKinds.map((k) => (
+                            <option key={k} value={k}>{k === "percent" ? "Percentage" : k[0].toUpperCase() + k.slice(1)}</option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-1 text-xs">
+                          <input type="checkbox" className="size-4 accent-primary" checked={col.required}
+                            onChange={(e) => editField({ columns: field.columns.map((c, j) => (j === i ? { ...c, required: e.target.checked } : c)) })} />
+                          Needed
+                        </label>
+                        <Button type="button" variant="ghost" size="icon" className="size-7 text-destructive" disabled={field.columns.length <= 1}
+                          aria-label={`Remove column ${i + 1}`}
+                          onClick={() => editField({ columns: field.columns.filter((_, j) => j !== i) })}>
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" disabled={field.columns.length >= 8}
+                    onClick={() => editField({ columns: [...field.columns, { label: "New column", kind: "text", required: false }] })}>
+                    <Plus size={14} /> Add column
+                  </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="table-fixed">Fixed rows (optional, one per line)</Label>
+                    <Textarea
+                      id="table-fixed"
+                      value={field.fixedRows.join("\n")}
+                      onChange={(e) => editField({ fixedRows: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
+                    />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Use for a set list such as work tools. The first column shows these names and cannot be changed. Leave empty to let the employee add rows.
+                    </p>
+                  </div>
+                  {field.fixedRows.length === 0 && (
+                    <div className="space-y-2">
+                      <Label htmlFor="table-max">Most rows allowed</Label>
+                      <Input id="table-max" type="number" min={1} max={30} value={field.maxRows}
+                        onChange={(e) => editField({ maxRows: Math.min(30, Math.max(1, Number(e.target.value) || 1)) })} />
+                    </div>
+                  )}
+                  {field.columns.some((c) => c.kind === "percent") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="table-total">Percentage column must add up to</Label>
+                      <Input id="table-total" type="number" min={1} max={1000} value={field.totalEquals ?? ""}
+                        onChange={(e) => editField({ totalEquals: e.target.value ? Number(e.target.value) : null })} />
+                    </div>
+                  )}
                 </div>
               )}
               {field.type === "signature" && (

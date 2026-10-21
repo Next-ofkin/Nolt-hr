@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { deflateRawSync } from "node:zlib";
 import sharp from "sharp";
-import { fieldVisible, isDisplayField, type FormField } from "@nolt/form-schemas";
+import { fieldVisible, isDisplayField, parseTable, type FormField } from "@nolt/form-schemas";
 import { Database } from "./database.js";
 import { FilesService } from "./files.js";
 import { SessionGuard, type AuthRequest } from "./auth.js";
@@ -203,6 +203,17 @@ export class HrExportService {
       const raw = answers[field.id];
       if (raw === null || raw === undefined || raw === "") {
         doc.field(label, "Not provided");
+        continue;
+      }
+      if (field.type === "table") {
+        const rows = parseTable(raw, field as FormField);
+        const used = rows === "invalid" ? [] : rows.filter((r) => r.some((c, i) => c.trim() && !((field as FormField).fixedRows.length && i === 0)));
+        doc.text(label, 10, true, 6);
+        if (!used.length) { doc.text("Not provided", 10, false, 8); continue; }
+        const columns = (field as FormField).columns;
+        used.forEach((r, n) => {
+          doc.text(`${n + 1}. ` + columns.map((c, i) => `${c.label}: ${r[i]?.trim() || "-"}`).join("  |  "), 10, false, 6);
+        });
         continue;
       }
       if (["file", "passport_photo", "signature"].includes(field.type ?? "")) {

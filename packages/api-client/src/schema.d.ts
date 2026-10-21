@@ -3186,7 +3186,7 @@ export interface operations {
                             /** Format: uuid */
                             id: string;
                             /** @enum {string} */
-                            type: "text" | "textarea" | "email" | "phone" | "number" | "date" | "select" | "checkbox" | "file" | "passport_photo" | "signature" | "heading" | "paragraph";
+                            type: "text" | "textarea" | "email" | "phone" | "number" | "date" | "select" | "checkbox" | "file" | "passport_photo" | "signature" | "heading" | "paragraph" | "table";
                             label: string;
                             /** @default  */
                             helpText: string;
@@ -3211,6 +3211,23 @@ export interface operations {
                                 fieldId: string;
                                 equals: string;
                             } | null;
+                            /** @default [] */
+                            columns: {
+                                label: string;
+                                /**
+                                 * @default text
+                                 * @enum {string}
+                                 */
+                                kind: "text" | "number" | "date" | "email" | "phone" | "percent";
+                                /** @default false */
+                                required: boolean;
+                            }[];
+                            /** @default [] */
+                            fixedRows: string[];
+                            /** @default 10 */
+                            maxRows: number;
+                            /** @default null */
+                            totalEquals: number | null;
                             /**
                              * @default null
                              * @enum {string|null}

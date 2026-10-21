@@ -2276,7 +2276,8 @@
                                 "passport_photo",
                                 "signature",
                                 "heading",
-                                "paragraph"
+                                "paragraph",
+                                "table"
                               ]
                             },
                             "label": {
@@ -2346,6 +2347,66 @@
                               ],
                               "additionalProperties": false
                             },
+                            "columns": {
+                              "default": [],
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                  },
+                                  "kind": {
+                                    "default": "text",
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "number",
+                                      "date",
+                                      "email",
+                                      "phone",
+                                      "percent"
+                                    ]
+                                  },
+                                  "required": {
+                                    "default": false,
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "kind",
+                                  "required"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "fixedRows": {
+                              "default": [],
+                              "maxItems": 30,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              }
+                            },
+                            "maxRows": {
+                              "default": 10,
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 30
+                            },
+                            "totalEquals": {
+                              "default": null,
+                              "nullable": true,
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000
+                            },
                             "prefill": {
                               "default": null,
                               "nullable": true,
@@ -2372,6 +2433,10 @@
                             "attachmentPurpose",
                             "body",
                             "showIf",
+                            "columns",
+                            "fixedRows",
+                            "maxRows",
+                            "totalEquals",
                             "prefill"
                           ],
                           "additionalProperties": false

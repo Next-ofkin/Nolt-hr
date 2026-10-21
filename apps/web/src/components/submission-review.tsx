@@ -1,6 +1,6 @@
 "use client";
 
-import { fieldVisible } from "@nolt/form-schemas";
+import { fieldVisible, parseTable } from "@nolt/form-schemas";
 import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage, normaliseForm } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
@@ -421,6 +421,17 @@ export function SubmissionReview({
                               {field.type === "file" && <p className="text-xs text-muted-foreground">Opens the original scanned attachment securely. PDFs and supported images can be previewed in your browser.</p>}
                             </div>
                           ) : <p role="alert" className="text-sm text-destructive">Invalid file reference. This attachment cannot be previewed.</p>
+                        ) : field.type === "table" && typeof raw === "string" ? (
+                          <div className="overflow-x-auto rounded border">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50"><tr>{field.columns.map((c, i) => <th key={i} className="px-2 py-1 font-semibold">{c.label}</th>)}</tr></thead>
+                              <tbody>
+                                {(() => { const rows = parseTable(raw, field); return rows === "invalid" ? [] : rows.filter((r) => r.some((c, i) => c.trim() && !(field.fixedRows.length && i === 0)) ); })().map((r, i) => (
+                                  <tr key={i} className="border-t">{r.map((c, j) => <td key={j} className="px-2 py-1 align-top">{c}</td>)}</tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         ) : typeof raw === "boolean" ? (
                           <Badge variant={raw ? "default" : "secondary"}>
                             {raw ? "Yes" : "No"}
