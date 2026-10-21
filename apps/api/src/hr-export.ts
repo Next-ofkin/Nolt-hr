@@ -14,7 +14,8 @@ import { createFileShareToken } from "./shared-files.js";
 type Image = { data: Buffer; width: number; height: number; name: string };
 const safe = (v: string) => v.replace(/[^\w .-]+/g, "_").slice(0, 90).trim() || "document";
 const formattedDate = (d: Date) => new Intl.DateTimeFormat("en-GB", {dateStyle:"medium",timeStyle:"short",timeZone:"UTC"}).format(d) + " UTC";
-const ascii = (v: unknown) => String(v ?? "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "?");
+const plainQuotes: Record<string, string> = { "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u00a0": " ", "\u20a6": "NGN " };
+const ascii = (v: unknown) => String(v ?? "").replace(/[\u2018\u2019\u201a\u201c\u201d\u2013\u2014\u2026\u00a0\u20a6]/g, (c) => plainQuotes[c]).normalize("NFKD").replace(/\s*[\r\n]+\s*/g, " ").replace(/[^\x20-\x7e]/g, "?");
 const escapePdf = (v: string) => ascii(v).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 import { zipFiles } from "./zip.js";
 export { zipFiles };
@@ -27,6 +28,12 @@ class PdfDocument {
   }
   private ensure(space: number) { if (this.page.y - space < 65) this.page = this.next(); }
   text(value: unknown, size = 11, bold = false, gap = 8) {
+    // Keep paragraph breaks in long wording (e.g. consent text) as visible gaps.
+    const paragraphs = String(value ?? "").split(/\r?\n+/).map((p) => p.trim()).filter(Boolean);
+    if (paragraphs.length > 1) {
+      paragraphs.forEach((para, i) => this.text(para, size, bold, i === paragraphs.length - 1 ? gap : Math.max(gap, 9)));
+      return;
+    }
     const content = ascii(value);
     const max = Math.max(22, Math.floor(94 * 11 / size));
     const words = content.split(/\s+/); let line = "";
@@ -42,7 +49,7 @@ class PdfDocument {
     if (line) emit(line); if (!words.length) emit("");
   }
   section(title: string) {
-    this.ensure(45);
+    this.ensure(100); // keep a heading together with the first lines under it
     this.page.y -= 7;
     this.page.lines.push(`0.91 0.95 0.99 rg 43 ${(this.page.y-23).toFixed(1)} 509 29 re f 0.05 0.19 0.39 rg`);
     this.page.lines.push(`BT /F2 12 Tf 52 ${(this.page.y-14).toFixed(1)} Td (${escapePdf(title)}) Tj ET 0 0 0 rg`);
