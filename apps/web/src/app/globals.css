@@ -74,8 +74,22 @@
   }
 }
 .native-select {
-  @apply h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  @apply h-12 w-full rounded-xl border-[1.5px] border-input bg-white px-3 text-base md:h-10 md:text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring;
 }
 .field-preview {
   @apply space-y-2;
 }
+
+/* Progress bars: brand blue on a soft track, rounded. */
+progress {
+  appearance: none;
+  height: 0.625rem;
+  border: 0;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: #d6e4f8;
+  accent-color: var(--primary);
+}
+progress::-webkit-progress-bar { background: #d6e4f8; border-radius: 9999px; }
+progress::-webkit-progress-value { background: var(--primary); border-radius: 9999px; }
+progress::-moz-progress-bar { background: var(--primary); border-radius: 9999px; }
