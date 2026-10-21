@@ -1,6 +1,6 @@
 "use client";
 import { FileUp, PenLine } from "lucide-react";
-import type { FormContent, Answers } from "@nolt/form-schemas";
+import { fieldVisible, isDisplayField, type FormContent, type Answers } from "@nolt/form-schemas";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -46,7 +46,23 @@ export function FormPreview({
           Add a field to see your form take shape.
         </p>
       ) : (
-        content.fields.map((field) => (
+        content.fields.map((field) =>
+          answers && !fieldVisible(field, answers) ? null : isDisplayField(field.type) ? (
+            field.type === "heading" ? (
+              <h4 key={field.id} className="break-words border-b border-border pb-2 pt-4 text-base font-semibold text-primary">
+                {field.label}
+              </h4>
+            ) : (
+              <div key={field.id} className="rounded-xl border border-border bg-accent/40 p-4">
+                {field.label && <p className="break-words text-sm font-semibold">{field.label}</p>}
+                {field.body && (
+                  <p className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+                    {field.body}
+                  </p>
+                )}
+              </div>
+            )
+          ) : (
           <div key={field.id} className="field-preview">
             <Label
               htmlFor={`preview-${field.id}`}
@@ -217,7 +233,8 @@ export function FormPreview({
               </p>
             )}
           </div>
-        ))
+          ),
+        )
       )}
       {!answers && (
         <p className="border-t pt-4 text-xs leading-5 text-muted-foreground">

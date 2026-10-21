@@ -12,6 +12,22 @@ export const fieldTypes = [
   "file",
   "passport_photo",
   "signature",
+  "heading",
+  "paragraph",
+] as const;
+/** Display-only blocks: they show text to the respondent and never collect an answer. */
+export const displayFieldTypes = ["heading", "paragraph"] as const;
+export const isDisplayField = (type: string) =>
+  (displayFieldTypes as readonly string[]).includes(type);
+/** Employee record values that can be filled in automatically (the employee can still correct them). */
+export const prefillKeys = [
+  "employee.fullName",
+  "employee.email",
+  "employee.jobTitle",
+  "employee.department",
+  "employee.startDate",
+  "employee.employmentType",
+  "employee.employeeNumber",
 ] as const;
 export const recipientTypes = ["EMPLOYEE", "GUARANTOR", "REFERENCE"] as const;
 export const fieldSchema = z.object({
@@ -25,6 +41,15 @@ export const fieldSchema = z.object({
   attachmentPurpose: z
     .enum(["SUPPORTING_DOCUMENT", "SIGNED_DOCUMENT"])
     .default("SUPPORTING_DOCUMENT"),
+  /** Long wording for "paragraph" blocks (agreements, instructions). */
+  body: z.string().trim().max(12000).default(""),
+  /** Show this question only when another question has the given answer. */
+  showIf: z
+    .object({ fieldId: z.string().uuid(), equals: z.string().trim().min(1).max(200) })
+    .nullable()
+    .default(null),
+  /** Fill from the employee record when the form is first opened. */
+  prefill: z.enum(prefillKeys).nullable().default(null),
 });
 export const formContentSchema = z
   .object({
@@ -41,6 +66,15 @@ export const formContentSchema = z
         message: "Each field must have a unique ID.",
       });
     data.fields.forEach((field, index) => {
+      if (field.showIf) {
+        const at = data.fields.findIndex((f) => f.id === field.showIf!.fieldId);
+        if (at < 0 || at >= index)
+          ctx.addIssue({
+            code: "custom",
+            path: ["fields", index, "showIf"],
+            message: "A condition must depend on a question placed above it.",
+          });
+      }
       if (
         field.type === "select" &&
         (field.options.length < 2 ||
@@ -152,12 +186,19 @@ export const signatureIntentSchema = z
   .strict();
 export type SignatureIntentInput = z.infer<typeof signatureIntentSchema>;
 
+/** Whether a question is shown, given the current answers. Hidden questions are never required. */
+export function fieldVisible(field: FormField, answers: Answers): boolean {
+  if (!field.showIf) return true;
+  const v = answers[field.showIf.fieldId];
+  return typeof v === "string" && v.trim() === field.showIf.equals;
+}
+
 export function canonicalAnswersJson(
   fields: FormField[],
   answers: Answers,
 ): string {
   const nonSignatureFieldIds = fields
-    .filter((f) => f.type !== "signature")
+    .filter((f) => f.type !== "signature" && !isDisplayField(f.type))
     .map((f) => f.id)
     .sort();
   const canonical: Record<string, unknown> = {};
@@ -183,6 +224,9 @@ export function validateAnswers(
         message: "This question is not in the assigned form.",
       });
   for (const f of fields) {
+    if (isDisplayField(f.type)) continue;
+    // A hidden follow-up question is skipped entirely: not required, not checked.
+    if (!fieldVisible(f, answers)) continue;
     const v = answers[f.id];
     const empty =
       v === undefined ||
@@ -252,6 +296,8 @@ export function createField(type: FormField["type"], id: string): FormField {
     file: "Attach a document",
     passport_photo: "Passport photograph",
     signature: "Your signature",
+    heading: "Section heading",
+    paragraph: "Information for the employee",
   };
   return {
     id,
@@ -262,5 +308,10 @@ export function createField(type: FormField["type"], id: string): FormField {
     options: type === "select" ? ["Option 1", "Option 2"] : [],
     signatureMethod: "EITHER",
     attachmentPurpose: "SUPPORTING_DOCUMENT",
+    body: "",
+    showIf: null,
+    prefill: null,
   };
 }
+
+export { formTemplates, type FormTemplate } from "./templates.js";
