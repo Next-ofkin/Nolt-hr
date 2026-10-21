@@ -96,6 +96,9 @@ export class PacksService {
     return this.db.$transaction(async tx => {
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
       if (!locked.length) throw new NotFoundException("Pack not found.");
+      const current = await tx.packTemplate.findUnique({ where: { id }, select: { status: true } });
+      if (current?.status === "PUBLISHED")
+        throw new ConflictException("This pack is published. Unpublish it first, then delete it.");
       const pack = await this.toDraft(tx, id);
       await tx.packItem.deleteMany({ where: { packId: id } });
       await tx.packTemplate.delete({ where: { id } });
@@ -283,7 +286,16 @@ export class PacksService {
           throw new BadRequestException("This pack is for a different employment type. Confirm the mismatch to assign it.");
         if (await tx.packAssignment.findUnique({ where: { packId_caseId: { packId, caseId } } }))
           throw new ConflictException("This pack is already assigned to the case.");
-        await this.lockAndVerifyVersions(tx, pack.items);
+        // A form that was edited after the pack was published: use its newest published version.
+        const formIds = [...new Set(pack.items.map(item => item.formId))];
+        const published = await tx.formVersion.findMany({
+          where: { formId: { in: formIds }, status: "PUBLISHED" },
+          orderBy: { version: "desc" }, select: { id: true, formId: true },
+        });
+        const newest = new Map<string, string>();
+        for (const v of published) if (!newest.has(v.formId)) newest.set(v.formId, v.id);
+        const items = pack.items.map(item => ({ ...item, formVersionId: newest.get(item.formId) ?? item.formVersionId }));
+        await this.lockAndVerifyVersions(tx, items);
         const existing = await tx.formAssignment.findMany({
           where: { caseId, formId: { in: pack.items.map(item => item.formId) } },
           select: { formId: true },
@@ -293,7 +305,7 @@ export class PacksService {
           data: { caseId, packId, assignedBy: actorId,
             dueDate: dueDate ? new Date(dueDate + "T00:00:00.000Z") : null },
         });
-        for (const item of pack.items) {
+        for (const item of items) {
           const form = await tx.formAssignment.create({
             data: { caseId, formId: item.formId, formVersionId: item.formVersionId,
               required: item.required, assignedBy: actorId,

@@ -366,7 +366,7 @@ export function PacksWorkspace() {
           {pack.status === "PUBLISHED" && <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void startNextVersion(pack)}>Create new version</Button>
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "unpublish" })}>Unpublish</Button>
-            {!pack.assignmentCount && !pack.hasLaterVersion && <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "delete" })}>Delete</Button>}
+            <p className="basis-full text-xs text-muted-foreground">To delete a published pack, unpublish it first.</p>
           </div>}
           {pack.status === "WITHDRAWN" && <div className="mt-3 flex flex-wrap gap-2">
             {!pack.assignmentCount && !pack.hasLaterVersion && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirmPack({ pack, kind: "reopen" })}>Edit again</Button>}
