@@ -181,6 +181,15 @@ export function EmployeesWorkspace() {
       setEditing(false);
     });
   }
+  const panelOpen = Boolean(detail || editing);
+  const closePanel = () => { setEditing(false); setDetail(null); setNotice(""); };
+  useEffect(() => {
+    // On phones the employee panel is a floating sheet: keep the page behind it still.
+    if (!panelOpen || typeof window === "undefined" || window.innerWidth >= 1280) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [panelOpen]);
   const c = detail?.onboardingCase;
   const pendingReviews = c?.assignments.filter(a => ["EXTERNAL_SUBMITTED", "SUBMITTED"].includes(a.status)).length ?? 0;
   return (
@@ -193,7 +202,7 @@ export function EmployeesWorkspace() {
         </p>
         <a href="/api/v1/exports/axa-enrolment.xlsx" download
           className="mt-3 inline-flex min-h-10 items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
-          Download AXA HMO enrolment sheet (approved forms)
+          Download AXA HMO sheet (approved forms)
         </a>
       </div>
       {error && (
@@ -324,7 +333,20 @@ export function EmployeesWorkspace() {
             </div>
           </div>
         </section>
-        <section className="min-w-0 space-y-5 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+        {(detail || editing) && (
+          <button type="button" aria-label="Close employee panel" onClick={closePanel}
+            className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] xl:hidden" />
+        )}
+        <section className={`min-w-0 space-y-5 rounded-xl border bg-card p-4 shadow-sm sm:p-6 ${detail || editing
+          ? "max-xl:fixed max-xl:inset-x-0 max-xl:bottom-0 max-xl:z-50 max-xl:max-h-[92dvh] max-xl:overflow-y-auto max-xl:rounded-b-none max-xl:rounded-t-3xl max-xl:border-x-0 max-xl:border-b-0 max-xl:pb-[calc(2rem+env(safe-area-inset-bottom))] max-xl:shadow-2xl"
+          : "max-xl:hidden"}`}>
+          {(detail || editing) && (
+            <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between bg-card/95 px-4 pb-2 pt-3 backdrop-blur sm:-mx-6 sm:px-6 xl:hidden">
+              <span aria-hidden="true" className="mx-auto h-1.5 w-12 rounded-full bg-muted-foreground/30 absolute left-1/2 top-2 -translate-x-1/2" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{editing ? "Employee record" : "Employee"}</span>
+              <Button type="button" size="sm" variant="outline" onClick={closePanel}>Close</Button>
+            </div>
+          )}
           {!detail && !editing && (
             <p className="text-muted-foreground">
               Select an employee or create a record to get started.
