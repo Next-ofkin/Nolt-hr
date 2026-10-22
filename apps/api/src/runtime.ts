@@ -30,12 +30,14 @@ export function runtimeSettings(env: NodeJS.ProcessEnv) {
       throw new Error(
         "Hosted staging requires real Supabase Auth configuration.",
       );
+    // The project is whatever the owner configured, but the id and the address must agree,
+    // so a typo or a copied setting can never point the API at a different project.
     if (
-      env.SUPABASE_PROJECT_REF !== "llslubzdkdnvhbatmfug" ||
-      env.SUPABASE_URL !== "https://llslubzdkdnvhbatmfug.supabase.co"
+      !/^[a-z0-9]{20}$/.test(env.SUPABASE_PROJECT_REF ?? "") ||
+      env.SUPABASE_URL !== `https://${env.SUPABASE_PROJECT_REF}.supabase.co`
     )
       throw new Error(
-        "Staging must use the approved development Supabase project.",
+        "SUPABASE_PROJECT_REF must be the 20-character project id and SUPABASE_URL must be https://<project id>.supabase.co.",
       );
     if (Buffer.from(env.AUTH_ENCRYPTION_KEY ?? "", "base64").length !== 32)
       throw new Error(

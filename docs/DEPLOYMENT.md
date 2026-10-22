@@ -2,6 +2,8 @@
 
 Updated 21 October 2026. This is how NOLT HR runs today. It replaces the earlier Railway and Vercel set-up (see [superseded notes](development/RAILWAY_STAGING.md)).
 
+> Taking this over on your own accounts? Start with [FRESH_INSTALL.md](FRESH_INSTALL.md).
+
 ## What runs where
 
 ```text

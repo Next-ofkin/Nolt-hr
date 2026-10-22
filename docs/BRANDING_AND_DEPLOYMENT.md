@@ -23,11 +23,7 @@ Other brand assets already in the app: `apps/web/src/app/icon.svg` (site icon) a
 
 ## Running a separate copy (handover)
 
-1. Fork or copy the repository into the new owner's GitHub account.
-2. Create their own Supabase project and apply every migration in `database/migrations` in order with `npm run db:migrate`, using the migration owner connection. Never reuse the NOLT production project.
-3. Prepare a VPS and follow [DEPLOYMENT.md](DEPLOYMENT.md) with their domain, keys and branding.
-4. In Supabase Authentication, set the Site URL and redirect list to their site only. Set up their own verified email sender in Resend.
-5. Confirm API readiness, login with MFA, authorisation, an onboarding journey end to end, and backups, before real users are invited.
+Follow **[FRESH_INSTALL.md](FRESH_INSTALL.md)**. It covers the accounts to create, a one-command database installer for a new Supabase project, the server settings, first sign-in and the Developer account. Never reuse the NOLT production project.
 
 ## Existing NOLT hosting
 

@@ -656,3 +656,10 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Guarantor reminders: late means no reply 2 days after the email went out (unopened) or 3 days (opened, not finished). The employee's card shows "Waiting N days" and a "Send a reminder" button (it sends a fresh link; the old one stops). HR sees a "late" tag in the guarantor panel. No automatic emails to guarantors.
 - [x] Bell links open the right screen: `/?open=<form id>` for the employee, `/employees?employee=<id>` for HR.
 - [x] Tests: `tests/notifications.test.ts`, `scripts/test-notifications-db.mjs` (disposable database). Also fixed an outdated guarantor-email test fixture.
+
+## 2026-10-22 — Installable on a new owner's accounts
+- [x] Found that the code only worked with the original Supabase project: the API refused any other project, and three migrations plus one setup file had the project address written into database functions. Fixed: the API accepts any project when the id and address agree. The installer rewrites the address in the functions for the new project (it never edits applied migrations).
+- [x] Found that migrations alone did not give the app's database user its permissions (the first eight tables were set up by a one-off script, several later tables only in production). Added `database/hosted-backend-access.sql`, copied from the live database on 22 October 2026, and `database/verify-supabase.sql` now counts policies instead of expecting 25.
+- [x] `scripts/install-fresh.mjs` installs a new, empty Supabase project in one command; `scripts/test-install-fresh.mjs` (`npm run test:install`) rehearses it on a throwaway PostgreSQL that imitates Supabase (with and without Supabase's automatic security setting). Not yet run against a real new Supabase project.
+- [x] `deploy/vps/setup.sh` takes the repository address; Docker Compose passes the branding settings through. `scripts/developer-bootstrap.mjs` accepts any project id that matches the database address.
+- [x] New runbook: [FRESH_INSTALL.md](FRESH_INSTALL.md). Uploads need a working malware scanner (Cloudmersive or ClamAV); without one they are refused.

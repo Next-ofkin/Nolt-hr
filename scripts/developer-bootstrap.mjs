@@ -58,11 +58,11 @@ try {
   const role = (await db.query("SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user")).rows[0];
   if (!role || role.name === "nolt_app")
     throw new Error("An approved privileged database owner is required; never use nolt_app.");
-  if (env.SUPABASE_PROJECT_REF !== "llslubzdkdnvhbatmfug")
-    throw new Error("SUPABASE_PROJECT_REF must identify the approved Supabase project.");
+  if (!/^[a-z0-9]{20}$/.test(env.SUPABASE_PROJECT_REF ?? ""))
+    throw new Error("SUPABASE_PROJECT_REF must be the 20-character Supabase project id.");
   const host = new URL(env.DIRECT_DATABASE_URL).hostname;
-  if (!host.endsWith(".pooler.supabase.com") || !decodeURIComponent(new URL(env.DIRECT_DATABASE_URL).username).endsWith(".llslubzdkdnvhbatmfug"))
-    throw new Error("The approved hosted Supabase pooler is required.");
+  if (!host.endsWith(".pooler.supabase.com") || !decodeURIComponent(new URL(env.DIRECT_DATABASE_URL).username).endsWith("." + env.SUPABASE_PROJECT_REF))
+    throw new Error("The Supabase pooler of the configured project is required.");
   await db.query("BEGIN");
   try {
     await db.query("SELECT set_config('nolt.bootstrap_project_ref', $1, true)", [env.SUPABASE_PROJECT_REF]);
