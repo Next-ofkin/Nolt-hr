@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./auth-provider";
 import { AccountMenu } from "./account-menu";
+import { NotificationBell } from "./notification-bell";
 import { brand } from "@/lib/brand";
 import {
   BriefcaseBusiness, ChevronRight, FileStack, LayoutDashboard,
@@ -99,9 +100,12 @@ export function WorkspaceShell({
               </h1>
             </div>
           </div>
-          <div className="hidden items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground sm:flex">
-            <PanelLeftClose size={15} aria-hidden="true" />
-            {session?.name ?? "NOLT HR"}
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <div className="hidden items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground sm:flex">
+              <PanelLeftClose size={15} aria-hidden="true" />
+              {session?.name ?? "NOLT HR"}
+            </div>
           </div>
         </header>
         <main id="main-content" className="mx-auto w-full max-w-[1550px] min-w-0 flex-1 px-4 py-5 pb-32 sm:px-7 sm:py-8 sm:pb-32 lg:px-9 lg:pb-8">

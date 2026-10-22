@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { idFromSearch } from "@/lib/notices";
 import { api, errorMessage } from "@nolt/api-client";
 import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
@@ -181,6 +183,15 @@ export function EmployeesWorkspace() {
       setEditing(false);
     });
   }
+  // The bell links here with ?employee=<id>: open that person once per link.
+  const wanted = idFromSearch(useSearchParams().toString(), "employee");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!wanted || !session || opened.current === wanted) return;
+    opened.current = wanted;
+    void select(wanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, session]);
   const panelOpen = Boolean(detail || editing);
   const closePanel = () => { setEditing(false); setDetail(null); setNotice(""); };
   useEffect(() => {

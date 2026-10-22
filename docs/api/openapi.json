@@ -4035,6 +4035,37 @@
         ]
       }
     },
+    "/api/v1/me/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/api/v1/employees/{id}/invitations": {
       "get": {
         "operationId": "InvitationsController_list",
@@ -7577,6 +7608,56 @@
           "onboardingCase"
         ]
       },
+      "NoticeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "action",
+              "late",
+              "info"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "detail",
+          "href"
+        ]
+      },
+      "NotificationsDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeDto"
+            }
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ]
+      },
       "InvitationDto": {
         "type": "object",
         "properties": {
@@ -7829,6 +7910,13 @@
           "correctionReason": {
             "type": "string",
             "nullable": true
+          },
+          "waitingDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "late": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -7840,7 +7928,9 @@
           "email",
           "fullName",
           "slot",
-          "correctionReason"
+          "correctionReason",
+          "waitingDays",
+          "late"
         ]
       },
       "ExternalRequestsDto": {

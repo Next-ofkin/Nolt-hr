@@ -7,7 +7,7 @@ import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { headsUpMessage, latestForSlot, progressLabel, stillSending, viewOf, type SlotItem } from "@/lib/guarantor-slots";
+import { headsUpMessage, latestForSlot, progressLabel, stillSending, viewOf, waitingNote, type SlotItem } from "@/lib/guarantor-slots";
 
 /** One card per guarantor. Type a name and an email, tap Send. Nothing else to save. */
 export function GuarantorSlots({ assignmentId, recipient }: { assignmentId: string; recipient: string }) {
@@ -58,7 +58,7 @@ function SlotCard({ slot, total, word, lower, assignmentId, recipient, item }: {
   const label = total > 1 ? `${word} ${slot}` : word;
   const showForm = view === "EMPTY" || view === "CHANGES_REQUIRED" || editing;
 
-  async function send(replace: boolean, details?: { name: string; email: string }) {
+  async function send(replace: boolean, details?: { name: string; email: string }, reminder = false) {
     if (!session) return;
     const body = {
       slot,
@@ -81,7 +81,7 @@ function SlotCard({ slot, total, word, lower, assignmentId, recipient, item }: {
       if (r.error) throw Error(errorMessage(r.error));
       key.current = null;
       setEditing(false);
-      setNotice("Queued. The email goes out in a moment.");
+      setNotice(reminder ? "Reminder queued. They get a fresh link, and the old one stops working." : "Queued. The email goes out in a moment.");
       await qc.invalidateQueries({ queryKey: ["external-requests", assignmentId] });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send. Try again.");
@@ -131,6 +131,16 @@ function SlotCard({ slot, total, word, lower, assignmentId, recipient, item }: {
           <p className="font-medium">HR feedback</p>
           <p className="mt-1 whitespace-pre-wrap break-words">{item.correctionReason}</p>
         </div>
+      )}
+      {view === "IN_PROGRESS" && !editing && item && (item.late || waitingNote(item)) && (
+        item.late ? (
+          <div className="space-y-2 rounded-xl border border-amber-300 bg-white p-3 text-sm">
+            <p><b>{item.fullName.split(" ")[0]} has not replied.</b> {waitingNote(item)}. A quick call or message, then a reminder, usually does it.</p>
+            <Button type="button" className="h-11 w-full sm:w-auto" disabled={busy} onClick={() => void send(true, { name: item.fullName, email: item.email }, true)}>
+              {busy ? "Sending…" : "Send a reminder"}
+            </Button>
+          </div>
+        ) : <p className="text-xs font-medium text-muted-foreground">{waitingNote(item)}</p>
       )}
       {view === "WAITING_HR" && <p className="text-sm">Your {lower} sent the form. HR will review it.</p>}
       {view === "APPROVED" && <p className="text-sm">HR approved this {lower}. Nothing more to do here.</p>}

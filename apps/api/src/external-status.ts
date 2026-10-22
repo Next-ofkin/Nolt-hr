@@ -42,3 +42,21 @@ export function externalAssignmentStatus(
   if (slots.some((s) => s !== "NONE")) return "DRAFT";
   return "NOT_STARTED";
 }
+
+// How long we wait before calling a guarantor "late". The count starts when the email went out.
+export const LATE_UNOPENED_DAYS = 2; // they have not even opened the email
+export const LATE_OPENED_DAYS = 3; // they opened the form but have not finished
+const DAY = 24 * 60 * 60 * 1000;
+
+type Waiting = { state: string; sentAt?: Date | null; createdAt?: Date };
+/** Whole days since the email went out, only while we are still waiting for the guarantor. */
+export function waitingDays(r: Waiting, now = new Date()): number | null {
+  if (!["SENT", "UNCERTAIN", "ACTIVE"].includes(r.state)) return null;
+  const since = r.sentAt ?? r.createdAt;
+  return since ? Math.max(0, Math.floor((now.getTime() - since.getTime()) / DAY)) : null;
+}
+export function isLate(r: Waiting, now = new Date()): boolean {
+  const days = waitingDays(r, now);
+  if (days === null) return false;
+  return days >= (r.state === "ACTIVE" ? LATE_OPENED_DAYS : LATE_UNOPENED_DAYS);
+}

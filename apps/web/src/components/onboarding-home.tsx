@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { idFromSearch } from "@/lib/notices";
 import {
   api,
   errorMessage,
@@ -64,6 +66,15 @@ function EmployeeHome() {
       setPackRefresh(value => value + 1);
     }
   }, [liveOnboarding.data]);
+  // The bell links here with ?open=<form id>: open that form once, if it is one the employee fills in.
+  const wanted = idFromSearch(useSearchParams().toString(), "open");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!wanted || !data || opened.current === wanted) return;
+    opened.current = wanted;
+    const a = data.onboardingCase?.assignments.find((x) => x.id === wanted);
+    if (a && a.recipient === "EMPLOYEE" && ["NOT_STARTED", "DRAFT", "CHANGES_REQUIRED"].includes(a.status)) setResponseId(wanted);
+  }, [wanted, data]);
   const load = useCallback(async () => {
     setError("");
     setBusy(true);

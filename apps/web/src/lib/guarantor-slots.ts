@@ -2,6 +2,7 @@
 export type SlotItem = {
   id: string; slot: number; state: string; email: string; fullName: string;
   expiresAt: string; correctionReason: string | null;
+  waitingDays?: number | null; late?: boolean;
 };
 export type SlotView =
   | "EMPTY" // nothing sent yet, or the last one was cancelled, expired or failed
@@ -52,4 +53,11 @@ export function headsUpMessage(o: { guarantorName: string; employeeName: string;
     `You will get an email from NOLT Finance titled "${me} named you as a ${role} - NOLT Finance". Please open it and tap "Open form". The link starts with https://${o.host}.`,
     `It takes about 10 minutes. Keep your phone camera ready for a photo of your ID and proof of address, and your finger for the signature. Thank you!`,
   ].join("\n\n");
+}
+
+/** "Waiting 3 days" for the card, only once a day has gone by. */
+export function waitingNote(item: Pick<SlotItem, "waitingDays" | "state">): string {
+  const d = item.waitingDays ?? 0;
+  if (d < 1) return "";
+  return `Waiting ${d} day${d === 1 ? "" : "s"}`;
 }
