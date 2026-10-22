@@ -19,6 +19,7 @@
     "build": "npm run contracts:build && npm run build -w @nolt/api && npm run build -w @nolt/web",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:domain": "node scripts/test-onboarding-db.mjs",
+    "test:install": "node scripts/test-install-fresh.mjs",
     "test:e2e": "playwright test",
     "api:generate": "npm run build -w @nolt/api && node apps/api/dist/export-openapi.js && openapi-typescript docs/api/openapi.json -o packages/api-client/src/schema.d.ts",
     "contracts:build": "npm run build -w @nolt/form-schemas",

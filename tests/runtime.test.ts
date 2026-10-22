@@ -43,6 +43,15 @@ test("hosted staging rejects unsafe auth, origins, owner connections and unverif
         "postgresql://nolt_app.example:fixture@pool.example.test/db?sslmode=require",
     },
     { SUPABASE_PROJECT_REF: "unapproved" },
+    { SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co" }, // address and id disagree
   ])
     assert.throws(() => runtimeSettings({ ...staging(), ...change }));
+});
+
+test("any Supabase project is accepted when the id and the address agree", () => {
+  const ref = "abcdefghijklmnopqrst";
+  assert.deepEqual(
+    runtimeSettings({ ...staging(), SUPABASE_PROJECT_REF: ref, SUPABASE_URL: `https://${ref}.supabase.co` }),
+    { host: "0.0.0.0", port: 8080 },
+  );
 });

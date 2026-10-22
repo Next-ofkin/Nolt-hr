@@ -37,7 +37,8 @@ DO $$ BEGIN
  OR has_table_privilege('nolt_app','public._prisma_migrations','SELECT')
  OR has_schema_privilege('nolt_app','public','CREATE')
  THEN RAISE EXCEPTION 'Backend grants incorrect'; END IF;
- IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND policyname='nolt_backend' AND roles=ARRAY['nolt_app']::name[]) <> 25
+ IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND roles=ARRAY['nolt_app']::name[] AND qual='true' AND with_check='true')
+    <> (SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename<>'_prisma_migrations')
  THEN RAISE EXCEPTION 'Backend policies incomplete'; END IF;
 END $$;
 SET LOCAL ROLE anon;

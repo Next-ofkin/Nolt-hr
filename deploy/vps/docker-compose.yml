@@ -22,6 +22,13 @@ services:
       dockerfile: Dockerfile.web
       args:
         API_ORIGIN: http://api:8080
+        # Optional branding, read from deploy/vps/.env when the image is built (see docs/BRANDING_AND_DEPLOYMENT.md).
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
+        NEXT_PUBLIC_PRODUCT_NAME: ${NEXT_PUBLIC_PRODUCT_NAME:-}
+        NEXT_PUBLIC_BRAND_TAGLINE: ${NEXT_PUBLIC_BRAND_TAGLINE:-}
+        NEXT_PUBLIC_BRAND_DESCRIPTION: ${NEXT_PUBLIC_BRAND_DESCRIPTION:-}
+        NEXT_PUBLIC_BRAND_PRIMARY: ${NEXT_PUBLIC_BRAND_PRIMARY:-}
+        NEXT_PUBLIC_BRAND_LOGO_PATH: ${NEXT_PUBLIC_BRAND_LOGO_PATH:-}
     environment:
       PORT: "8080"
       NODE_ENV: production
