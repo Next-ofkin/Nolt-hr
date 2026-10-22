@@ -900,6 +900,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/employees/{id}/invitations": {
         parameters: {
             query?: never;
@@ -1614,6 +1630,18 @@ export interface components {
             employee: components["schemas"]["EmployeeDto"] | null;
             onboardingCase: components["schemas"]["CaseDto"] | null;
         };
+        NoticeDto: {
+            id: string;
+            /** @enum {string} */
+            kind: "action" | "late" | "info";
+            title: string;
+            detail: string;
+            href: string;
+        };
+        NotificationsDto: {
+            count: number;
+            items: components["schemas"]["NoticeDto"][];
+        };
         InvitationDto: {
             id: string;
             employeeId: string;
@@ -1684,6 +1712,8 @@ export interface components {
             fullName: string;
             slot: number;
             correctionReason: string | null;
+            waitingDays: number | null;
+            late: boolean;
         };
         ExternalRequestsDto: {
             items: components["schemas"]["ExternalRequestDto"][];
@@ -4358,6 +4388,33 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthErrorDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsDto"];
+                };
+            };
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

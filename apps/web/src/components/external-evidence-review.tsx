@@ -12,7 +12,7 @@ type Submission = {
 type Detail = {
   assignmentId: string; title: string; recipient: string;
   required: number;
-  slots: { slot: number; status: string; fullName: string | null; email: string | null }[];
+  slots: { slot: number; status: string; fullName: string | null; email: string | null; waitingDays?: number | null; late?: boolean }[];
   fields: { id: string; label: string; type?: string }[];
   items: Submission[];
 };
@@ -109,6 +109,7 @@ export function ExternalEvidenceReview({
             {s.fullName ? `${s.fullName} (${s.email}) — ` : ""}
             {({ NONE: "not sent yet", IN_PROGRESS: "sent, not submitted yet", SUBMITTED: "submitted, needs your review",
               CHANGES_REQUIRED: "corrections requested", APPROVED: "approved" } as Record<string, string>)[s.status] ?? s.status}
+            {s.status === "IN_PROGRESS" && s.late && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">late: waiting {s.waitingDays ?? 0} day{s.waitingDays === 1 ? "" : "s"}</span>}
           </li>)}
         </ul>
       </div>

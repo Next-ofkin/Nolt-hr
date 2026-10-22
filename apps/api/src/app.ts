@@ -53,6 +53,7 @@ import {
   MyOnboardingController,
 } from "./employees.js";
 import { FilesController, FilesService, FilesStorage } from "./files.js";
+import { NotificationsController, NotificationsService } from "./notifications.js";
 @Controller("health")
 @ApiTags("Health")
 class HealthController {
@@ -84,6 +85,7 @@ class HealthController {
     MyPacksController,
     EmployeesController,
     MyOnboardingController,
+    NotificationsController,
     InvitationsController,
     InvitationActivationController,
     FilesController,
@@ -109,6 +111,7 @@ class HealthController {
     FormsService,
     PacksService,
     EmployeesService,
+    NotificationsService,
     EmployeesGuard,
     InvitationsService,
     FilesService,

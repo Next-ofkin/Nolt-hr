@@ -649,3 +649,10 @@ Latest acceptance, 14 October 2026: migration 005 and private verified-account l
 - [x] Fixed: HR got 403 opening a guarantor's photo, signature or documents (`can_review_assignment` only covers employee forms). Guarantor/reference files now open for the same HR accounts that review guarantor evidence (`forms.manage`); the employee still cannot open them. Code only, no migration. Review screen shows pictures inline and Open/Download links for every file.
 - [x] Guarantors now see a Thank-you screen after submitting.
 
+
+## 2026-10-22 — Notification bell and guarantor reminders
+- [x] Bell icon in the top bar for employees and HR with a red count. It lists what needs attention right now and links to it. Nothing is stored: a line disappears when the task is done (`GET /api/v1/me/notifications`, rules in `apps/api/src/notification-rules.ts`). Refreshes every minute and when the tab is focused. Lines marked "info" (for example "guarantor sent the form") are shown but not counted.
+- [x] Employee sees: forms to fill or finish, changes HR asked for, guarantors to add, late/expired/failed guarantor emails. HR sees: employee forms waiting for review, guarantor files waiting for review, late guarantors.
+- [x] Guarantor reminders: late means no reply 2 days after the email went out (unopened) or 3 days (opened, not finished). The employee's card shows "Waiting N days" and a "Send a reminder" button (it sends a fresh link; the old one stops). HR sees a "late" tag in the guarantor panel. No automatic emails to guarantors.
+- [x] Bell links open the right screen: `/?open=<form id>` for the employee, `/employees?employee=<id>` for HR.
+- [x] Tests: `tests/notifications.test.ts`, `scripts/test-notifications-db.mjs` (disposable database). Also fixed an outdated guarantor-email test fixture.

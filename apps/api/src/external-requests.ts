@@ -68,7 +68,7 @@ import {
   permissionsFor,
 } from "./security.js";
 import { dto as formDto, FormDto } from "./forms.js";
-import { latestPerSlot, slotStatus } from "./external-status.js";
+import { isLate, latestPerSlot, slotStatus, waitingDays } from "./external-status.js";
 import { FilesService, SignatureResultDto, StoredFileDto, UploadIntentDto } from "./files.js";
 
 export const createExternalSchema = z
@@ -126,6 +126,10 @@ export class ExternalRequestDto {
   @ApiProperty({ type: String }) fullName!: string;
   @ApiProperty({ type: Number }) slot!: number;
   @ApiProperty({ type: String, nullable: true }) correctionReason!: string | null;
+  /** Whole days since the email went out, while we are still waiting for them. */
+  @ApiProperty({ type: Number, nullable: true }) waitingDays!: number | null;
+  /** True once they have been quiet for longer than we allow (see external-status.ts). */
+  @ApiProperty({ type: Boolean }) late!: boolean;
 }
 export class ExternalRequestsDto {
   @ApiProperty({ type: [ExternalRequestDto] }) items!: ExternalRequestDto[];
@@ -158,6 +162,8 @@ function dto(r: ExternalRequest & { evidenceReview?: { decision: string; reason:
     correctionReason: r.evidenceReview?.reason ?? null,
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
+    waitingDays: r.expiresAt > new Date() ? waitingDays(r) : null,
+    late: r.expiresAt > new Date() && isLate(r),
   };
 }
 @Injectable()
@@ -1083,6 +1089,8 @@ export class ExternalEvidenceReviewService {
             status: slotStatus(r),
             fullName: r?.fullName ?? null,
             email: r?.email ?? null,
+            waitingDays: r && r.expiresAt > new Date() ? waitingDays(r) : null,
+            late: !!r && r.expiresAt > new Date() && isLate(r),
           };
         }),
         title: assignment.formVersion.title,

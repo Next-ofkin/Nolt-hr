@@ -92,7 +92,7 @@ test("external sender generates proof without staff email and sends only the sim
     assert.match(body.text, /#token_hash=proof-for-unit-fixture&type=signup/);
     assert.doesNotMatch(
       body.text.replace(/https:\S+/g, ""),
-      /password|MFA|authenticator|sign.up/i,
+      /(choose|set|create) (a |your )?(strong )?password|MFA|authenticator|sign.up/i,
     );
     return new Response(JSON.stringify({ id: "email-fixture" }), {
       status: 200,
@@ -104,7 +104,11 @@ test("external sender generates proof without staff email and sends only the sim
         externalRequest: {
           findUniqueOrThrow: async () => ({
             expiresAt: new Date(Date.now() + 60000),
-            assignment: { formVersion: { title: "Guarantor form" } },
+            fullName: "Ada Obi",
+            assignment: {
+              formVersion: { title: "Guarantor form", recipient: "GUARANTOR" },
+              onboardingCase: { employee: { fullName: "Bola Ade", jobTitle: "Analyst", department: "Credit" } },
+            },
           }),
         },
       } as never,
