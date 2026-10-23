@@ -112,9 +112,9 @@ export function dtoWithUse(row: {
  * Permanent draft deletion is allowed only for a form with exactly one
  * never-published version and no assignment history.
  */
-/** A form can be deleted only while none of its versions was ever sent to an employee or put in a pack. */
-export function canDeleteForm(assignmentCount: number, packItemCount: number): boolean {
-  return assignmentCount === 0 && packItemCount === 0;
+/** A form is soft-deleted, so being sent to employees no longer blocks it. It must first leave every live pack, so new assignments of that pack stay whole. */
+export function canDeleteForm(livePackItemCount: number): boolean {
+  return livePackItemCount === 0;
 }
 export function canDeleteUnpublishedDraft(
   versions: readonly { status: string }[],
@@ -149,9 +149,9 @@ export class FormsService {
   private async usage(formIds: string[]) {
     const [a, p, av, pv] = await Promise.all([
       this.db.formAssignment.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
-      this.db.packItem.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formId"], where: { formId: { in: formIds }, pack: { deletedAt: null } } }),
       this.db.formAssignment.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
-      this.db.packItem.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds }, pack: { deletedAt: null } } }),
     ]);
     const forms = new Set([...a, ...p].map((r) => r.formId));
     const versions = new Set([...av, ...pv].map((r) => r.formVersionId));
@@ -164,6 +164,7 @@ export class FormsService {
   }
   async list() {
     const forms = await this.db.form.findMany({
+      where: { deletedAt: null },
       take: 100,
       orderBy: { createdAt: "desc" },
       include: { versions: { orderBy: { version: "desc" }, take: 1 } },
@@ -175,7 +176,7 @@ export class FormsService {
   }
   async listPublished() {
     const versions = await this.db.formVersion.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: "PUBLISHED", form: { deletedAt: null } },
       take: 500,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
@@ -299,28 +300,20 @@ export class FormsService {
       return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
-  /** Delete a form and all its versions, but only if no version was ever used. */
+  /** Soft-delete a form: it disappears from lists and new assignments; anything already sent or filled in is kept. */
   async deleteForm(actorId: string, formId: string) {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;
       const form = await tx.form.findUnique({ where: { id: formId }, include: { versions: true } });
-      if (!form) throw new NotFoundException("Form not found.");
-      const [assignments, packItems] = await Promise.all([
-        tx.formAssignment.count({ where: { formId } }),
-        tx.packItem.count({ where: { formId } }),
-      ]);
+      if (!form || form.deletedAt) throw new NotFoundException("Form not found.");
+      const livePackItems = await tx.packItem.count({ where: { formId, pack: { deletedAt: null } } });
       if (form.versions.some((v) => v.status === "PUBLISHED"))
         throw new ConflictException("This form is published. Unpublish it first, then delete it.");
-      if (!canDeleteForm(assignments, packItems))
-        throw new ConflictException(
-          packItems > 0
-            ? "This form is inside a pack, so it cannot be deleted. You can still edit it: packs use the newest published version."
-            : "This form has already been sent to an employee, so its record is kept. Unpublish it instead.",
-        );
+      if (!canDeleteForm(livePackItems))
+        throw new ConflictException("This form is inside a pack. Delete or change that pack first, or edit this form instead.");
       const latest = form.versions.reduce((a, b) => (b.version > a.version ? b : a));
-      await tx.formVersion.deleteMany({ where: { formId } });
-      await tx.form.delete({ where: { id: formId } });
-      await this.record(tx, actorId, "FORM_DELETED", formId, { title: latest.title, versions: form.versions.length });
+      await tx.form.update({ where: { id: formId }, data: { deletedAt: new Date(), deletedBy: actorId } });
+      await this.record(tx, actorId, "FORM_DELETED", formId, { title: latest.title, versions: form.versions.length, soft: true });
       return { deleted: true };
     });
   }

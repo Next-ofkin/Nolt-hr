@@ -472,6 +472,7 @@ export class EmployeesService {
     const rows = await this.db.formVersion.findMany({
       where: {
         status: "PUBLISHED",
+        form: { deletedAt: null },
         ...(q.q
           ? { title: { contains: q.q, mode: "insensitive" as const } }
           : {}),

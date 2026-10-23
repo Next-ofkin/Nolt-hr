@@ -34,6 +34,7 @@ export class PacksService {
 
   async list() {
     const packs = await this.db.packTemplate.findMany({
+      where: { deletedAt: null },
       take: 100, orderBy: { createdAt: "desc" }, include: this.useInclude,
     });
     return packs.map(p => this.withUse(p));
@@ -41,7 +42,7 @@ export class PacksService {
 
   async get(id: string) {
     const pack = await this.db.packTemplate.findUnique({ where: { id }, include: this.useInclude });
-    if (!pack) throw new NotFoundException("Pack not found.");
+    if (!pack || pack.deletedAt) throw new NotFoundException("Pack not found.");
     return this.withUse(pack);
   }
 
@@ -92,18 +93,17 @@ export class PacksService {
     });
   }
 
-  /** Delete a pack that was never given to anyone. */
+  /** Soft-delete a pack: hidden from lists and new assignments; employees who already have it keep it. */
   async remove(actorId: string, id: string) {
     return this.db.$transaction(async tx => {
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
       if (!locked.length) throw new NotFoundException("Pack not found.");
-      const current = await tx.packTemplate.findUnique({ where: { id }, select: { status: true } });
-      if (current?.status === "PUBLISHED")
+      const current = await tx.packTemplate.findUnique({ where: { id }, select: { status: true, name: true, versionNumber: true, deletedAt: true } });
+      if (!current || current.deletedAt) throw new NotFoundException("Pack not found.");
+      if (current.status === "PUBLISHED")
         throw new ConflictException("This pack is published. Unpublish it first, then delete it.");
-      const pack = await this.toDraft(tx, id);
-      await tx.packItem.deleteMany({ where: { packId: id } });
-      await tx.packTemplate.delete({ where: { id } });
-      await tx.auditEvent.create({ data: { actorId, action: "PACK_DELETED", targetId: id, metadata: { name: pack.name, versionNumber: pack.versionNumber } } });
+      await tx.packTemplate.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actorId } });
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_DELETED", targetId: id, metadata: { name: current.name, versionNumber: current.versionNumber, soft: true } } });
       await tx.outboxEvent.create({ data: { type: "PACK_DELETED", targetId: id } });
       return { deleted: true };
     });
@@ -270,6 +270,7 @@ export class PacksService {
         const pack = await tx.packTemplate.findUniqueOrThrow({
           where: { id: packId }, include: { items: { orderBy: { position: "asc" } } },
         });
+        if (pack.deletedAt) throw new NotFoundException("Pack not found.");
         if (pack.status !== "PUBLISHED" || pack.items.length === 0)
           throw new ConflictException("Only published nonempty packs can be assigned.");
         // A pack family can have older published versions assigned historically,

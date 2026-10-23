@@ -237,7 +237,7 @@ export function PacksWorkspace() {
             <DialogTitle>{confirmPack?.kind === "delete" ? "Delete this pack?" : confirmPack?.kind === "reopen" ? "Edit this pack again?" : "Unpublish this pack?"}</DialogTitle>
             <DialogDescription>
               {confirmPack?.kind === "delete"
-                ? `Delete "${confirmPack.pack.name}" permanently? It has never been given to an employee. This cannot be undone.`
+                ? `Delete "${confirmPack.pack.name}"? It is removed from your lists and can no longer be assigned. Employees who already have it keep it.`
                 : confirmPack?.kind === "reopen"
                   ? "The pack goes back to a draft so you can change its forms, then publish it again."
                   : "This pack can no longer be assigned to new employees. Employees who already have it keep it."}

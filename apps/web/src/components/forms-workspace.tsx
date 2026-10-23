@@ -680,7 +680,7 @@ function FormEditor({
         throw new Error(errorMessage(error));
       }
       if (operation === "delete") {
-        onNotice({ kind: "success", text: "Form permanently deleted." });
+        onNotice({ kind: "success", text: "Form deleted. Anything already sent to employees is kept." });
         onBack();
       } else {
         onChange(normaliseForm(await response.json()));
@@ -717,7 +717,7 @@ function FormEditor({
             <DialogTitle>{confirmAction === "delete" ? "Delete this form?" : confirmAction === "reopen" ? "Edit this form again?" : "Unpublish this form?"}</DialogTitle>
             <DialogDescription>
               {confirmAction === "delete"
-                ? "This permanently deletes the form and all of its versions. It has never been sent to an employee or put in a pack. This cannot be undone."
+                ? "The form is removed from your lists and can no longer be assigned. Anything already sent to or filled in by employees is kept exactly as it is."
                 : confirmAction === "reopen"
                   ? "The form goes back to a draft so you can change it, then publish it again. It has never been sent to an employee."
                   : "This version can no longer be assigned to new employees. Anything already sent, with its answers and evidence, remains unchanged."}
