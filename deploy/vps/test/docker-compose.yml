@@ -1,0 +1,47 @@
+# A TEST copy of NOLT HR on the same server, with its own database project and keys.
+# It has no proxy of its own: the live Caddy serves it (see docs/TEST_SITE.md).
+# Run from /opt/nolt-test/deploy/vps/test with:  docker compose -p nolt-test up -d --build
+# Service names are different from the live ones (api-test, web-test) so the two can never be confused.
+services:
+  api-test:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile.api
+    env_file: .env.api
+    environment:
+      PORT: "8080"
+      NODE_ENV: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+  web-test:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile.web
+      args:
+        API_ORIGIN: http://api-test:8080
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
+        NEXT_PUBLIC_PRODUCT_NAME: ${NEXT_PUBLIC_PRODUCT_NAME:-}
+        NEXT_PUBLIC_BRAND_TAGLINE: ${NEXT_PUBLIC_BRAND_TAGLINE:-}
+        NEXT_PUBLIC_BRAND_DESCRIPTION: ${NEXT_PUBLIC_BRAND_DESCRIPTION:-}
+        NEXT_PUBLIC_BRAND_PRIMARY: ${NEXT_PUBLIC_BRAND_PRIMARY:-}
+        NEXT_PUBLIC_BRAND_LOGO_PATH: ${NEXT_PUBLIC_BRAND_LOGO_PATH:-}
+    environment:
+      PORT: "8080"
+      NODE_ENV: production
+    depends_on:
+      api-test:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+networks:
+  # The live Caddy's network, so it can reach web-test by name. Only web-test joins it.
+  proxy:
+    external: true
+    name: vps_default
