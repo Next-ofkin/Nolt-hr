@@ -10,7 +10,7 @@ import {
   PackageOpen, PanelLeftClose, ShieldCheck, UserRound,
 } from "lucide-react";
 
-type Page = "forms" | "employees" | "packs";
+type Page = "forms" | "formlib" | "employees" | "packs";
 type NavItem = { href: string; label: string; short: string; page: Page; icon: typeof FileStack };
 
 export function WorkspaceShell({
@@ -26,8 +26,8 @@ export function WorkspaceShell({
   const items: NavItem[] = [
     ...(isDeveloper ? [{ href: "/", label: "Developer overview", short: "Overview", page: "forms" as Page, icon: LayoutDashboard }] : []),
     ...(session?.permissions.includes("employees.manage") ? [{ href: "/employees", label: "Employees", short: "Staff", page: "employees" as Page, icon: BriefcaseBusiness }] : []),
-    ...(!isDeveloper ? [{ href: "/", label: session?.permissions.includes("profile.own") ? "My onboarding" : "Forms", short: session?.permissions.includes("profile.own") ? "Onboarding" : "Forms", page: "forms" as Page, icon: FileStack }] : []),
-    ...(session?.permissions.includes("forms.manage") && !isDeveloper ? [{ href: "/packs", label: "Onboarding packs", short: "Packs", page: "packs" as Page, icon: PackageOpen }] : []),
+    ...(session?.permissions.includes("profile.own") ? [{ href: "/", label: "My onboarding", short: "Onboarding", page: "forms" as Page, icon: FileStack }] : []),
+    ...(session?.permissions.includes("templates.manage") ? [{ href: "/forms", label: "Forms", short: "Forms", page: "formlib" as Page, icon: FileStack }, { href: "/packs", label: "Onboarding packs", short: "Packs", page: "packs" as Page, icon: PackageOpen }] : []),
   ];
   const onAccount = pathname?.startsWith("/account") ?? false;
 
@@ -96,7 +96,7 @@ export function WorkspaceShell({
             <div className="min-w-0">
               <p className="hidden text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground sm:block">NOLT HR / Workspace</p>
               <h1 className="truncate text-sm font-semibold sm:text-base">
-                {isDeveloper ? "Developer overview" : active === "employees" ? "Employee management" : active === "packs" ? "Onboarding packs" : session?.permissions.includes("profile.own") ? "My onboarding" : "Form management"}
+                {active === "packs" ? "Onboarding packs" : active === "formlib" ? "Forms" : isDeveloper ? "Developer overview" : active === "employees" ? "Employee management" : session?.permissions.includes("profile.own") ? "My onboarding" : "Form management"}
               </h1>
             </div>
           </div>

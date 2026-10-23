@@ -615,7 +615,7 @@ function FormEditor({
       onNotice({
         kind: "success",
         text: publish
-          ? "Version published. Its questions and signing settings are now locked."
+          ? "Saved and live. Employees who have not submitted this form now see this version; submitted forms keep the version they used."
           : "Draft saved to the database.",
       });
     } catch (error) {
@@ -680,7 +680,7 @@ function FormEditor({
         throw new Error(errorMessage(error));
       }
       if (operation === "delete") {
-        onNotice({ kind: "success", text: "Form permanently deleted." });
+        onNotice({ kind: "success", text: "Form deleted. Anything already sent to employees is kept." });
         onBack();
       } else {
         onChange(normaliseForm(await response.json()));
@@ -717,7 +717,7 @@ function FormEditor({
             <DialogTitle>{confirmAction === "delete" ? "Delete this form?" : confirmAction === "reopen" ? "Edit this form again?" : "Unpublish this form?"}</DialogTitle>
             <DialogDescription>
               {confirmAction === "delete"
-                ? "This permanently deletes the form and all of its versions. It has never been sent to an employee or put in a pack. This cannot be undone."
+                ? "The form is removed from your lists and can no longer be assigned. Anything already sent to or filled in by employees is kept exactly as it is."
                 : confirmAction === "reopen"
                   ? "The form goes back to a draft so you can change it, then publish it again. It has never been sent to an employee."
                   : "This version can no longer be assigned to new employees. Anything already sent, with its answers and evidence, remains unchanged."}
@@ -754,9 +754,9 @@ function FormEditor({
               ? record.status === "UNPUBLISHED" && !record.inUse
                 ? "Unpublished. Choose Edit again to change it, or Delete it."
                 : record.inPack
-                  ? "This form is in a pack, so it can't be unpublished or deleted. Choose New version to edit it: packs use the newest published version for new assignments."
+                  ? "This form is in a pack, so it can't be unpublished or deleted. Choose Edit form to change it: packs and employees use the newest live version."
                   : record.inUse
-                    ? "This version has been used, so it is locked. Create a new version to make changes."
+                    ? "This version is live. Choose Edit form to change it, then Save and make live. Employees who have not submitted it will see the new version."
                     : "Unpublish this form to edit it again or delete it."
               : dirty
                 ? "Unsaved changes · save before leaving"
@@ -780,19 +780,19 @@ function FormEditor({
                 <Pencil size={16} /> Edit again
               </Button>
             )}
-            {record.status === "UNPUBLISHED" && !record.formInUse && !record.inPack && (
+            {record.status === "UNPUBLISHED" && !record.inPack && (
               <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
                 <Trash2 size={16} /> Delete
               </Button>
             )}
             <Button onClick={nextVersion} disabled={busy}>
               <CopyPlus size={16} />
-              New version
+              Edit form
             </Button>
             </>
           ) : (
             <>
-              {!record.formInUse && !record.inPack && (
+              {!record.inPack && (
                 <Button variant="destructive" disabled={busy} onClick={() => setConfirmAction("delete")}>
                   <Trash2 size={16} /> Delete
                 </Button>
@@ -811,7 +811,7 @@ function FormEditor({
                 ) : (
                   <Check size={16} />
                 )}
-                Publish form
+                Save and make live
               </Button>
             </>
           )}

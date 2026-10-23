@@ -6,7 +6,7 @@ import {
 import { ApiBody, ApiCookieAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma } from "@prisma/client";
 import { Database } from "./database.js";
-import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
+import { SessionGuard, TemplateGuard, TemplateReadGuard, type AuthRequest } from "./auth.js";
 import { assignPackSchema, extendPackDeadlineSchema, isPackOverdue, packTemplateSchema, publishPackSchema, updatePackSchema } from "./pack-rules.js";
 
 const packAssignmentInclude = {
@@ -34,6 +34,7 @@ export class PacksService {
 
   async list() {
     const packs = await this.db.packTemplate.findMany({
+      where: { deletedAt: null },
       take: 100, orderBy: { createdAt: "desc" }, include: this.useInclude,
     });
     return packs.map(p => this.withUse(p));
@@ -41,7 +42,7 @@ export class PacksService {
 
   async get(id: string) {
     const pack = await this.db.packTemplate.findUnique({ where: { id }, include: this.useInclude });
-    if (!pack) throw new NotFoundException("Pack not found.");
+    if (!pack || pack.deletedAt) throw new NotFoundException("Pack not found.");
     return this.withUse(pack);
   }
 
@@ -92,18 +93,17 @@ export class PacksService {
     });
   }
 
-  /** Delete a pack that was never given to anyone. */
+  /** Soft-delete a pack: hidden from lists and new assignments; employees who already have it keep it. */
   async remove(actorId: string, id: string) {
     return this.db.$transaction(async tx => {
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PackTemplate" WHERE id = ${id}::uuid FOR UPDATE`;
       if (!locked.length) throw new NotFoundException("Pack not found.");
-      const current = await tx.packTemplate.findUnique({ where: { id }, select: { status: true } });
-      if (current?.status === "PUBLISHED")
+      const current = await tx.packTemplate.findUnique({ where: { id }, select: { status: true, name: true, versionNumber: true, deletedAt: true } });
+      if (!current || current.deletedAt) throw new NotFoundException("Pack not found.");
+      if (current.status === "PUBLISHED")
         throw new ConflictException("This pack is published. Unpublish it first, then delete it.");
-      const pack = await this.toDraft(tx, id);
-      await tx.packItem.deleteMany({ where: { packId: id } });
-      await tx.packTemplate.delete({ where: { id } });
-      await tx.auditEvent.create({ data: { actorId, action: "PACK_DELETED", targetId: id, metadata: { name: pack.name, versionNumber: pack.versionNumber } } });
+      await tx.packTemplate.update({ where: { id }, data: { deletedAt: new Date(), deletedBy: actorId } });
+      await tx.auditEvent.create({ data: { actorId, action: "PACK_DELETED", targetId: id, metadata: { name: current.name, versionNumber: current.versionNumber, soft: true } } });
       await tx.outboxEvent.create({ data: { type: "PACK_DELETED", targetId: id } });
       return { deleted: true };
     });
@@ -270,6 +270,7 @@ export class PacksService {
         const pack = await tx.packTemplate.findUniqueOrThrow({
           where: { id: packId }, include: { items: { orderBy: { position: "asc" } } },
         });
+        if (pack.deletedAt) throw new NotFoundException("Pack not found.");
         if (pack.status !== "PUBLISHED" || pack.items.length === 0)
           throw new ConflictException("Only published nonempty packs can be assigned.");
         // A pack family can have older published versions assigned historically,
@@ -482,7 +483,7 @@ export class PacksService {
 
 @ApiTags("HR packs")
 @ApiCookieAuth("session")
-@UseGuards(SessionGuard, HrGuard)
+@UseGuards(SessionGuard, TemplateReadGuard)
 @Controller("packs")
 export class PacksController {
   constructor(@Inject(PacksService) private readonly packs: PacksService) {}
@@ -522,40 +523,47 @@ export class PacksController {
   @Get(":id")
   @ApiOkResponse({ description: "Get a pack template" })
   get(@Param("id", ParseUUIDPipe) id: string) { return this.packs.get(id); }
+  @UseGuards(TemplateGuard)
   @Put(":id")
   @ApiOkResponse({ description: "Update a revision-checked draft pack" })
   update(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
     @Body() body: unknown) { return this.packs.update(req.actor.id, id, body); }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/versions")
   @ApiCreatedResponse({ description: "Create a new draft version without altering assigned published packs" })
   newVersion(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.newVersion(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/unpublish")
   @ApiCreatedResponse({ description: "Stop offering a published pack; employees who have it keep it" })
   unpublish(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.unpublish(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/reopen")
   @ApiCreatedResponse({ description: "Return an unpublished, never-assigned pack to an editable draft" })
   reopen(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.reopen(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Delete(":id")
   @ApiOkResponse({ description: "Delete a pack that has never been given to an employee" })
   remove(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.remove(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/publish")
   @ApiCreatedResponse({ description: "Publish and lock a completed pack" })
   publish(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
     @Body() body: unknown) { return this.packs.publish(req.actor.id, id, body); }
 
+  @UseGuards(TemplateGuard)
   @Post()
   @ApiCreatedResponse({ description: "Create a draft pack from published forms" })
   @ApiBody({ schema: { type: "object", additionalProperties: true } })

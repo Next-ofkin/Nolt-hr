@@ -469,9 +469,17 @@ export class EmployeesService {
         .strict(),
       query,
     );
+    // Only the newest published version of each form is offered for assigning.
+    const newest = await this.db.formVersion.groupBy({
+      by: ["formId"],
+      where: { status: "PUBLISHED", form: { deletedAt: null } },
+      _max: { version: true },
+    });
     const rows = await this.db.formVersion.findMany({
       where: {
         status: "PUBLISHED",
+        form: { deletedAt: null },
+        OR: newest.map((n) => ({ formId: n.formId, version: n._max.version ?? 0 })),
         ...(q.q
           ? { title: { contains: q.q, mode: "insensitive" as const } }
           : {}),

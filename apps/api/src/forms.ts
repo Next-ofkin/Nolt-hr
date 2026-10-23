@@ -42,7 +42,7 @@ function openapi(schema: z.ZodType): SchemaObject {
   }) as unknown as SchemaObject;
 }
 import { Database } from "./database.js";
-import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
+import { SessionGuard, TemplateGuard, TemplateReadGuard, type AuthRequest } from "./auth.js";
 
 function parse<T>(schema: z.ZodType<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -112,9 +112,9 @@ export function dtoWithUse(row: {
  * Permanent draft deletion is allowed only for a form with exactly one
  * never-published version and no assignment history.
  */
-/** A form can be deleted only while none of its versions was ever sent to an employee or put in a pack. */
-export function canDeleteForm(assignmentCount: number, packItemCount: number): boolean {
-  return assignmentCount === 0 && packItemCount === 0;
+/** A form is soft-deleted, so being sent to employees no longer blocks it. It must first leave every live pack, so new assignments of that pack stay whole. */
+export function canDeleteForm(livePackItemCount: number): boolean {
+  return livePackItemCount === 0;
 }
 export function canDeleteUnpublishedDraft(
   versions: readonly { status: string }[],
@@ -125,6 +125,12 @@ export function canDeleteUnpublishedDraft(
     versions[0].status === "DRAFT" &&
     assignmentCount === 0
   );
+}
+/** Keep a half-filled form's answers for questions that still exist in the new version; drop the rest. */
+export function carryAnswers(answers: unknown, fields: readonly { id: string }[]): Record<string, unknown> {
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return {};
+  const keep = new Set(fields.map((f) => f.id));
+  return Object.fromEntries(Object.entries(answers as Record<string, unknown>).filter(([key]) => keep.has(key)));
 }
 @Injectable()
 export class FormsService {
@@ -149,9 +155,9 @@ export class FormsService {
   private async usage(formIds: string[]) {
     const [a, p, av, pv] = await Promise.all([
       this.db.formAssignment.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
-      this.db.packItem.groupBy({ by: ["formId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formId"], where: { formId: { in: formIds }, pack: { deletedAt: null } } }),
       this.db.formAssignment.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
-      this.db.packItem.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds } } }),
+      this.db.packItem.groupBy({ by: ["formVersionId"], where: { formId: { in: formIds }, pack: { deletedAt: null } } }),
     ]);
     const forms = new Set([...a, ...p].map((r) => r.formId));
     const versions = new Set([...av, ...pv].map((r) => r.formVersionId));
@@ -164,6 +170,7 @@ export class FormsService {
   }
   async list() {
     const forms = await this.db.form.findMany({
+      where: { deletedAt: null },
       take: 100,
       orderBy: { createdAt: "desc" },
       include: { versions: { orderBy: { version: "desc" }, take: 1 } },
@@ -175,11 +182,14 @@ export class FormsService {
   }
   async listPublished() {
     const versions = await this.db.formVersion.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: "PUBLISHED", form: { deletedAt: null } },
       take: 500,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
-    return versions.map((v) => dto(v));
+    // When a form has several published versions, only the newest is offered.
+    const newest = new Map<string, number>();
+    for (const v of versions) newest.set(v.formId, Math.max(newest.get(v.formId) ?? 0, v.version));
+    return versions.filter((v) => newest.get(v.formId) === v.version).map((v) => dto(v));
   }
   async get(id: string) {
     const row = await this.db.formVersion.findUnique({ where: { id } });
@@ -277,6 +287,21 @@ export class FormsService {
       await this.record(tx, actorId, "FORM_PUBLISHED", id, {
         version: row.version,
       });
+      // Employees who have not finished this form see the new version; submitted, signed
+      // and guarantor-sent forms keep the version they used (the database enforces this).
+      const moved = await tx.$queryRaw<{ assignment_id: string }[]>`
+        SELECT assignment_id FROM public.advance_waiting_assignments(${row.formId}::uuid, ${id}::uuid)`;
+      if (moved.length) {
+        const ids = moved.map((m) => m.assignment_id);
+        const fields = row.fields as { id: string }[];
+        const drafts = await tx.employeeResponse.findMany({ where: { assignmentId: { in: ids } } });
+        for (const draft of drafts)
+          await tx.employeeResponse.update({
+            where: { assignmentId: draft.assignmentId },
+            data: { answers: carryAnswers(draft.answers, fields) as Prisma.InputJsonValue, revision: { increment: 1 } },
+          });
+        await this.record(tx, actorId, "FORM_ROLLED_OUT", id, { version: row.version, employees: ids.length, drafts: drafts.length });
+      }
       return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
@@ -299,28 +324,20 @@ export class FormsService {
       return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
-  /** Delete a form and all its versions, but only if no version was ever used. */
+  /** Soft-delete a form: it disappears from lists and new assignments; anything already sent or filled in is kept. */
   async deleteForm(actorId: string, formId: string) {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Form" WHERE id = ${formId}::uuid FOR UPDATE`;
       const form = await tx.form.findUnique({ where: { id: formId }, include: { versions: true } });
-      if (!form) throw new NotFoundException("Form not found.");
-      const [assignments, packItems] = await Promise.all([
-        tx.formAssignment.count({ where: { formId } }),
-        tx.packItem.count({ where: { formId } }),
-      ]);
+      if (!form || form.deletedAt) throw new NotFoundException("Form not found.");
+      const livePackItems = await tx.packItem.count({ where: { formId, pack: { deletedAt: null } } });
       if (form.versions.some((v) => v.status === "PUBLISHED"))
         throw new ConflictException("This form is published. Unpublish it first, then delete it.");
-      if (!canDeleteForm(assignments, packItems))
-        throw new ConflictException(
-          packItems > 0
-            ? "This form is inside a pack, so it cannot be deleted. You can still edit it: packs use the newest published version."
-            : "This form has already been sent to an employee, so its record is kept. Unpublish it instead.",
-        );
+      if (!canDeleteForm(livePackItems))
+        throw new ConflictException("This form is inside a pack. Delete or change that pack first, or edit this form instead.");
       const latest = form.versions.reduce((a, b) => (b.version > a.version ? b : a));
-      await tx.formVersion.deleteMany({ where: { formId } });
-      await tx.form.delete({ where: { id: formId } });
-      await this.record(tx, actorId, "FORM_DELETED", formId, { title: latest.title, versions: form.versions.length });
+      await tx.form.update({ where: { id: formId }, data: { deletedAt: new Date(), deletedBy: actorId } });
+      await this.record(tx, actorId, "FORM_DELETED", formId, { title: latest.title, versions: form.versions.length, soft: true });
       return { deleted: true };
     });
   }
@@ -389,7 +406,7 @@ export class FormsService {
   description:
     "Required for mutations; obtained from the authenticated session",
 })
-@UseGuards(SessionGuard, HrGuard)
+@UseGuards(SessionGuard, TemplateReadGuard)
 @Controller()
 export class FormsController {
   constructor(@Inject(FormsService) private readonly service: FormsService) {}
@@ -403,6 +420,7 @@ export class FormsController {
   listPublished(): Promise<FormDto[]> {
     return this.service.listPublished();
   }
+  @UseGuards(TemplateGuard)
   @Post("forms")
   @ApiCreatedResponse({ type: FormDto })
   @ApiBody({ schema: openapi(createFormSchema) })
@@ -414,6 +432,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.get(id);
   }
+  @UseGuards(TemplateGuard)
   @Put("form-versions/:id")
   @ApiOkResponse({ type: FormDto })
   @ApiBody({ schema: openapi(saveFormSchema) })
@@ -424,6 +443,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.save(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/publish")
   @ApiCreatedResponse({ type: FormDto })
   @ApiBody({ schema: openapi(revisionSchema) })
@@ -434,6 +454,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.publish(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/unpublish")
   @ApiOkResponse({ type: FormDto })
   @ApiBody({ schema: openapi(revisionSchema) })
@@ -444,6 +465,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.unpublish(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/reopen")
   @ApiOkResponse({ type: FormDto })
   reopen(
@@ -453,6 +475,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.reopen(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Delete("forms/:id")
   deleteForm(
     @Req() req: AuthRequest,
@@ -460,6 +483,7 @@ export class FormsController {
   ): Promise<{ deleted: boolean }> {
     return this.service.deleteForm(req.actor.id, id);
   }
+  @UseGuards(TemplateGuard)
   @Post("forms/:id/versions") @ApiCreatedResponse({ type: FormDto }) newVersion(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

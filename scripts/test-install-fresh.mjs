@@ -70,6 +70,35 @@ try {
   await app.end();
   console.log("ok: the app role can read and write its tables but cannot delete audit records or change roles");
 
+  // A newer published form version reaches employees who have not finished, and nobody else.
+  const q = (t, v) => db.query(t, v);
+  const id = () => randomUUID();
+  const f = id(), v1 = id(), v2 = id();
+  await q(`INSERT INTO public."Form"(id,"createdBy") VALUES ($1,$2)`, [f, hr]);
+  await q(`INSERT INTO public."FormVersion"(id,"formId",version,status,title,recipient,fields,"publishedAt") VALUES ($1,$2,1,'PUBLISHED','Details','EMPLOYEE','[]',now())`, [v1, f]);
+  const mk = async (n, userId = null) => { const e = id(), c = id(), a = id();
+    await q(`INSERT INTO public."Employee"(id,"userId","fullName",email,"jobTitle",department,"employmentType","startDate","createdBy") VALUES ($1,$5,$2,$3,'t','d','FULL_TIME',now(),$4)`, [e, "E" + n, `e${n}@new-company.test`, hr, userId]);
+    await q(`INSERT INTO public."OnboardingCase"(id,"employeeId","createdBy") VALUES ($1,$2,$3)`, [c, e, hr]);
+    await q(`INSERT INTO public."FormAssignment"(id,"caseId","formId","formVersionId","assignedBy") VALUES ($1,$2,$3,$4,$5)`, [a, c, f, v1, hr]); return a; };
+  const [waiting, drafting, submitted] = [await mk(1), await mk(2, other), await mk(3)];
+  await q(`INSERT INTO public."EmployeeResponse"("assignmentId",status,answers,"updatedBy") VALUES ($1,'DRAFT','{"x":1}',$2)`, [drafting, other]);
+  await q(`ALTER TABLE public."EmployeeResponse" DISABLE TRIGGER response_guard`);
+  await q(`INSERT INTO public."EmployeeResponse"("assignmentId",status,answers,"updatedBy") VALUES ($1,'SUBMITTED','{"x":2}',$2)`, [submitted, hr]);
+  await q(`ALTER TABLE public."EmployeeResponse" ENABLE TRIGGER response_guard`);
+  await q(`INSERT INTO public."FormVersion"(id,"formId",version,status,title,recipient,fields,"publishedAt") VALUES ($1,$2,2,'PUBLISHED','Details v2','EMPLOYEE','[]',now())`, [v2, f]);
+  await assert.rejects(q(`UPDATE public."FormAssignment" SET "formVersionId"=$1 WHERE id=$2`, [v2, waiting]), /immutable/);
+  const app2 = new pg.Client({ connectionString: appUrl }); await app2.connect();
+  await assert.rejects(app2.query(`UPDATE public."FormAssignment" SET "formVersionId"=$1 WHERE id=$2`, [v2, waiting]), /permission denied/);
+  const moved = (await app2.query(`SELECT assignment_id FROM public.advance_waiting_assignments($1,$2)`, [f, v2])).rows.map((r) => r.assignment_id).sort();
+  await app2.end();
+  assert.deepEqual(moved, [waiting, drafting].sort());
+  const now = Object.fromEntries((await q(`SELECT id,"formVersionId" v FROM public."FormAssignment"`)).rows.map((r) => [r.id, r.v]));
+  assert.equal(now[waiting], v2); assert.equal(now[drafting], v2); assert.equal(now[submitted], v1);
+  console.log("ok: a new form version reaches unstarted and draft forms; a submitted form keeps its version");
+  const anon = await q(`SELECT has_function_privilege('anon','public.advance_waiting_assignments(uuid,uuid)','EXECUTE') a, has_function_privilege('authenticated','public.advance_waiting_assignments(uuid,uuid)','EXECUTE') b`);
+  assert.deepEqual(anon.rows[0], { a: false, b: false });
+  console.log("ok: only the app role can run the roll-out function; the public web API cannot");
+
   const again = spawnSync(process.execPath, ["scripts/install-fresh.mjs"], { encoding: "utf8",
     env: { ...process.env, INSTALL_REHEARSAL: "1", OWNER_DATABASE_URL: url, SUPABASE_URL: `https://${REF}.supabase.co`, BOOTSTRAP_HR_EMAIL: "x@y.test" } });
   assert.notEqual(again.status, 0);

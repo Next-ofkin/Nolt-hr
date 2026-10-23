@@ -10,6 +10,7 @@ test("Role grants separate technical administration and sensitive HR access", ()
   assert.deepEqual(permissionsFor({ role: "DEVELOPER", permissions: [] }), [
     "system.manage",
     "hr.accounts.manage",
+    "templates.manage",
   ]);
   assert.equal(
     permissionsFor({ role: "HR", permissions: [] }).includes("health.read"),
@@ -61,7 +62,14 @@ test("Sign-in throttling is bounded and expires", () => {
 
 test("developer can administer HR accounts without accessing employee or sensitive HR data", () => {
   const grants = permissionsFor({ role: "DEVELOPER", permissions: [] });
-  assert.deepEqual(grants, ["system.manage", "hr.accounts.manage"]);
+  assert.deepEqual(grants, ["system.manage", "hr.accounts.manage", "templates.manage"]);
   for (const forbidden of ["forms.manage", "employees.manage", "reviews.assigned", "health.read", "finance.read"])
     assert.equal(grants.includes(forbidden), false);
+});
+
+test("only the Developer can build forms and packs; HR keeps using them", () => {
+  const hr = permissionsFor({ role: "HR", permissions: [] });
+  assert.equal(hr.includes("templates.manage"), false);
+  assert.equal(hr.includes("forms.manage"), true);
+  assert.equal(permissionsFor({ role: "EMPLOYEE", permissions: ["templates.manage"] }).includes("templates.manage"), false);
 });
