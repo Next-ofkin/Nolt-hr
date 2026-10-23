@@ -19,3 +19,6 @@ coverage/
 test-results/
 playwright-report/
 apps/web/.generated/
+
+# Extra Caddy sites configured on a server (kept out of git)
+deploy/vps/caddy-extra/*.caddy

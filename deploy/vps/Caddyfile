@@ -6,3 +6,7 @@
 	}
 	reverse_proxy web:8080
 }
+
+# Optional extra sites (for example a test copy). Put a *.caddy file in deploy/vps/caddy-extra/ on the server;
+# it is not tracked by git. With no files there, nothing changes.
+import /etc/caddy/extra/*.caddy
