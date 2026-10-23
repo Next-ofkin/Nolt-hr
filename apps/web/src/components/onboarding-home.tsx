@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { idFromSearch } from "@/lib/notices";
 import {
   api,
@@ -12,7 +12,6 @@ import type { components } from "@nolt/api-client/schema";
 import { useAuth } from "./auth-provider";
 import { useQuery } from "@tanstack/react-query";
 import { DeveloperWorkspace } from "./developer-workspace";
-import { FormsWorkspace } from "./forms-workspace";
 import { WorkspaceAccess } from "./workspace-access";
 import { FormPreview } from "./form-preview";
 import { Button } from "./ui/button";
@@ -33,11 +32,17 @@ export function HomeWorkspace() {
         <EmployeeHome />
       </WorkspaceAccess>
     );
+  // HR no longer builds forms or packs (the Developer does). HR works from the Employees page.
   return (
     <WorkspaceAccess>
-      <FormsWorkspace />
+      <HrHomeRedirect />
     </WorkspaceAccess>
   );
+}
+function HrHomeRedirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/employees"); }, [router]);
+  return <p role="status" className="py-12 text-sm text-muted-foreground">Opening employees…</p>;
 }
 function EmployeeHome() {
   const [responseId, setResponseId] = useState<string | null>(null);

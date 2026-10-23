@@ -5,7 +5,7 @@ import { PacksWorkspace } from "@/components/packs-workspace";
 export default function Page() {
   return (
     <WorkspaceShell active="packs">
-      <WorkspaceAccess permission="forms.manage">
+      <WorkspaceAccess permission="templates.manage">
         <PacksWorkspace />
       </WorkspaceAccess>
     </WorkspaceShell>
