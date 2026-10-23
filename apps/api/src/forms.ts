@@ -126,6 +126,12 @@ export function canDeleteUnpublishedDraft(
     assignmentCount === 0
   );
 }
+/** Keep a half-filled form's answers for questions that still exist in the new version; drop the rest. */
+export function carryAnswers(answers: unknown, fields: readonly { id: string }[]): Record<string, unknown> {
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return {};
+  const keep = new Set(fields.map((f) => f.id));
+  return Object.fromEntries(Object.entries(answers as Record<string, unknown>).filter(([key]) => keep.has(key)));
+}
 @Injectable()
 export class FormsService {
   constructor(@Inject(Database) private readonly db: Database) {}
@@ -180,7 +186,10 @@ export class FormsService {
       take: 500,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
-    return versions.map((v) => dto(v));
+    // When a form has several published versions, only the newest is offered.
+    const newest = new Map<string, number>();
+    for (const v of versions) newest.set(v.formId, Math.max(newest.get(v.formId) ?? 0, v.version));
+    return versions.filter((v) => newest.get(v.formId) === v.version).map((v) => dto(v));
   }
   async get(id: string) {
     const row = await this.db.formVersion.findUnique({ where: { id } });
@@ -278,6 +287,21 @@ export class FormsService {
       await this.record(tx, actorId, "FORM_PUBLISHED", id, {
         version: row.version,
       });
+      // Employees who have not finished this form see the new version; submitted, signed
+      // and guarantor-sent forms keep the version they used (the database enforces this).
+      const moved = await tx.$queryRaw<{ assignment_id: string }[]>`
+        SELECT assignment_id FROM public.advance_waiting_assignments(${row.formId}::uuid, ${id}::uuid)`;
+      if (moved.length) {
+        const ids = moved.map((m) => m.assignment_id);
+        const fields = row.fields as { id: string }[];
+        const drafts = await tx.employeeResponse.findMany({ where: { assignmentId: { in: ids } } });
+        for (const draft of drafts)
+          await tx.employeeResponse.update({
+            where: { assignmentId: draft.assignmentId },
+            data: { answers: carryAnswers(draft.answers, fields) as Prisma.InputJsonValue, revision: { increment: 1 } },
+          });
+        await this.record(tx, actorId, "FORM_ROLLED_OUT", id, { version: row.version, employees: ids.length, drafts: drafts.length });
+      }
       return this.view(await tx.formVersion.findUniqueOrThrow({ where: { id } }));
     });
   }
