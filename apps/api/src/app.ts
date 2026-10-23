@@ -36,7 +36,7 @@ import {
   ReviewsController,
   ReviewGuard,
 } from "./responses.js";
-import { AuthController, DeveloperGuard, HrGuard, SessionGuard } from "./auth.js";
+import { AuthController, DeveloperGuard, HrGuard, SessionGuard, TemplateGuard, TemplateReadGuard } from "./auth.js";
 import { FormsController, FormsService } from "./forms.js";
 import { MyPacksController, PacksController, PacksService } from "./packs.js";
 import { Sessions } from "./sessions.js";
@@ -108,6 +108,8 @@ class HealthController {
     SupabaseAuth,
     SessionGuard,
     HrGuard,
+    TemplateGuard,
+    TemplateReadGuard,
     FormsService,
     PacksService,
     EmployeesService,

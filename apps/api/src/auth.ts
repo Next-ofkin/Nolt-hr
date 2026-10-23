@@ -97,6 +97,26 @@ export class HrGuard implements CanActivate {
     return true;
   }
 }
+/** HR staff (to assign and review) or the Developer (who builds them) may read form and pack templates. */
+@Injectable()
+export class TemplateReadGuard implements CanActivate {
+  canActivate(context: import("@nestjs/common").ExecutionContext) {
+    const perms = context.switchToHttp().getRequest<AuthRequest>().actor?.permissions ?? [];
+    if (!perms.includes("forms.manage") && !perms.includes("templates.manage"))
+      throw new ForbiddenException("Form access is required.");
+    return true;
+  }
+}
+/** Only the Developer builds, publishes and deletes form and pack templates. */
+@Injectable()
+export class TemplateGuard implements CanActivate {
+  canActivate(context: import("@nestjs/common").ExecutionContext) {
+    const perms = context.switchToHttp().getRequest<AuthRequest>().actor?.permissions ?? [];
+    if (!perms.includes("templates.manage"))
+      throw new ForbiddenException("Only the Developer can create or change forms and packs.");
+    return true;
+  }
+}
 /** Explicit system-owner guard for HR-account administration only. */
 @Injectable()
 export class DeveloperGuard implements CanActivate {

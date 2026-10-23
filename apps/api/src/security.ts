@@ -10,7 +10,8 @@ const grants: Record<string, string[]> = {
   HR: ["forms.manage", "employees.manage", "reviews.assigned"],
   EMPLOYEE: ["profile.own"],
   // Technical account provisioning must never imply permission to read HR records.
-  DEVELOPER: ["system.manage", "hr.accounts.manage"],
+  // templates.manage builds and deletes form and pack templates only; it never opens an employee's answers.
+  DEVELOPER: ["system.manage", "hr.accounts.manage", "templates.manage"],
 };
 const extraPermissions = new Set(["health.read", "finance.read"]);
 export function permissionsFor(user: { role: string; permissions: string[] }) {

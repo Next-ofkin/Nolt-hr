@@ -42,7 +42,7 @@ function openapi(schema: z.ZodType): SchemaObject {
   }) as unknown as SchemaObject;
 }
 import { Database } from "./database.js";
-import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
+import { SessionGuard, TemplateGuard, TemplateReadGuard, type AuthRequest } from "./auth.js";
 
 function parse<T>(schema: z.ZodType<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -389,7 +389,7 @@ export class FormsService {
   description:
     "Required for mutations; obtained from the authenticated session",
 })
-@UseGuards(SessionGuard, HrGuard)
+@UseGuards(SessionGuard, TemplateReadGuard)
 @Controller()
 export class FormsController {
   constructor(@Inject(FormsService) private readonly service: FormsService) {}
@@ -403,6 +403,7 @@ export class FormsController {
   listPublished(): Promise<FormDto[]> {
     return this.service.listPublished();
   }
+  @UseGuards(TemplateGuard)
   @Post("forms")
   @ApiCreatedResponse({ type: FormDto })
   @ApiBody({ schema: openapi(createFormSchema) })
@@ -414,6 +415,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.get(id);
   }
+  @UseGuards(TemplateGuard)
   @Put("form-versions/:id")
   @ApiOkResponse({ type: FormDto })
   @ApiBody({ schema: openapi(saveFormSchema) })
@@ -424,6 +426,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.save(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/publish")
   @ApiCreatedResponse({ type: FormDto })
   @ApiBody({ schema: openapi(revisionSchema) })
@@ -434,6 +437,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.publish(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/unpublish")
   @ApiOkResponse({ type: FormDto })
   @ApiBody({ schema: openapi(revisionSchema) })
@@ -444,6 +448,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.unpublish(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Post("form-versions/:id/reopen")
   @ApiOkResponse({ type: FormDto })
   reopen(
@@ -453,6 +458,7 @@ export class FormsController {
   ): Promise<FormDto> {
     return this.service.reopen(req.actor.id, id, body);
   }
+  @UseGuards(TemplateGuard)
   @Delete("forms/:id")
   deleteForm(
     @Req() req: AuthRequest,
@@ -460,6 +466,7 @@ export class FormsController {
   ): Promise<{ deleted: boolean }> {
     return this.service.deleteForm(req.actor.id, id);
   }
+  @UseGuards(TemplateGuard)
   @Post("forms/:id/versions") @ApiCreatedResponse({ type: FormDto }) newVersion(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

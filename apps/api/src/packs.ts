@@ -6,7 +6,7 @@ import {
 import { ApiBody, ApiCookieAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma } from "@prisma/client";
 import { Database } from "./database.js";
-import { HrGuard, SessionGuard, type AuthRequest } from "./auth.js";
+import { SessionGuard, TemplateGuard, TemplateReadGuard, type AuthRequest } from "./auth.js";
 import { assignPackSchema, extendPackDeadlineSchema, isPackOverdue, packTemplateSchema, publishPackSchema, updatePackSchema } from "./pack-rules.js";
 
 const packAssignmentInclude = {
@@ -482,7 +482,7 @@ export class PacksService {
 
 @ApiTags("HR packs")
 @ApiCookieAuth("session")
-@UseGuards(SessionGuard, HrGuard)
+@UseGuards(SessionGuard, TemplateReadGuard)
 @Controller("packs")
 export class PacksController {
   constructor(@Inject(PacksService) private readonly packs: PacksService) {}
@@ -522,40 +522,47 @@ export class PacksController {
   @Get(":id")
   @ApiOkResponse({ description: "Get a pack template" })
   get(@Param("id", ParseUUIDPipe) id: string) { return this.packs.get(id); }
+  @UseGuards(TemplateGuard)
   @Put(":id")
   @ApiOkResponse({ description: "Update a revision-checked draft pack" })
   update(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
     @Body() body: unknown) { return this.packs.update(req.actor.id, id, body); }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/versions")
   @ApiCreatedResponse({ description: "Create a new draft version without altering assigned published packs" })
   newVersion(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.newVersion(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/unpublish")
   @ApiCreatedResponse({ description: "Stop offering a published pack; employees who have it keep it" })
   unpublish(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.unpublish(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/reopen")
   @ApiCreatedResponse({ description: "Return an unpublished, never-assigned pack to an editable draft" })
   reopen(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.reopen(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Delete(":id")
   @ApiOkResponse({ description: "Delete a pack that has never been given to an employee" })
   remove(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
     return this.packs.remove(req.actor.id, id);
   }
 
+  @UseGuards(TemplateGuard)
   @Post(":id/publish")
   @ApiCreatedResponse({ description: "Publish and lock a completed pack" })
   publish(@Req() req: AuthRequest, @Param("id", ParseUUIDPipe) id: string,
     @Body() body: unknown) { return this.packs.publish(req.actor.id, id, body); }
 
+  @UseGuards(TemplateGuard)
   @Post()
   @ApiCreatedResponse({ description: "Create a draft pack from published forms" })
   @ApiBody({ schema: { type: "object", additionalProperties: true } })
